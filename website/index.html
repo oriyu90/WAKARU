@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WAKARU — ローカルファーストのAI資料アシスタント / わかる</title>
+<meta name="description" content="WAKARUは、手元の資料を取り込み、閲覧・検索し、根拠（引用）を確認しながらAIで解説や作業成果を作る、ローカルファーストのデスクトップアプリです。開発者: Yuki Orita（折田悠希 / おりたゆうき）。MITライセンス、オープンソース。" />
+<meta name="keywords" content="WAKARU, わかる, ワカル, 折田悠希, おりたゆうき, Yuki Orita, github, ローカルAI, RAG, デスクトップアプリ, オープンソース" />
+<link rel="canonical" href="https://wakaru.pages.dev/" />
+<meta name="robots" content="index, follow" />
+
+<meta property="og:type" content="website" />
+<meta property="og:title" content="WAKARU — ローカルファーストのAI資料アシスタント" />
+<meta property="og:description" content="手元の資料を取り込み、根拠つきでAIに解説させる、オフラインで壊れないローカルファーストのデスクトップアプリ。" />
+<meta property="og:image" content="https://wakaru.pages.dev/assets/icon.png" />
+<meta property="og:url" content="https://wakaru.pages.dev/" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:site" content="@InovateofRIZI" />
+
+<link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32.png" />
+<link rel="apple-touch-icon" href="./assets/icon-128.png" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "WAKARU",
+  "alternateName": "わかる",
+  "operatingSystem": "macOS 11+",
+  "applicationCategory": "ProductivityApplication",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": { "@type": "Person", "name": "Yuki Orita", "alternateName": "折田悠希", "url": "https://oriyu90.github.io/official/" },
+  "license": "https://opensource.org/licenses/MIT",
+  "url": "https://wakaru.pages.dev/",
+  "sameAs": ["https://x.com/InovateofRIZI", "https://github.com/oriyu90/WAKARU"]
+}
+</script>
+
+<style>
+:root{
+  --color-paper:oklch(98.5% 0.004 250);--color-paper-2:oklch(96.5% 0.005 250);--color-paper-3:oklch(94% 0.006 251);
+  --color-rule:oklch(89% 0.008 252);--color-rule-strong:oklch(62% 0.014 253);
+  --color-neutral:oklch(54% 0.012 254);--color-muted:oklch(46% 0.012 255);
+  --color-ink:oklch(34% 0.018 257);--color-ink-strong:oklch(24% 0.020 258);--color-control-ink:oklch(18% 0.020 258);
+  --color-accent:oklch(52% 0.165 256);--color-accent-ink:oklch(99% 0.002 250);--color-accent-weak:oklch(94% 0.028 256);
+  --color-focus:oklch(48% 0.160 256);
+  --font-ui:ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Hiragino Sans","Yu Gothic",sans-serif;
+  --font-reading:"Newsreader",ui-serif,Georgia,"Hiragino Mincho ProN",serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"SF Mono",monospace;
+  --measure:38rem;--page:74rem;
+  --space-3xs:.25rem;--space-2xs:.5rem;--space-xs:.75rem;--space-sm:1rem;--space-md:1.5rem;--space-lg:2.5rem;--space-xl:4rem;--space-2xl:6rem;
+  --radius:6px;--radius-lg:10px;
+  --ease-out:cubic-bezier(.16,1,.3,1);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --color-paper:oklch(16% 0.012 258);--color-paper-2:oklch(19.5% 0.014 258);--color-paper-3:oklch(23% 0.015 258);
+    --color-rule:oklch(31% 0.014 258);--color-rule-strong:oklch(52% 0.016 258);
+    --color-neutral:oklch(62% 0.010 256);--color-muted:oklch(74% 0.008 255);
+    --color-ink:oklch(92% 0.008 255);--color-ink-strong:oklch(97% 0.005 255);--color-control-ink:oklch(100% 0 0);
+    --color-accent:oklch(72% 0.140 256);--color-accent-ink:oklch(17% 0.020 258);--color-accent-weak:oklch(29% 0.055 256);
+    --color-focus:oklch(78% 0.110 256);
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--color-paper);color:var(--color-ink);font-family:var(--font-ui);font-size:16px;line-height:1.6;font-weight:400}
+h1,h2,h3{font-family:var(--font-ui);color:var(--color-ink-strong);line-height:1.2;margin:0}
+p{margin:0}
+a{color:inherit}
+img{max-width:100%;display:block}
+button{font:inherit;cursor:pointer}
+.wrap{max-width:var(--page);margin-inline:auto;padding-inline:var(--space-md)}
+:focus-visible{outline:2px solid var(--color-focus);outline-offset:2px}
+
+.wordmark{font-family:var(--font-mono);font-weight:700;letter-spacing:.02em;text-decoration:none;color:var(--color-ink-strong);font-size:1.05rem;display:inline-flex;align-items:center;gap:.5rem}
+.wordmark img{width:22px;height:22px;border-radius:5px}
+
+header.site{position:sticky;top:0;z-index:10;background:color-mix(in oklch, var(--color-paper) 88%, transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--color-rule)}
+header.site .bar{display:flex;align-items:center;justify-content:space-between;gap:var(--space-sm);padding-block:var(--space-xs)}
+.navlinks{display:flex;align-items:center;gap:var(--space-sm)}
+.navlinks a.textlink{font-size:.9rem;color:var(--color-muted);text-decoration:none}
+.navlinks a.textlink:hover{color:var(--color-ink)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4em;border:none;border-radius:var(--radius);padding:.65rem 1.1rem;font-size:.95rem;font-weight:600;text-decoration:none;transition:background .12s var(--ease-out)}
+.btn-primary{background:var(--color-accent);color:var(--color-accent-ink)}
+.btn-primary:hover{background:color-mix(in oklch, var(--color-accent) 88%, black)}
+.btn-quiet{background:var(--color-paper-3);color:var(--color-control-ink)}
+.btn-quiet:hover{background:var(--color-rule)}
+.btn-sm{padding:.4rem .7rem;font-size:.82rem}
+
+.langswitch{display:flex;gap:2px;background:var(--color-paper-3);border-radius:var(--radius);padding:2px}
+.langswitch button{background:transparent;border:none;color:var(--color-muted);padding:.3rem .55rem;border-radius:4px;font-size:.78rem;font-weight:600;font-family:var(--font-mono)}
+.langswitch button[aria-pressed="true"]{background:var(--color-paper);color:var(--color-ink-strong)}
+
+.hero{padding-block:var(--space-2xl) var(--space-xl)}
+.hero .grid{display:grid;grid-template-columns:1.1fr 1fr;gap:var(--space-xl);align-items:center}
+.kicker{font-family:var(--font-mono);text-transform:uppercase;font-size:.78rem;letter-spacing:.08em;color:var(--color-accent);font-weight:600}
+.hero h1{font-size:clamp(2.1rem,4vw,3.2rem);margin-block:.6rem .9rem;letter-spacing:-.01em}
+.hero .lede{font-size:1.15rem;color:var(--color-muted);max-width:34rem}
+.hero .ctas{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:var(--space-md)}
+.hero .fineprint{margin-top:var(--space-sm);font-size:.82rem;color:var(--color-neutral)}
+
+.mock{border:1px solid var(--color-rule);border-radius:var(--radius-lg);background:var(--color-paper-2);overflow:hidden;box-shadow:0 24px 60px -30px oklch(0% 0 0 / .35)}
+.mock .chrome{display:flex;gap:6px;padding:.6rem .8rem;border-bottom:1px solid var(--color-rule)}
+.mock .chrome span{width:9px;height:9px;border-radius:50%;background:var(--color-rule-strong)}
+.mock .body{display:grid;grid-template-columns:120px 1fr 160px;min-height:280px}
+.mock .col{padding:.9rem;border-right:1px solid var(--color-rule)}
+.mock .col:last-child{border-right:none}
+.mock .bar{height:9px;border-radius:3px;background:var(--color-rule);margin-bottom:8px}
+.mock .bar.short{width:60%}
+.mock .bar.accent{background:var(--color-accent);width:40%}
+.mock .doc{padding:1rem}
+.mock .doc .line{height:8px;border-radius:2px;background:var(--color-rule);margin-bottom:9px}
+.mock .doc .line:nth-child(3n){width:82%}
+.mock .doc .line:nth-child(5n){width:60%}
+.mock .chip{display:inline-block;font-family:var(--font-mono);font-size:.6rem;background:var(--color-accent-weak);color:var(--color-accent);border-radius:99px;padding:.15rem .5rem;margin-bottom:.6rem}
+
+section{padding-block:var(--space-xl)}
+.section-head{max-width:38rem;margin-bottom:var(--space-lg)}
+.section-head h2{font-size:clamp(1.6rem,2.6vw,2.1rem)}
+.section-head p{color:var(--color-muted);margin-top:.6rem;font-size:1.05rem}
+
+.features{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--color-rule);border:1px solid var(--color-rule);border-radius:var(--radius-lg);overflow:hidden}
+.feature{background:var(--color-paper);padding:var(--space-md)}
+.feature .glyph{font-family:var(--font-mono);color:var(--color-accent);font-size:.85rem;margin-bottom:.6rem;display:block}
+.feature h3{font-size:1.05rem;margin-bottom:.4rem}
+.feature p{color:var(--color-muted);font-size:.92rem;line-height:1.55}
+
+.privacy{background:var(--color-paper-2);border-top:1px solid var(--color-rule);border-bottom:1px solid var(--color-rule)}
+.privacy .grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-xl);align-items:start}
+.checklist{list-style:none;margin:0;padding:0;display:grid;gap:.7rem}
+.checklist li{display:flex;gap:.6rem;font-size:.95rem;color:var(--color-ink)}
+.checklist li::before{content:"✓";font-family:var(--font-mono);color:var(--color-accent);font-weight:700;flex:none}
+
+.download .panel{border:1px solid var(--color-rule-strong);border-radius:var(--radius-lg);padding:var(--space-lg);background:var(--color-paper-2);display:grid;grid-template-columns:1fr auto;gap:var(--space-lg);align-items:center}
+.download h2{font-size:1.5rem;margin-bottom:.5rem}
+.download p{color:var(--color-muted)}
+.reqs{margin-top:.9rem;display:flex;flex-wrap:wrap;gap:.5rem}
+.reqs span{font-family:var(--font-mono);font-size:.75rem;background:var(--color-paper-3);color:var(--color-control-ink);padding:.3rem .55rem;border-radius:4px}
+
+.community{text-align:center}
+.community .links{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap;margin-top:var(--space-md)}
+
+footer{border-top:1px solid var(--color-rule);padding-block:var(--space-lg);color:var(--color-muted);font-size:.85rem}
+footer .bar{display:flex;justify-content:space-between;flex-wrap:wrap;gap:var(--space-sm);align-items:center}
+footer a{color:var(--color-muted);text-decoration:underline}
+
+@media (max-width:900px){
+  .hero .grid{grid-template-columns:1fr}
+  .features{grid-template-columns:1fr}
+  .privacy .grid{grid-template-columns:1fr}
+  .download .panel{grid-template-columns:1fr}
+  .mock .body{grid-template-columns:1fr}
+  .mock .col{border-right:none;border-bottom:1px solid var(--color-rule)}
+}
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap bar">
+    <a class="wordmark" href="#top"><img src="./assets/icon-128.png" alt="" /> WAKARU</a>
+    <nav class="navlinks">
+      <a class="textlink" href="#features" data-i18n="nav.features">機能</a>
+      <a class="textlink" href="#privacy" data-i18n="nav.privacy">プライバシー</a>
+      <a class="textlink" href="https://github.com/oriyu90/WAKARU" data-i18n="nav.github">GitHub</a>
+      <div class="langswitch" role="group" aria-label="Language">
+        <button type="button" data-lang="ja">JA</button>
+        <button type="button" data-lang="en">EN</button>
+        <button type="button" data-lang="zh">中文</button>
+        <button type="button" data-lang="pt">PT</button>
+      </div>
+      <a class="btn btn-primary btn-sm" href="https://github.com/oriyu90/WAKARU/releases/latest" data-i18n="nav.download">ダウンロード</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap grid">
+      <div>
+        <span class="kicker" data-i18n="hero.kicker">ローカルファースト・AI資料アシスタント</span>
+        <h1 data-i18n="hero.title">資料を、根拠つきで「わかる」に変える。</h1>
+        <p class="lede" data-i18n="hero.lede">WAKARUは、手元のPDF・音声・動画・スプレッドシートなどを取り込み、閲覧・検索し、引用つきでAIに解説させるローカルファーストのデスクトップアプリです。資料はあなたの端末に留まります。</p>
+        <div class="ctas">
+          <a class="btn btn-primary" href="https://github.com/oriyu90/WAKARU/releases/latest" data-i18n="hero.ctaDownload">macOS版をダウンロード</a>
+          <a class="btn btn-quiet" href="https://github.com/oriyu90/WAKARU" data-i18n="hero.ctaGithub">ソースを見る（GitHub）</a>
+        </div>
+        <p class="fineprint" data-i18n="hero.fineprint">無料・オープンソース（MIT）。現在は Apple Silicon Mac / macOS 11以降のDMGを配布しています。</p>
+      </div>
+      <div class="mock" aria-hidden="true">
+        <div class="chrome"><span></span><span></span><span></span></div>
+        <div class="body">
+          <div class="col">
+            <div class="bar"></div><div class="bar short"></div><div class="bar"></div><div class="bar short"></div><div class="bar"></div>
+          </div>
+          <div class="doc">
+            <div class="line" style="width:70%"></div>
+            <div class="line"></div><div class="line"></div><div class="line"></div>
+            <div class="line" style="width:82%"></div><div class="line"></div>
+          </div>
+          <div class="col">
+            <span class="chip" data-i18n="hero.mockChip">引用 [1]</span>
+            <div class="bar"></div><div class="bar"></div><div class="bar accent"></div><div class="bar short"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-i18n="features.kicker">機能</span>
+        <h2 data-i18n="features.title">資料を読む・探す・使うための一式</h2>
+        <p data-i18n="features.lede">形式を選ばず取り込み、出典を明示したまま、閲覧からAI活用までを一本化します。</p>
+      </div>
+      <div class="features">
+        <div class="feature"><span class="glyph">01</span><h3 data-i18n="features.f1.title">幅広い形式の取り込み</h3><p data-i18n="features.f1.body">PDF・DOCX・PPTX・XLSX/XLS・CSV/TSV・TXT・Markdown・JSON・画像・Webページ・音声・動画に対応。</p></div>
+        <div class="feature"><span class="glyph">02</span><h3 data-i18n="features.f2.title">アプリ自身が描くPDF</h3><p data-i18n="features.f2.body">macOSではPDFKitで直接ページを描画。OS標準ビューアのコントロールドックが資料の上に出ません。</p></div>
+        <div class="feature"><span class="glyph">03</span><h3 data-i18n="features.f3.title">根拠つきのLive Illustrator</h3><p data-i18n="features.f3.body">読んでいるページを逐次解説。すべての回答に引用が付き、根拠が無ければ「根拠なし」と明示します。</p></div>
+        <div class="feature"><span class="glyph">04</span><h3 data-i18n="features.f4.title">Studio（作業領域つきAIチャット）</h3><p data-i18n="features.f4.body">プロジェクトのワークスペースにファイルを生成し、承認制でコマンドを隔離実行。拒否も許可も明確に。</p></div>
+        <div class="feature"><span class="glyph">05</span><h3 data-i18n="features.f5.title">キーワード＋意味検索</h3><p data-i18n="features.f5.body">日本語対応のハイブリッド検索（BM25＋ベクトル）。ローカル埋め込みモデルまたはOpenAI互換APIを選択できます。</p></div>
+        <div class="feature"><span class="glyph">06</span><h3 data-i18n="features.f6.title">多言語・アクセシビリティ</h3><p data-i18n="features.f6.body">日本語・English・简体中文、ライト／ダーク／モノトーム、表示倍率80〜150%、コマンドパレット対応。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="privacy" class="privacy">
+    <div class="wrap grid">
+      <div>
+        <span class="kicker" data-i18n="privacy.kicker">プライバシーと通信</span>
+        <h2 data-i18n="privacy.title">資料はあなたの端末から出ません。</h2>
+        <p style="color:var(--color-muted);margin-top:.6rem" data-i18n="privacy.lede">テレメトリや自動的な資料送信は一切ありません。通信が発生するのは、あなたが実行した操作だけです。</p>
+      </div>
+      <ul class="checklist">
+        <li data-i18n="privacy.p1">APIキーはOSの資格情報ストアに保存され、アプリのDB/設定ファイルには残りません</li>
+        <li data-i18n="privacy.p2">オフラインでも、取り込み済み資料の閲覧・検索・書き出しは動作します</li>
+        <li data-i18n="privacy.p3">通信するのは、登録したAI/MCPサーバーへの接続、URL資料の取り込み、モデルのダウンロード時のみ</li>
+        <li data-i18n="privacy.p4">資料本文・プロンプト・APIキーはアプリのログへ記録されません</li>
+        <li data-i18n="privacy.p5">プロジェクトの原本ファイルはアプリが書き換え・削除しません</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="download" id="download">
+    <div class="wrap">
+      <div class="panel">
+        <div>
+          <h2 data-i18n="download.title">今すぐ試す</h2>
+          <p data-i18n="download.body">GitHub Releaseからダウンロードしてください。ソースコードは公開せず、アプリ本体（DMG）とチェックサムのみを配布します。</p>
+          <div class="reqs">
+            <span data-i18n="download.req1">Apple Silicon Mac</span>
+            <span data-i18n="download.req2">macOS 11以降</span>
+            <span data-i18n="download.req3">未署名（初回起動に確認あり）</span>
+            <span data-i18n="download.req4">MITライセンス</span>
+          </div>
+        </div>
+        <a class="btn btn-primary" href="https://github.com/oriyu90/WAKARU/releases/latest" data-i18n="download.cta">最新版を見る</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="community">
+    <div class="wrap">
+      <span class="kicker" data-i18n="community.kicker">コミュニティ</span>
+      <h2 data-i18n="community.title">不具合報告・お知らせ</h2>
+      <p style="color:var(--color-muted);margin-top:.6rem" data-i18n="community.lede">バグ報告や更新のお知らせはDiscordとXで行っています。</p>
+      <div class="links">
+        <a class="btn btn-quiet" href="https://discord.gg/x7KXhNTD8M" data-i18n="community.discord">Discordに参加</a>
+        <a class="btn btn-quiet" href="https://x.com/InovateofRIZI" data-i18n="community.x">Xでフォロー</a>
+        <a class="btn btn-quiet" href="https://oriyu90.github.io/official/" data-i18n="community.dev">開発者サイト</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap bar">
+    <span data-i18n="footer.license">MIT License — © 2026 Yuki Orita（折田悠希）</span>
+    <span><a href="https://github.com/oriyu90/WAKARU/blob/main/THIRD_PARTY_LICENSES.md" data-i18n="footer.thirdparty">サードパーティライセンス</a> · <a href="https://github.com/oriyu90/WAKARU" data-i18n="footer.source">GitHub</a></span>
+  </div>
+</footer>
+
+<script>
+var translations = {
+  ja: {
+    "nav.features":"機能","nav.privacy":"プライバシー","nav.github":"GitHub","nav.download":"ダウンロード",
+    "hero.kicker":"ローカルファースト・AI資料アシスタント",
+    "hero.title":"資料を、根拠つきで「わかる」に変える。",
+    "hero.lede":"WAKARUは、手元のPDF・音声・動画・スプレッドシートなどを取り込み、閲覧・検索し、引用つきでAIに解説させるローカルファーストのデスクトップアプリです。資料はあなたの端末に留まります。",
+    "hero.ctaDownload":"macOS版をダウンロード","hero.ctaGithub":"ソースを見る（GitHub）",
+    "hero.fineprint":"無料・オープンソース（MIT）。現在は Apple Silicon Mac / macOS 11以降のDMGを配布しています。",
+    "hero.mockChip":"引用 [1]",
+    "features.kicker":"機能","features.title":"資料を読む・探す・使うための一式","features.lede":"形式を選ばず取り込み、出典を明示したまま、閲覧からAI活用までを一本化します。",
+    "features.f1.title":"幅広い形式の取り込み","features.f1.body":"PDF・DOCX・PPTX・XLSX/XLS・CSV/TSV・TXT・Markdown・JSON・画像・Webページ・音声・動画に対応。",
+    "features.f2.title":"アプリ自身が描くPDF","features.f2.body":"macOSではPDFKitで直接ページを描画。OS標準ビューアのコントロールドックが資料の上に出ません。",
+    "features.f3.title":"根拠つきのLive Illustrator","features.f3.body":"読んでいるページを逐次解説。すべての回答に引用が付き、根拠が無ければ「根拠なし」と明示します。",
+    "features.f4.title":"Studio（作業領域つきAIチャット）","features.f4.body":"プロジェクトのワークスペースにファイルを生成し、承認制でコマンドを隔離実行。拒否も許可も明確に。",
+    "features.f5.title":"キーワード＋意味検索","features.f5.body":"日本語対応のハイブリッド検索（BM25＋ベクトル）。ローカル埋め込みモデルまたはOpenAI互換APIを選択できます。",
+    "features.f6.title":"多言語・アクセシビリティ","features.f6.body":"日本語・English・简体中文、ライト／ダーク／モノトーム、表示倍率80〜150%、コマンドパレット対応。",
+    "privacy.kicker":"プライバシーと通信","privacy.title":"資料はあなたの端末から出ません。","privacy.lede":"テレメトリや自動的な資料送信は一切ありません。通信が発生するのは、あなたが実行した操作だけです。",
+    "privacy.p1":"APIキーはOSの資格情報ストアに保存され、アプリのDB/設定ファイルには残りません",
+    "privacy.p2":"オフラインでも、取り込み済み資料の閲覧・検索・書き出しは動作します",
+    "privacy.p3":"通信するのは、登録したAI/MCPサーバーへの接続、URL資料の取り込み、モデルのダウンロード時のみ",
+    "privacy.p4":"資料本文・プロンプト・APIキーはアプリのログへ記録されません",
+    "privacy.p5":"プロジェクトの原本ファイルはアプリが書き換え・削除しません",
+    "download.title":"今すぐ試す","download.body":"GitHub Releaseからダウンロードしてください。ソースコードは公開せず、アプリ本体（DMG）とチェックサムのみを配布します。",
+    "download.req1":"Apple Silicon Mac","download.req2":"macOS 11以降","download.req3":"未署名（初回起動に確認あり）","download.req4":"MITライセンス","download.cta":"最新版を見る",
+    "community.kicker":"コミュニティ","community.title":"不具合報告・お知らせ","community.lede":"バグ報告や更新のお知らせはDiscordとXで行っています。",
+    "community.discord":"Discordに参加","community.x":"Xでフォロー","community.dev":"開発者サイト",
+    "footer.license":"MIT License — © 2026 Yuki Orita（折田悠希）","footer.thirdparty":"サードパーティライセンス","footer.source":"GitHub"
+  },
+  en: {
+    "nav.features":"Features","nav.privacy":"Privacy","nav.github":"GitHub","nav.download":"Download",
+    "hero.kicker":"A local-first AI document assistant",
+    "hero.title":"Turn your documents into answers you can trust.",
+    "hero.lede":"WAKARU ingests your PDFs, audio, video, and spreadsheets, then lets you read, search, and ask AI about them with citations attached to every answer. Your files never leave your machine.",
+    "hero.ctaDownload":"Download for macOS","hero.ctaGithub":"View source on GitHub",
+    "hero.fineprint":"Free and open source (MIT). Currently distributing a DMG for Apple Silicon Mac / macOS 11+.",
+    "hero.mockChip":"Citation [1]",
+    "features.kicker":"Features","features.title":"Everything to read, search, and work with your documents","features.lede":"Ingest any format, keep the source visible, and go from reading to AI assistance in one app.",
+    "features.f1.title":"Broad format support","features.f1.body":"PDF, DOCX, PPTX, XLSX/XLS, CSV/TSV, TXT, Markdown, JSON, images, web pages, audio, and video.",
+    "features.f2.title":"PDF rendered by the app itself","features.f2.body":"On macOS, pages are drawn directly with PDFKit — no OS control dock floating over your document.",
+    "features.f3.title":"Live Illustrator, grounded in citations","features.f3.body":"Explains the page you're reading as you go. Every answer carries a citation, or says plainly there is none.",
+    "features.f4.title":"Studio: an AI chat with a workspace","features.f4.body":"Generates files inside your project workspace and runs commands in an approval-gated sandbox — allow or deny, always explicit.",
+    "features.f5.title":"Keyword + semantic search","features.f5.body":"Hybrid search (BM25 + vectors) with Japanese support. Choose a local embedding model or an OpenAI-compatible API.",
+    "features.f6.title":"Multilingual and accessible","features.f6.body":"Japanese, English, Simplified Chinese; light/dark/monochrome; 80–150% display scale; full command palette.",
+    "privacy.kicker":"Privacy & network use","privacy.title":"Your documents never leave your machine.","privacy.lede":"No telemetry and no automatic uploads. The app only talks to the network when you tell it to.",
+    "privacy.p1":"API keys live in the OS credential store — never in the app's database or settings files",
+    "privacy.p2":"Works fully offline: viewing, searching, and exporting already-ingested sources always work",
+    "privacy.p3":"Network calls happen only for AI/MCP connections you configure, URL ingestion, and model downloads",
+    "privacy.p4":"Document text, prompts, and API keys are never written to the app log",
+    "privacy.p5":"The app never rewrites or deletes your original source files",
+    "download.title":"Try it now","download.body":"Download from GitHub Releases. We publish the app bundle (DMG) and checksums only — the source code stays private.",
+    "download.req1":"Apple Silicon Mac","download.req2":"macOS 11+","download.req3":"Unsigned (a confirmation appears on first launch)","download.req4":"MIT license","download.cta":"See the latest release",
+    "community.kicker":"Community","community.title":"Bug reports & announcements","community.lede":"Bug reports and release announcements happen on Discord and X.",
+    "community.discord":"Join the Discord","community.x":"Follow on X","community.dev":"Developer site",
+    "footer.license":"MIT License — © 2026 Yuki Orita","footer.thirdparty":"Third-party licenses","footer.source":"GitHub"
+  },
+  zh: {
+    "nav.features":"功能","nav.privacy":"隐私","nav.github":"GitHub","nav.download":"下载",
+    "hero.kicker":"本地优先的AI资料助手",
+    "hero.title":"让资料带着依据，变得「一看就懂」。",
+    "hero.lede":"WAKARU 可导入本地的 PDF、音频、视频、表格等资料，进行阅读与搜索，并让AI在附带引用的前提下为你解读。资料始终保留在你的设备上。",
+    "hero.ctaDownload":"下载 macOS 版","hero.ctaGithub":"在 GitHub 查看源码",
+    "hero.fineprint":"免费、开源（MIT）。目前提供 Apple Silicon Mac / macOS 11 及以上的 DMG。",
+    "hero.mockChip":"引用 [1]",
+    "features.kicker":"功能","features.title":"阅读、搜索与使用资料的完整工具","features.lede":"无需在意格式即可导入，来源始终可见，从阅读到AI辅助一气呵成。",
+    "features.f1.title":"广泛的格式支持","features.f1.body":"支持 PDF、DOCX、PPTX、XLSX/XLS、CSV/TSV、TXT、Markdown、JSON、图片、网页、音频与视频。",
+    "features.f2.title":"应用自行渲染 PDF","features.f2.body":"在 macOS 上通过 PDFKit 直接绘制页面，不会有系统自带的控制条浮在资料上方。",
+    "features.f3.title":"有据可查的 Live Illustrator","features.f3.body":"随阅读进度逐段讲解，每个回答都附带引用；若无依据，会明确告知「无依据」。",
+    "features.f4.title":"Studio：带工作区的AI对话","features.f4.body":"在项目工作区中生成文件，命令在沙盒中执行并需要你的批准，允许与拒绝都清晰明了。",
+    "features.f5.title":"关键词 + 语义搜索","features.f5.body":"支持日语的混合搜索（BM25 + 向量）。可选择本地嵌入模型或兼容 OpenAI 的 API。",
+    "features.f6.title":"多语言与无障碍","features.f6.body":"支持日语、英语、简体中文；浅色/深色/单色主题；80%–150%显示缩放；完整命令面板。",
+    "privacy.kicker":"隐私与网络通信","privacy.title":"资料不会离开你的设备。","privacy.lede":"没有遥测，也不会自动上传任何资料。只有在你主动操作时才会发生网络通信。",
+    "privacy.p1":"API 密钥保存在系统凭据库中，不会写入应用的数据库或设置文件",
+    "privacy.p2":"完全离线可用：已导入资料的浏览、搜索与导出始终有效",
+    "privacy.p3":"仅在你配置的 AI/MCP 连接、URL 资料导入、模型下载时才会通信",
+    "privacy.p4":"资料正文、提示词与 API 密钥不会写入应用日志",
+    "privacy.p5":"应用不会改写或删除你的原始资料文件",
+    "download.title":"立即试用","download.body":"请从 GitHub Releases 下载。我们只发布应用本体（DMG）与校验和，不公开源代码。",
+    "download.req1":"Apple Silicon Mac","download.req2":"macOS 11 及以上","download.req3":"未签名（首次启动会有系统提示）","download.req4":"MIT 许可证","download.cta":"查看最新版本",
+    "community.kicker":"社区","community.title":"问题反馈与公告","community.lede":"问题反馈与更新公告发布在 Discord 与 X。",
+    "community.discord":"加入 Discord","community.x":"关注 X","community.dev":"开发者主页",
+    "footer.license":"MIT License — © 2026 Yuki Orita（折田悠希）","footer.thirdparty":"第三方许可声明","footer.source":"GitHub"
+  },
+  pt: {
+    "nav.features":"Recursos","nav.privacy":"Privacidade","nav.github":"GitHub","nav.download":"Baixar",
+    "hero.kicker":"Um assistente de documentos com IA, local-first",
+    "hero.title":"Transforme seus documentos em respostas com fontes.",
+    "hero.lede":"O WAKARU importa seus PDFs, áudios, vídeos e planilhas, permitindo ler, pesquisar e perguntar à IA com citações em cada resposta. Seus arquivos nunca saem do seu computador.",
+    "hero.ctaDownload":"Baixar para macOS","hero.ctaGithub":"Ver código no GitHub",
+    "hero.fineprint":"Gratuito e open source (MIT). Atualmente distribuímos um DMG para Apple Silicon Mac / macOS 11+.",
+    "hero.mockChip":"Citação [1]",
+    "features.kicker":"Recursos","features.title":"Tudo para ler, buscar e trabalhar com seus documentos","features.lede":"Importe qualquer formato, mantenha a fonte visível e vá da leitura à assistência de IA em um só app.",
+    "features.f1.title":"Amplo suporte de formatos","features.f1.body":"PDF, DOCX, PPTX, XLSX/XLS, CSV/TSV, TXT, Markdown, JSON, imagens, páginas web, áudio e vídeo.",
+    "features.f2.title":"PDF renderizado pelo próprio app","features.f2.body":"No macOS, as páginas são desenhadas diretamente com PDFKit — sem a barra de controle do sistema sobre o documento.",
+    "features.f3.title":"Live Illustrator, sempre com fontes","features.f3.body":"Explica a página que você está lendo em tempo real. Toda resposta traz uma citação, ou diz claramente que não há uma.",
+    "features.f4.title":"Studio: um chat de IA com workspace","features.f4.body":"Gera arquivos dentro do workspace do projeto e executa comandos em um sandbox com aprovação — permitir ou negar, sempre explícito.",
+    "features.f5.title":"Busca por palavra-chave + semântica","features.f5.body":"Busca híbrida (BM25 + vetores) com suporte a japonês. Escolha um modelo de embedding local ou uma API compatível com OpenAI.",
+    "features.f6.title":"Multilíngue e acessível","features.f6.body":"Japonês, inglês, chinês simplificado; temas claro/escuro/monocromático; escala de 80–150%; paleta de comandos completa.",
+    "privacy.kicker":"Privacidade e rede","privacy.title":"Seus documentos nunca saem do seu computador.","privacy.lede":"Sem telemetria e sem upload automático. O app só se conecta à rede quando você manda.",
+    "privacy.p1":"As chaves de API ficam no cofre de credenciais do sistema — nunca no banco de dados ou nos arquivos de configuração do app",
+    "privacy.p2":"Funciona totalmente offline: visualizar, buscar e exportar fontes já importadas sempre funciona",
+    "privacy.p3":"Só há tráfego de rede para as conexões de IA/MCP que você configurar, importação por URL e download de modelos",
+    "privacy.p4":"O texto dos documentos, os prompts e as chaves de API nunca são gravados no log do app",
+    "privacy.p5":"O app nunca reescreve ou apaga seus arquivos-fonte originais",
+    "download.title":"Experimente agora","download.body":"Baixe pelo GitHub Releases. Publicamos apenas o app empacotado (DMG) e os checksums — o código-fonte permanece privado.",
+    "download.req1":"Apple Silicon Mac","download.req2":"macOS 11+","download.req3":"Não assinado (uma confirmação aparece na primeira execução)","download.req4":"Licença MIT","download.cta":"Ver a última versão",
+    "community.kicker":"Comunidade","community.title":"Relatos de bugs e novidades","community.lede":"Relatos de bugs e anúncios de versões acontecem no Discord e no X.",
+    "community.discord":"Entrar no Discord","community.x":"Seguir no X","community.dev":"Site do desenvolvedor",
+    "footer.license":"MIT License — © 2026 Yuki Orita","footer.thirdparty":"Licenças de terceiros","footer.source":"GitHub"
+  }
+};
+var htmlLang = { ja:"ja", en:"en", zh:"zh-Hans", pt:"pt" };
+var titles = {
+  ja:"WAKARU — ローカルファーストのAI資料アシスタント / わかる",
+  en:"WAKARU — a local-first AI document assistant",
+  zh:"WAKARU — 本地优先的AI资料助手",
+  pt:"WAKARU — um assistente de documentos com IA, local-first"
+};
+function applyLang(lang){
+  var dict = translations[lang] || translations.ja;
+  document.querySelectorAll("[data-i18n]").forEach(function(el){
+    var key = el.getAttribute("data-i18n");
+    if (dict[key]) el.textContent = dict[key];
+  });
+  document.documentElement.lang = htmlLang[lang] || "ja";
+  document.title = titles[lang] || titles.ja;
+  document.querySelectorAll(".langswitch button").forEach(function(btn){
+    btn.setAttribute("aria-pressed", btn.getAttribute("data-lang") === lang ? "true" : "false");
+  });
+  try { localStorage.setItem("wakaru-lang", lang); } catch (e) {}
+}
+function detectLang(){
+  try {
+    var saved = localStorage.getItem("wakaru-lang");
+    if (saved && translations[saved]) return saved;
+  } catch (e) {}
+  var nav = (navigator.language || "ja").toLowerCase();
+  if (nav.indexOf("zh") === 0) return "zh";
+  if (nav.indexOf("pt") === 0) return "pt";
+  if (nav.indexOf("en") === 0) return "en";
+  return "ja";
+}
+document.querySelectorAll(".langswitch button").forEach(function(btn){
+  btn.addEventListener("click", function(){ applyLang(btn.getAttribute("data-lang")); });
+});
+applyLang(detectLang());
+</script>
+</body>
+</html>
