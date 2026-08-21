@@ -2,7 +2,7 @@
 
 WAKARUは、手元の資料（PDF・DOCX・PPTX・スプレッドシート・画像・音声・動画・Webページなど）を取り込み、閲覧・検索し、根拠（引用）を確認しながらAIに解説や作業成果を作らせる、ローカルファーストのデスクトップアプリです。
 
-[wakaru.pages.dev](https://wakaru.pages.dev/) — 紹介サイト / [Releases](https://github.com/oriyu90/WAKARU/releases) — ダウンロード
+[Studio RIZI / WAKARU](https://studio-rizi.pages.dev/projects/wakaru/) — 紹介サイト / [Releases](https://github.com/oriyu90/WAKARU/releases) — ダウンロード
 
 > このリポジトリでは、アプリ本体（README・ライセンス・紹介サイト）のみを公開しています。ソースコードは非公開です。
 
@@ -52,4 +52,4 @@ MIT License — Copyright (c) 2026 Yuki Orita（折田悠希）。依存ソフ�
 
 - Discord（不具合報告・お知らせ）: [https://discord.gg/x7KXhNTD8M](https://discord.gg/x7KXhNTD8M)
 - X: [https://x.com/InovateofRIZI](https://x.com/InovateofRIZI)
-- 開発者サイト: [https://oriyu90.github.io/official/](https://oriyu90.github.io/official/)
+- 開発者サイト: [https://studio-rizi.pages.dev/](https://studio-rizi.pages.dev/)
