@@ -4,6 +4,7 @@
 //! (fetch + SSRF guard + readable text). Audio / video are Phase 5; PDF/slide
 //! rasterisation is Phase 2 (D-09); Vision analysis of pages/images is Phase 4.
 
+mod av;
 mod image;
 mod office;
 mod pdf;
@@ -84,7 +85,7 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput) -> AppResult<
         [ctx.source_id],
     )?;
 
-    let parsed = parse(kind, input, &dd)?;
+    let parsed = parse(ctx, kind, input, &dd)?;
     let Parsed {
         units,
         page_count,
@@ -196,8 +197,18 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput) -> AppResult<
     })
 }
 
+/// `data_dir` is `<...>/projects/<id>` → up two = the app data dir, where
+/// whisper models live. Threading it through every ingest signature isn't worth
+/// it for the one consumer.
+fn data_dir_of(project_dir: &Path) -> &Path {
+    project_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .unwrap_or(project_dir)
+}
+
 /// Dispatch to the format parser. `dd` is `derived/<sid>/`.
-fn parse(kind: SourceKind, input: &IngestInput, dd: &Path) -> AppResult<Parsed> {
+fn parse(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput, dd: &Path) -> AppResult<Parsed> {
     let file = |input: &IngestInput| -> AppResult<PathBuf> {
         match input {
             IngestInput::File(p) => Ok(p.clone()),
@@ -256,11 +267,9 @@ fn parse(kind: SourceKind, input: &IngestInput, dd: &Path) -> AppResult<Parsed> 
             }
         }
         SourceKind::Audio | SourceKind::Video => {
-            return Err(AppError::new(
-                "SOURCE_UNSUPPORTED_FORMAT",
-                "error.source.unsupported",
-                "audio/video transcription arrives in Phase 5",
-            ))
+            let units = av::parse_av(ctx.app_db, data_dir_of(ctx.project_dir), &file(input)?)?;
+            let n = units.len() as u32;
+            Parsed { page_count: Some(n), ..Parsed::plain(units) }
         }
     })
 }

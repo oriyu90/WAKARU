@@ -172,3 +172,71 @@ mark.hitActive {
   min-width: 3.5rem;
   text-align: end;
 }
+
+/* audio / video preview (P5) */
+.av {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  min-height: 0;
+  overflow-y: auto;
+}
+.avMedia {
+  width: 100%;
+  max-height: 60vh;
+  background: var(--color-paper-3);
+  border-radius: var(--radius-md);
+}
+.avAudio {
+  width: 100%;
+}
+.transcript {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+}
+.seg,
+.segActive {
+  display: flex;
+  gap: var(--space-sm);
+  width: 100%;
+  text-align: start;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--color-ink);
+  padding: var(--space-2xs) var(--space-xs);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.seg:hover,
+.segActive {
+  background: var(--color-paper-2);
+}
+.segActive {
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+.seg:focus-visible,
+.segActive:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: -2px;
+}
+.segTime {
+  flex: none;
+  color: var(--color-neutral);
+  font-size: var(--fs-2xs);
+  padding-top: var(--space-3xs);
+}
+.segText {
+  flex: 1;
+}
+.segEmpty {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  padding: var(--space-xs);
+}

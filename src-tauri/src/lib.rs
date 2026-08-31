@@ -132,6 +132,12 @@ pub fn run() {
             commands::mcp_disconnect,
             commands::mcp_set_tool_policy,
             commands::mcp_server_stderr,
+            commands::whisper_list_models,
+            commands::whisper_disk_check,
+            commands::whisper_download_model,
+            commands::whisper_cancel_download,
+            commands::whisper_delete_model,
+            commands::whisper_select_model,
         ])
         .build(tauri::generate_context!())
         .expect("error while building WAKARU")

@@ -16,6 +16,7 @@ pub mod search;
 pub mod settings;
 pub mod source;
 pub mod studio;
+pub mod transcription;
 pub mod viewer;
 
 pub use job::*;

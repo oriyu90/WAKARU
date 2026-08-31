@@ -68,6 +68,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 rmcp = { version = "2.2.0", features = ["client", "macros", "transport-child-process"] }
+whisper-rs = { version = "0.14", default-features = false, features = ["metal"] }
+symphonia = { version = "0.5.5", features = ["mp3", "aac", "isomp4", "wav", "flac", "ogg"] }
 
 [dev-dependencies]
 tempfile = "3"
@@ -80,4 +82,4 @@ opt-level = "s"
 strip = true
 
 [target."cfg(unix)".dependencies]
-nix = { version = "0.31", features = ["signal", "process"] }
+nix = { version = "0.31", features = ["signal", "process", "fs"] }

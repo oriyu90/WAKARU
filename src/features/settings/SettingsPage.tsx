@@ -10,6 +10,7 @@ import type { UiLanguage } from "../../i18n";
 import i18n from "../../i18n";
 import { AiSettings } from "./AiSettings";
 import { McpSettings } from "./McpSettings";
+import { WhisperSettings } from "./WhisperSettings";
 import { About } from "./About";
 import { Shortcuts } from "./Shortcuts";
 import { ProjectManagement } from "./ProjectManagement";
@@ -125,9 +126,7 @@ export function SettingsPage() {
 
         {section === "ai" && <AiSettings />}
 
-        {section === "transcription" && (
-          <p className={styles.placeholder}>{t("settings.comingIn", { phase: 5 })}</p>
-        )}
+        {section === "transcription" && <WhisperSettings />}
         {section === "mcp" && <McpSettings />}
         {section === "projects" && <ProjectManagement />}
 

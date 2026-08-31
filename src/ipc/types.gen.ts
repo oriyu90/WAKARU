@@ -48,6 +48,8 @@ export type CreateProjectInput = { name: string, description: string | null, col
 
 export type DetailLevel = "simple" | "standard" | "detailed";
 
+export type DiskCheck = { ok: boolean, neededBytes: number, freeBytes: number, };
+
 /**
  * One page/slide/segment/sheet/section returned by `source_get_document`.
  */
@@ -336,6 +338,12 @@ export type Thread = { id: string, scope: string, sourceId: string | null, locat
 
 export type TokenUsage = { promptTokens: number, completionTokens: number, };
 
+/**
+ * One line of a transcript. `start` / `end` are seconds from the top of the
+ * media (AC-5-3, AC-5-8).
+ */
+export type TranscriptSegment = { start: number, end: number, text: string, };
+
 export type Transcription = { 
 /**
  * "base" | "small" | "medium" | "large-v2"
@@ -351,5 +359,28 @@ export type UpdateProjectInput = { id: string, name: string | null, description:
 export type VersionVerdict = "accept" | "migrate" | "warnOpen" | "reject";
 
 export type ViewerTab = { id: string, sourceId: string, kind: SourceKind, name: string, locator: unknown, pinned: boolean, ordinal: number, };
+
+export type WhisperModel = { 
+/**
+ * `"base" | "small" | "medium" | "large-v2"`.
+ */
+name: string, 
+/**
+ * Rough download size, for the pre-flight disk check (AC-5-2).
+ */
+approxBytes: number, downloaded: boolean, 
+/**
+ * SHA-256 of the downloaded file, recorded after the first successful
+ * download (DECISIONS D-15 — no authoritative upstream manifest to pin to).
+ */
+sha256: string | null, 
+/**
+ * Absolute path once downloaded.
+ */
+path: string | null, 
+/**
+ * True for the model currently bound in settings.
+ */
+selected: boolean, };
 
 export type WrittenFile = { path: string, };

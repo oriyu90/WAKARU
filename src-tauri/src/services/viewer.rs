@@ -215,6 +215,14 @@ pub fn source_detail(
             source_id,
             &format!("derived/{source_id}/reader.md"),
         )),
+        // Audio / video play back from the original file via `wakaru-asset://`
+        // (docs/04 §6 — no copy is made).
+        SourceKind::Audio | SourceKind::Video => project_db
+            .query_row("SELECT rel_path FROM sources WHERE id = ?1", [source_id], |r| {
+                r.get::<_, String>(0)
+            })
+            .ok()
+            .map(|rel| crate::services::assets::url(project_id, source_id, &rel)),
         _ => None,
     };
     Ok(SourceDetail {

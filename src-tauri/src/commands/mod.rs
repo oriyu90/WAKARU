@@ -14,6 +14,7 @@ mod settings;
 mod sources;
 mod studio;
 mod viewer;
+mod whisper;
 
 pub use ai::*;
 pub use app::*;
@@ -27,3 +28,4 @@ pub use settings::*;
 pub use sources::*;
 pub use studio::*;
 pub use viewer::*;
+pub use whisper::*;

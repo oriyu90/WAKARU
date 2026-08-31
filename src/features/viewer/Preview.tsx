@@ -433,8 +433,90 @@ export function Preview({
       ? <SheetPreview projectId={projectId} tab={tab} />
       : <ReadingPreview projectId={projectId} detail={d} />;
   }
-  // doc / audio / video fall back to the canonical markdown.
+  if ((d.kind === "audio" || d.kind === "video") && d.primaryAssetUrl) {
+    return <AvPreview projectId={projectId} detail={d} />;
+  }
+  // doc falls back to the canonical markdown.
   return <ReadingPreview projectId={projectId} detail={d} />;
+}
+
+/* ───────────────────────── audio / video ───────────────────────── */
+
+function parseTs(title: string | null): number {
+  const m = (title ?? "").match(/(\d+):(\d\d)/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : 0;
+}
+
+function AvPreview({ projectId, detail }: { projectId: string; detail: SourceDetail }) {
+  const { t } = useTranslation();
+  const mediaRef = useRef<HTMLMediaElement>(null);
+  const [now, setNow] = useState(0);
+  const total = detail.pageCount ?? 1;
+
+  const segs = useQuery({
+    queryKey: ["av-transcript", projectId, detail.id, total],
+    queryFn: () =>
+      Promise.all(
+        Array.from({ length: total }, (_, i) =>
+          documentApi.get(projectId, detail.id, i),
+        ),
+      ),
+  });
+
+  const seek = (sec: number) => {
+    const el = mediaRef.current;
+    if (!el) return;
+    el.currentTime = sec;
+    void el.play();
+  };
+
+  return (
+    <div className={styles.av}>
+      {detail.kind === "video" ? (
+        <video
+          ref={mediaRef as React.RefObject<HTMLVideoElement>}
+          className={styles.avMedia}
+          src={detail.primaryAssetUrl ?? undefined}
+          controls
+          onTimeUpdate={(e) => setNow(e.currentTarget.currentTime)}
+        />
+      ) : (
+        <audio
+          ref={mediaRef as React.RefObject<HTMLAudioElement>}
+          className={styles.avAudio}
+          src={detail.primaryAssetUrl ?? undefined}
+          controls
+          onTimeUpdate={(e) => setNow(e.currentTarget.currentTime)}
+        />
+      )}
+
+      {segs.isLoading ? (
+        <LoadingRows />
+      ) : (
+        <ol className={styles.transcript}>
+          {(segs.data ?? []).map((doc) => {
+            const start = parseTs(doc.title);
+            const active = now >= start && now < start + 30;
+            return (
+              <li key={doc.ordinal}>
+                <button
+                  type="button"
+                  className={active ? styles.segActive : styles.seg}
+                  onClick={() => seek(start)}
+                >
+                  <span className={`${styles.segTime} u-mono-nums`}>{doc.title}</span>
+                  <span className={styles.segText}>{doc.text}</span>
+                </button>
+              </li>
+            );
+          })}
+          {(segs.data ?? []).length === 0 ? (
+            <li className={styles.segEmpty}>{t("viewer.noTranscript")}</li>
+          ) : null}
+        </ol>
+      )}
+    </div>
+  );
 }
 
 /* ───────────────────────── helpers ───────────────────────── */

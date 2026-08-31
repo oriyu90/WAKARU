@@ -213,7 +213,8 @@
     "sourceList": "ソース一覧",
     "illustrator": "ライブ解説",
     "illustratorHandle": "ライブ解説を開く",
-    "illustratorSoon": "ライブ解説は Phase 4 で実装されます。"
+    "illustratorSoon": "ライブ解説は Phase 4 で実装されます。",
+    "noTranscript": "文字起こしがありません。"
   },
   "ai": {
     "connections": "接続先",
@@ -376,5 +377,12 @@
     "deleteOne": "「{{name}}」を完全に削除します。元に戻せません。プロジェクト名を入力して確認してください。",
     "deleteManyLabel": "{{count}}件を完全に削除します。件数（数字）を入力してください。",
     "embeddingsNote": "エクスポートには埋め込みベクトルは含めません。インポート先で自動的に再計算されます。"
+  },
+  "whisper": {
+    "intro": "Whisper モデルは音声・動画をローカルで文字起こしします。1 つ選んでダウンロードしてください。大きいモデルほど遅いですが精度が上がります。",
+    "selected": "使用中",
+    "use": "使う",
+    "download": "ダウンロード",
+    "diskShort": "ディスク残量が不足しています。約 {{needed}} 必要、空き {{free}}。"
   }
 }
