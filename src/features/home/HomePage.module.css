@@ -1,0 +1,13 @@
+.page {
+  padding: var(--space-xl) var(--space-xl) var(--space-2xl);
+}
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+.title {
+  font-size: var(--fs-2xl);
+}

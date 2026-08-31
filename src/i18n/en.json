@@ -1,0 +1,64 @@
+{
+  "app": {
+    "name": "WAKARU",
+    "menu": "Menu",
+    "openSidebar": "Open sidebar",
+    "closeSidebar": "Close sidebar",
+    "tagline": "Make the page you're reading make sense."
+  },
+  "nav": {
+    "home": "Home",
+    "fileModifier": "File Modifier",
+    "search": "Search",
+    "settings": "Settings",
+    "projects": "Projects"
+  },
+  "palette": {
+    "title": "Command palette",
+    "placeholder": "Jump to a project, source or tab…"
+  },
+  "home": {
+    "title": "Projects",
+    "newProject": "New project",
+    "empty": {
+      "title": "No projects yet",
+      "body": "A project is where your sources live. Once you make one, drop in PDFs, images, audio and more.",
+      "cta": "Get started",
+      "import": "Import from ZIP"
+    }
+  },
+  "fileModifier": {
+    "title": "File Modifier",
+    "subtitle": "One-off conversions that don't belong to a project."
+  },
+  "search": {
+    "title": "Search",
+    "placeholder": "Search across every project"
+  },
+  "settings": {
+    "title": "Settings"
+  },
+  "common": {
+    "loading": "Loading",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "close": "Close",
+    "save": "Save",
+    "saved": "Saved",
+    "details": "Details"
+  },
+  "states": {
+    "queued": "Queued",
+    "analyzing": "Analyzing",
+    "ready": "Ready",
+    "readyPartial": "Partly ready",
+    "failed": "Failed"
+  },
+  "errors": {
+    "internal": "Something went wrong. Please try again.",
+    "db": "Reading or writing data failed.",
+    "io": "Reading or writing a file failed.",
+    "offline": "This needs a network connection or an AI endpoint set up.",
+    "backendUnavailable": "Can't reach the backend. Restart the app."
+  }
+}

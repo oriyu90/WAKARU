@@ -1,0 +1,177 @@
+/* Hallmark · genre: modern-minimal · macrostructure: Workbench · design-system: design.md · designed-as-app */
+
+.shell {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-paper);
+}
+
+/* ─── Top bar — the dark origin of the eye ─────────────────────────────── */
+.topBar {
+  flex: none;
+  height: var(--toolbar-height);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding-inline: var(--space-xs) var(--space-sm);
+  background: var(--topbar);
+  color: var(--topbar-ink);
+  border-bottom: var(--rule-1) solid oklch(0% 0 0 / 0.2);
+}
+.topBar .wordmark {
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--tracking-tight);
+  font-size: var(--fs-md);
+}
+.topBar .tagline {
+  font-size: var(--fs-2xs);
+  color: color-mix(in oklab, var(--topbar-ink) 62%, transparent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spacer {
+  flex: 1;
+}
+.kbd {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-sm);
+  border: var(--rule-1) solid color-mix(in oklab, var(--topbar-ink) 30%, transparent);
+  color: color-mix(in oklab, var(--topbar-ink) 78%, transparent);
+}
+.topBar :global(button),
+.topAction {
+  color: var(--topbar-ink);
+}
+.topAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  border-radius: var(--radius-md);
+}
+@media (hover: hover) {
+  .topAction:hover {
+    background: color-mix(in oklab, var(--topbar-ink) 12%, transparent);
+  }
+}
+.topActionActive {
+  color: var(--color-accent);
+}
+
+/* ─── Body: content + overlay sidebar ─────────────────────────────────── */
+.body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+
+/* The sidebar overlays; it never pushes the content (FR-N1). */
+.sidebar {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  z-index: var(--z-dropdown);
+  inline-size: var(--sidebar-width);
+  display: flex;
+  flex-direction: column;
+  background: var(--overlay-panel);
+  backdrop-filter: blur(16px) saturate(1.1);
+  border-inline-end: var(--rule-1) solid var(--color-rule);
+  transform: translateX(-100%);
+  transition: transform var(--dur-long) var(--ease-out);
+}
+.sidebar[data-open="true"] {
+  transform: translateX(0);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .sidebar {
+    background: var(--color-paper-2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition-duration: var(--dur-reduced);
+  }
+}
+
+.navTop,
+.navBottom {
+  flex: none;
+  padding: var(--space-xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+}
+.navTop {
+  border-bottom: var(--rule-1) solid var(--color-rule);
+}
+.navBottom {
+  border-top: var(--rule-1) solid var(--color-rule);
+}
+.navProjects {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-xs);
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  height: var(--row-height);
+  padding-inline: var(--space-xs);
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  font-size: var(--fs-sm);
+  font-weight: var(--weight-medium);
+}
+@media (hover: hover) {
+  .navItem:hover {
+    background: var(--color-paper-3);
+    text-decoration: none;
+  }
+}
+.navItem:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: -2px;
+}
+.navItemActive {
+  color: var(--color-accent);
+  background: var(--color-accent-weak);
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: calc(var(--z-dropdown) - 1);
+  border: none;
+  padding: 0;
+  background: var(--overlay-scrim);
+  opacity: 0;
+  pointer-events: none;
+  cursor: default;
+  transition: opacity var(--dur-long) var(--ease-out);
+}
+.scrim[data-open="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scrim {
+    transition-duration: var(--dur-reduced);
+  }
+}

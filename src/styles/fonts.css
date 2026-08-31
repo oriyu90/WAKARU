@@ -1,0 +1,18 @@
+/* Latin faces are bundled (offline-first, I-2). CJK is taken from the platform —
+ * bundling three CJK families would break NFR-7 (docs/07 §2.4).
+ *
+ * @fontsource packages ship the WOFF2 + @font-face; we import the subsets we use.
+ * `font-display: swap` and metric-matched fallbacks come from those packages.
+ */
+
+/* UI / display — Geist (variable) */
+@import "@fontsource-variable/geist/index.css";
+
+/* Machine strings — JetBrains Mono (variable) */
+@import "@fontsource-variable/jetbrains-mono/index.css";
+
+/* Reading surface — Spectral (roman + italic, the weights design.md names) */
+@import "@fontsource/spectral/400.css";
+@import "@fontsource/spectral/500.css";
+@import "@fontsource/spectral/600.css";
+@import "@fontsource/spectral/400-italic.css";

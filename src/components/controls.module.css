@@ -1,0 +1,297 @@
+/* Shared control surface. Every interactive primitive here honours the 8-state
+ * contract (docs/06 §9.1). Border width is constant across all states — state
+ * goes to background / outline / colour, never to geometry. */
+
+.control {
+  --_bg: var(--color-paper);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  height: var(--control-h);
+  padding: 0 var(--space-md);
+  border: var(--rule-1) solid var(--color-rule-strong);
+  border-radius: var(--radius-md);
+  background: var(--_bg);
+  color: var(--color-ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  outline: var(--focus-ring) solid transparent; /* reserved slot — no shift on focus */
+  outline-offset: var(--focus-offset);
+  transition:
+    background-color var(--dur-micro) var(--ease-out),
+    color var(--dur-micro) var(--ease-out),
+    border-color var(--dur-micro) var(--ease-out),
+    transform var(--dur-micro) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .control:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-paper-2);
+  }
+}
+
+.control:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: translateY(0.5px);
+  background: var(--color-paper-3);
+}
+
+.control:focus-visible {
+  outline-color: var(--color-focus);
+}
+
+.control:disabled,
+.control[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ─ Variants ─ */
+.primary {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: var(--weight-strong);
+}
+@media (hover: hover) {
+  .primary:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-accent-weak);
+  }
+}
+.primary:active:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--color-accent-weak);
+}
+
+.secondary {
+  /* base .control already is this */
+}
+
+.quiet {
+  border-color: transparent;
+  background: transparent;
+}
+@media (hover: hover) {
+  .quiet:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-paper-2);
+  }
+}
+
+.danger {
+  border-color: var(--color-rule-strong);
+  color: var(--color-danger);
+}
+@media (hover: hover) {
+  .danger:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: color-mix(in oklab, var(--color-danger) 8%, var(--color-paper));
+  }
+}
+
+.iconBtn {
+  width: var(--control-h);
+  padding: 0;
+  position: relative;
+}
+.iconBtn::before {
+  /* expand hit target to --hit-min without changing visual size */
+  content: "";
+  position: absolute;
+  inset: calc((var(--control-h) - var(--hit-min)) / 2);
+}
+.iconBtn.small {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.small {
+  height: 1.75rem;
+  padding: 0 var(--space-sm);
+  font-size: var(--fs-xs);
+}
+
+.block {
+  display: flex;
+  width: 100%;
+}
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+.spinnerSlot {
+  display: inline-flex;
+  width: var(--spinner-size);
+}
+
+/* ─ Text inputs ─ */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+.fieldLabel {
+  font-size: var(--fs-xs);
+  font-weight: var(--weight-medium);
+  color: var(--color-ink);
+}
+.fieldHint {
+  min-height: 1lh;
+  font-size: var(--fs-2xs);
+  color: var(--color-muted);
+}
+.fieldHint.error {
+  color: var(--color-danger);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+.input {
+  height: var(--control-h);
+  width: 100%;
+  padding: 0 var(--space-sm);
+  border: var(--rule-1) solid var(--color-rule-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-3);
+  color: var(--color-ink-strong);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  outline: var(--focus-ring) solid transparent;
+  outline-offset: 1px;
+  transition:
+    background-color var(--dur-micro) var(--ease-out),
+    border-color var(--dur-micro) var(--ease-out);
+}
+.input::placeholder {
+  color: var(--color-muted);
+}
+@media (hover: hover) {
+  .input:hover:not(:disabled) {
+    background: var(--color-paper-2);
+  }
+}
+.input:focus-visible {
+  outline-color: var(--color-focus);
+  border-color: var(--color-ink-strong);
+}
+.input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.input[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+.textarea {
+  composes: input;
+  height: auto;
+  min-height: 6rem;
+  padding: var(--space-xs) var(--space-sm);
+  line-height: var(--lh-normal);
+  resize: vertical;
+}
+
+.select {
+  composes: input;
+  padding-right: var(--space-xl);
+  appearance: none;
+  background-image: linear-gradient(
+      45deg,
+      transparent 50%,
+      var(--color-neutral) 50%
+    ),
+    linear-gradient(135deg, var(--color-neutral) 50%, transparent 50%);
+  background-position:
+    calc(100% - 1rem) 55%,
+    calc(100% - 0.72rem) 55%;
+  background-size:
+    0.28rem 0.28rem,
+    0.28rem 0.28rem;
+  background-repeat: no-repeat;
+}
+
+/* ─ Checkbox / switch ─ */
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  min-height: var(--hit-min);
+}
+.check input {
+  inline-size: 1.05rem;
+  block-size: 1.05rem;
+  accent-color: var(--color-accent);
+}
+.check input:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: 2px;
+}
+.check input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.switch {
+  --_w: 2.4rem;
+  --_h: 1.35rem;
+  position: relative;
+  inline-size: var(--_w);
+  block-size: var(--_h);
+  flex: none;
+}
+.switch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.switchTrack {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-rule-strong);
+  transition: background-color var(--dur-short) var(--ease-in-out);
+}
+.switchThumb {
+  position: absolute;
+  inset-block: 0.15rem;
+  inset-inline-start: 0.15rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--color-paper);
+  transition: transform var(--dur-short) var(--ease-in-out);
+}
+.switch input:checked ~ .switchTrack {
+  background: var(--color-accent);
+}
+.switch input:checked ~ .switchThumb {
+  transform: translateX(calc(var(--_w) - var(--_h)));
+}
+.switch input:focus-visible ~ .switchTrack {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: 2px;
+}
+.switch input:disabled ~ .switchTrack {
+  opacity: 0.55;
+}
+
+/* ─ Slider ─ */
+.slider {
+  inline-size: 100%;
+  accent-color: var(--color-accent);
+  block-size: var(--hit-min);
+}
+.slider:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.fieldRequired {
+  color: var(--color-danger);
+}

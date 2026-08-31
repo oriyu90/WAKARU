@@ -1,0 +1,57 @@
+.dialog {
+  width: var(--dialog-width);
+  max-width: calc(100vw - var(--space-xl));
+  max-height: min(80vh, 40rem);
+  margin: auto;
+  padding: 0;
+  border: var(--rule-1) solid var(--color-rule-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-overlay);
+}
+.dialog::backdrop {
+  background: var(--overlay-scrim);
+}
+.dialog[open] {
+  animation: dialog-in var(--dur-long) var(--ease-out);
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dialog[open] {
+    animation: none;
+  }
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+}
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-md) var(--space-sm);
+  border-bottom: var(--rule-1) solid var(--color-rule);
+}
+.title {
+  font-size: var(--fs-lg);
+}
+.body {
+  padding: var(--space-md);
+  overflow-y: auto;
+}
+.foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+  border-top: var(--rule-1) solid var(--color-rule);
+}

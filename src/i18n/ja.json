@@ -1,0 +1,64 @@
+{
+  "app": {
+    "name": "WAKARU",
+    "menu": "メニュー",
+    "openSidebar": "サイドバーを開く",
+    "closeSidebar": "サイドバーを閉じる",
+    "tagline": "見ているそのページを、わかるように。"
+  },
+  "nav": {
+    "home": "ホーム",
+    "fileModifier": "ファイル変換",
+    "search": "検索",
+    "settings": "設定",
+    "projects": "プロジェクト"
+  },
+  "palette": {
+    "title": "コマンドパレット",
+    "placeholder": "プロジェクト・ソース・タブへ移動…"
+  },
+  "home": {
+    "title": "プロジェクト",
+    "newProject": "新規プロジェクト",
+    "empty": {
+      "title": "まだプロジェクトがありません",
+      "body": "資料をまとめる場所を作ります。作成後、PDF・画像・音声などをそのまま取り込めます。",
+      "cta": "はじめる",
+      "import": "ZIPからインポート"
+    }
+  },
+  "fileModifier": {
+    "title": "ファイル変換",
+    "subtitle": "プロジェクトに属さない単発の変換。"
+  },
+  "search": {
+    "title": "検索",
+    "placeholder": "すべてのプロジェクトを横断して検索"
+  },
+  "settings": {
+    "title": "設定"
+  },
+  "common": {
+    "loading": "読み込み中",
+    "retry": "再試行",
+    "cancel": "キャンセル",
+    "close": "閉じる",
+    "save": "保存",
+    "saved": "保存済み",
+    "details": "詳細"
+  },
+  "states": {
+    "queued": "待機中",
+    "analyzing": "解析中",
+    "ready": "完了",
+    "readyPartial": "一部のみ完了",
+    "failed": "失敗"
+  },
+  "errors": {
+    "internal": "問題が発生しました。もう一度お試しください。",
+    "db": "データの読み書きに失敗しました。",
+    "io": "ファイルの読み書きに失敗しました。",
+    "offline": "この操作にはネットワークまたはAI接続の設定が必要です。",
+    "backendUnavailable": "バックエンドに接続できません。アプリを再起動してください。"
+  }
+}

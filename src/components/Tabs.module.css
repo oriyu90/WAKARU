@@ -1,0 +1,77 @@
+.list {
+  display: flex;
+  align-items: center;
+}
+
+.tab {
+  appearance: none;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--color-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color var(--dur-micro) var(--ease-out),
+    background-color var(--dur-micro) var(--ease-out);
+}
+.tab:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Underline strip — file tabs. Thin weight, underline shows selection. */
+.underline {
+  gap: var(--space-md);
+  height: var(--tab-height);
+  border-bottom: var(--rule-1) solid var(--color-rule);
+}
+.underline .tab {
+  height: 100%;
+  padding: 0 var(--space-3xs);
+  font-size: var(--fs-sm);
+  font-weight: var(--weight-body);
+  border-bottom: 2px solid transparent;
+}
+@media (hover: hover) {
+  .underline .tab:hover {
+    color: var(--color-ink);
+  }
+}
+.underline .tab[aria-selected="true"] {
+  color: var(--color-ink-strong);
+  border-bottom-color: var(--color-accent);
+}
+
+/* Segmented — pane switch. Bold, background shows selection, no underline. */
+.segmented {
+  gap: var(--space-3xs);
+  padding: var(--space-3xs);
+  background: var(--color-paper-3);
+  border-radius: var(--radius-md);
+}
+.segmented .tab {
+  padding: var(--space-2xs) var(--space-md);
+  font-size: var(--fs-sm);
+  font-weight: var(--weight-medium);
+  border-radius: var(--radius-sm);
+}
+@media (hover: hover) {
+  .segmented .tab:hover {
+    color: var(--color-ink);
+  }
+}
+.segmented .tab[aria-selected="true"] {
+  color: var(--color-ink-strong);
+  background: var(--color-paper);
+  box-shadow: var(--shadow-whisper);
+}
+
+.panel {
+  min-height: 0;
+}
+.panel:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: -2px;
+}

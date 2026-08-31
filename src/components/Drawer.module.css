@@ -1,0 +1,22 @@
+.drawer {
+  flex: none;
+  block-size: 100%;
+  inline-size: 0;
+  overflow: hidden;
+  background: var(--color-paper);
+  transition: inline-size var(--dur-long) var(--ease-out);
+}
+.drawer[data-side="right"] {
+  border-inline-start: var(--rule-1) solid var(--color-rule);
+}
+.drawer[data-side="left"] {
+  border-inline-end: var(--rule-1) solid var(--color-rule);
+}
+.drawer[data-open="true"] {
+  inline-size: 24rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer {
+    transition-duration: var(--dur-reduced);
+  }
+}

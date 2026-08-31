@@ -1,0 +1,20 @@
+.wrap {
+  position: relative;
+  display: inline-flex;
+}
+.tip {
+  position: absolute;
+  inset-block-start: calc(100% + var(--space-2xs));
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-tooltip);
+  max-width: 16rem;
+  padding: var(--space-2xs) var(--space-xs);
+  border-radius: var(--radius-sm);
+  background: var(--color-ink-strong);
+  color: var(--color-paper);
+  font-size: var(--fs-2xs);
+  line-height: var(--lh-normal);
+  white-space: normal;
+  pointer-events: none;
+}

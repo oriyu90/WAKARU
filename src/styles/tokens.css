@@ -1,0 +1,175 @@
+/* Hallmark · genre: modern-minimal · macrostructure: Workbench · design-system: design.md · designed-as-app
+ *
+ * The locked system lives in ../../design.md — read it before changing anything here.
+ * Every colour, space and type value the app uses is defined in this file. Components
+ * reference them with var() only; a raw colour or px outside this file is a bug that
+ * `npm run lint` (scripts/check-design-rules.mjs) will flag.
+ *
+ * Contrast is verified by `npm run check:contrast`, not by eye.
+ */
+
+:root {
+  /* ─── Spacing · 4pt scale, named by role ─────────────────────────────── */
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+
+  /* ─── Density ────────────────────────────────────────────────────────── */
+  --pad-control: var(--space-xs) var(--space-sm);
+  --gap-tight: var(--space-2xs);
+  --gap-default: var(--space-xs);
+  --control-h: 2.25rem;
+  --row-height: 2rem;
+  --tab-height: 2.25rem;
+  --toolbar-height: 2.75rem;
+  --hit-min: 2.75rem;
+
+  /* ─── Measures ───────────────────────────────────────────────────────── */
+  --sidebar-width: 17rem;
+  --content-measure: 66ch;
+  --dialog-width: 32rem;
+  --toast-width: 22rem;
+  --spinner-size: 1rem;
+  --spinner-rule: 0.125rem;
+
+  /* ─── Rules, radii, rings ────────────────────────────────────────────── */
+  --rule-1: 1px;
+  --focus-ring: 2px;
+  --focus-offset: 2px;
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 9px;
+  --radius-pill: 999px;
+
+  /* ─── Elevation · one shadow, never stacked ──────────────────────────── */
+  --shadow-whisper: 0 1px 2px oklch(28% 0.02 70 / 0.06);
+  --shadow-overlay: 0 10px 30px oklch(28% 0.02 70 / 0.16);
+
+  /* ─── Z-index · six named levels ─────────────────────────────────────── */
+  --z-base: 1;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+
+  /* ─── Motion ─────────────────────────────────────────────────────────── */
+  --dur-micro: 120ms;
+  --dur-short: 200ms;
+  --dur-long: 380ms;
+  --dur-reduced: 1ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* ─── Typography · 2 + 1 ─────────────────────────────────────────────── */
+  --font-ui: "Geist Variable", "Hiragino Kaku Gothic ProN", "Yu Gothic UI",
+    "Noto Sans JP", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-read: "Spectral", "Hiragino Mincho ProN", "Yu Mincho",
+    "Noto Serif JP", "Songti SC", Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", "SFMono-Regular", ui-monospace, monospace;
+
+  --fs-2xs: 0.6875rem;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.375rem;
+  --fs-2xl: 1.75rem;
+
+  --lh-tight: 1.22;
+  --lh-normal: 1.5;
+  --lh-relaxed: 1.72;
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-label: 0.06em;
+
+  --weight-body: 400;
+  --weight-medium: 560;
+  --weight-strong: 640;
+}
+
+/* ─── Light · anchor hue 70 (warm oat) ─────────────────────────────────── */
+:root,
+:root[data-theme="light"] {
+  --color-paper: oklch(98.6% 0.006 70);
+  --color-paper-2: oklch(96.6% 0.008 70);
+  --color-paper-3: oklch(93.8% 0.010 68);
+  --color-rule: oklch(88% 0.012 66);
+  --color-rule-strong: oklch(61% 0.016 64);
+  --color-neutral: oklch(56% 0.014 62);
+  --color-muted: oklch(45% 0.014 60);
+  --color-ink: oklch(32% 0.018 58);
+  --color-ink-strong: oklch(22% 0.020 56);
+
+  --color-accent: oklch(55% 0.152 40);
+  --color-accent-ink: oklch(99% 0.002 70);
+  --color-accent-weak: oklch(94% 0.030 45);
+  --color-focus: oklch(52% 0.150 40);
+
+  --color-success: oklch(52% 0.115 150);
+  --color-warning: oklch(60% 0.120 75);
+  --color-danger: oklch(53% 0.180 25);
+
+  --overlay-scrim: oklch(28% 0.02 70 / 0.30);
+  --overlay-panel: oklch(96.6% 0.008 70 / 0.86);
+  --topbar: oklch(24% 0.022 60);
+  --topbar-ink: oklch(96% 0.006 70);
+}
+
+/* ─── Dark · hue fixed; only L and C move ─────────────────────────────── */
+:root[data-theme="dark"] {
+  --color-paper: oklch(17% 0.014 66);
+  --color-paper-2: oklch(20.5% 0.015 66);
+  --color-paper-3: oklch(24% 0.016 66);
+  --color-rule: oklch(32% 0.014 66);
+  --color-rule-strong: oklch(55% 0.017 66);
+  --color-neutral: oklch(62% 0.012 64);
+  --color-muted: oklch(73% 0.010 62);
+  --color-ink: oklch(91% 0.010 66);
+  --color-ink-strong: oklch(97% 0.006 66);
+
+  --color-accent: oklch(72% 0.125 42);
+  --color-accent-ink: oklch(18% 0.02 60);
+  --color-accent-weak: oklch(30% 0.055 42);
+  --color-focus: oklch(76% 0.11 42);
+
+  --color-success: oklch(74% 0.115 150);
+  --color-warning: oklch(80% 0.115 75);
+  --color-danger: oklch(70% 0.150 25);
+
+  --overlay-scrim: oklch(10% 0.012 66 / 0.55);
+  --overlay-panel: oklch(20.5% 0.015 66 / 0.90);
+  --topbar: oklch(13% 0.014 66);
+  --topbar-ink: oklch(93% 0.010 66);
+  --shadow-whisper: 0 1px 2px oklch(0% 0 0 / 0.40);
+  --shadow-overlay: 0 10px 30px oklch(0% 0 0 / 0.55);
+}
+:root[data-theme="dark"] body {
+  font-weight: 350;
+}
+
+/* ─── Display size — one root size scales everything (rem) ─────────────── */
+:root[data-scale="80"] { font-size: 12.8px; }
+:root[data-scale="90"] { font-size: 14.4px; }
+:root[data-scale="100"] { font-size: 16px; }
+:root[data-scale="110"] { font-size: 17.6px; }
+:root[data-scale="125"] { font-size: 20px; }
+:root[data-scale="150"] { font-size: 24px; }
+
+/* ─── Monochrome — see design.md; no position:fixed anywhere in the app ─ */
+:root[data-monochrome="true"] #app {
+  filter: grayscale(1);
+}
+
+/* Reading-face override when the user prefers sans for document bodies */
+:root[data-reading-font="sans"] {
+  --font-read: var(--font-ui);
+}

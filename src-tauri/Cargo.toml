@@ -1,0 +1,51 @@
+[package]
+name = "wakaru"
+version = "0.2.0"
+description = "Local-first AI notebook for your own documents"
+authors = ["Yuki Orita"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.78"
+
+[lib]
+name = "wakaru_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ts-rs = { version = "10", features = ["serde-json-impl", "no-serde-warnings"] }
+
+# storage
+rusqlite = { version = "0.32", features = ["bundled", "backup"] }
+
+# ids + time
+uuid = { version = "1", features = ["v7"] }
+time = { version = "0.3", features = ["formatting", "parsing", "macros"] }
+
+# async + jobs
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "process", "fs"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+
+# errors + logging
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

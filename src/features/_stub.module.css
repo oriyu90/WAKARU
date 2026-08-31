@@ -1,0 +1,20 @@
+.page {
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  max-width: var(--content-measure);
+}
+.title {
+  font-size: var(--fs-2xl);
+}
+.subtitle {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+.note {
+  margin-top: var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  color: var(--color-neutral);
+}

@@ -1,0 +1,36 @@
+.page {
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+.page h1 {
+  font-size: var(--fs-2xl);
+}
+.page h2 {
+  font-size: var(--fs-lg);
+  margin-bottom: var(--space-sm);
+}
+.lede {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--space-md);
+}
+.forceHover {
+  background: var(--color-paper-2) !important;
+}
+.forceActive {
+  transform: translateY(0.5px);
+  background: var(--color-paper-3) !important;
+}

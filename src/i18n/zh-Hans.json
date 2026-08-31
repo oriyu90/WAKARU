@@ -1,0 +1,64 @@
+{
+  "app": {
+    "name": "WAKARU",
+    "menu": "菜单",
+    "openSidebar": "打开侧栏",
+    "closeSidebar": "关闭侧栏",
+    "tagline": "让你正在读的这一页变得好懂。"
+  },
+  "nav": {
+    "home": "主页",
+    "fileModifier": "文件转换",
+    "search": "搜索",
+    "settings": "设置",
+    "projects": "项目"
+  },
+  "palette": {
+    "title": "命令面板",
+    "placeholder": "跳转到项目、资料或标签页…"
+  },
+  "home": {
+    "title": "项目",
+    "newProject": "新建项目",
+    "empty": {
+      "title": "还没有项目",
+      "body": "项目用来存放你的资料。创建后即可拖入 PDF、图片、音频等。",
+      "cta": "开始",
+      "import": "从 ZIP 导入"
+    }
+  },
+  "fileModifier": {
+    "title": "文件转换",
+    "subtitle": "不属于任何项目的一次性转换。"
+  },
+  "search": {
+    "title": "搜索",
+    "placeholder": "在所有项目中搜索"
+  },
+  "settings": {
+    "title": "设置"
+  },
+  "common": {
+    "loading": "加载中",
+    "retry": "重试",
+    "cancel": "取消",
+    "close": "关闭",
+    "save": "保存",
+    "saved": "已保存",
+    "details": "详情"
+  },
+  "states": {
+    "queued": "等待中",
+    "analyzing": "解析中",
+    "ready": "完成",
+    "readyPartial": "部分完成",
+    "failed": "失败"
+  },
+  "errors": {
+    "internal": "出现问题，请重试。",
+    "db": "读写数据失败。",
+    "io": "读写文件失败。",
+    "offline": "此操作需要网络连接或已配置的 AI 接口。",
+    "backendUnavailable": "无法连接后端，请重启应用。"
+  }
+}
