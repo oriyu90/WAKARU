@@ -4,7 +4,7 @@ WAKARUは、手元の資料（PDF・DOCX・PPTX・スプレッドシート・画
 
 [Studio RIZI / WAKARU](https://studio-rizi.pages.dev/projects/wakaru/) — 紹介サイト / [Releases](https://github.com/oriyu90/WAKARU/releases) — ダウンロード
 
-> このリポジトリでは、アプリ本体（README・ライセンス・紹介サイト）のみを公開しています。ソースコードは非公開です。
+> このリポジトリでは、配布用アプリ、README、ライセンス、品質情報のみを公開しています。ソースコードは非公開です。
 
 ## 主な機能
 
@@ -12,8 +12,9 @@ WAKARUは、手元の資料（PDF・DOCX・PPTX・スプレッドシート・画
 - 読み取り専用Viewer、ページ位置を保持するタブ、日本語対応のキーワード／意味検索
 - **PDFはアプリ自身がページを描画**（macOS）。OS標準ビューアのコントロールドックが資料の上に出ません
 - **資料の見え方**：白黒反転、露出低減、シャープネス、モノトーン
-- 出典（引用）付きLive Illustratorと、プロジェクトの作業領域へ成果物を作るStudio
-- OpenAI互換AI接続、ローカルWhisper文字起こし、承認制MCPツール、隔離コマンド実行
+- 平易な核心、具体例、必要時の短い理解確認を組み合わせた、出典（引用）付きLive Illustrator
+- 定型的な前置きや反復を避け、目的に合う自然な成果物を作るStudio
+- 接続ごとに選べるOpenAI互換・Anthropic互換API、ローカルWhisper文字起こし、承認制MCPツール、隔離コマンド実行
 - 改ざん検証付きプロジェクトZIPの書き出し・読み込み、アーカイブ、完全削除
 - 日本語、English、简体中文、ライト／ダーク／モノトーン、表示倍率80〜150%
 - コマンドパレット（Cmd/Ctrl+K）とキーボード操作
@@ -22,9 +23,9 @@ WAKARUは、手元の資料（PDF・DOCX・PPTX・スプレッドシート・画
 
 ## ダウンロード
 
-[Releases](https://github.com/oriyu90/WAKARU/releases/latest) から最新版のDMGを取得してください。
+[WAKARU v0.0.0](https://github.com/oriyu90/WAKARU/releases/tag/v0.0.0) から `WAKARU_0.0.0_aarch64.dmg` を取得してください。
 
-- **動作条件**: Apple Silicon Mac / macOS 11以降
+- **動作条件**: Apple Silicon Mac / macOS 12以降
 - Windows／Linux向けの実行ファイルは、実機での検証が完了していないため現時点では配布していません
 - Developer ID署名とApple公証は未実施です。初回起動時にmacOSの確認が表示される場合があります。Finderで`WAKARU.app`を右クリック→「開く」を選んでください
 

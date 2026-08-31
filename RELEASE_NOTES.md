@@ -1,134 +1,71 @@
-# WAKARU v0.1.0
+# WAKARU v0.0.0
 
-初回の公開リリースです。バージョン番号は、内部の開発上の通し番号だった `0.99.0` から、公開ソフトウェアとしてのsemverの慣例（`1.0.0`未満は開発途上を示す）に合わせて `0.1.0` に付け直しました。中身は同じ開発の続きで、機能を後退させたものではありません。
+A reliability-focused build of the fully redeveloped WAKARU app on Tauri v2,
+Rust, and React. This release number intentionally follows the requested
+`v0.0.0` label even though an earlier public prerelease was tagged `v0.1.0`.
 
-## 2026-08-19 の更新（公開に向けた安定性監査）
+macOS (Apple Silicon) only for this release, ad-hoc signed and **not
+notarized** — on first launch, right-click the app and choose *Open* to get
+past Gatekeeper.
 
-メモリ安全性・アプリの安定性・UI仕様準拠を独立して再監査し、見つかった問題を修正しました。
+## What's in it
 
-### 見つけて直したもの（フロントエンド）
+- **Two API formats** — choose OpenAI-compatible or Anthropic-compatible per
+  connection. The Anthropic adapter supports native authentication, top-level
+  system instructions, image blocks, tool definitions/results, structured
+  output mapping, text/thinking/tool SSE events, usage, and provider errors.
+- **Built-in response quality** — Studio continuously avoids canned AI prose,
+  filler, repetition, and unnecessary structure. Live Illustrator combines a
+  plain-language first explanation with examples, misconception handling, and
+  an optional short understanding check. No external Skill source is bundled.
+- **Reliability hardening** — validated endpoint URLs, safe database migration
+  for existing profiles, incomplete-stream detection, no caching of truncated
+  explanations, recoverable poisoned locks, safe corrupt-ZIP errors, and
+  visible failures when saving AI settings.
 
-- **Live Illustratorが、古い応答で新しいページの解説を上書きすることがあった不具合を修正しました。** ページを連続でめくったとき、先に出した（遅い）応答が後から届くと、すでに表示していた新しいページの解説を無言で置き換えていました。応答ごとに識別子を持たせ、今表示すべき応答かどうかを照合してから反映するようにしています。
-- **引用を連続でクリックすると、意図と違う資料が開くことがあった不具合を修正しました。** 1つ目の引用を開く処理が終わる前に2つ目をクリックすると、後から返ってきた方が勝つ順序不同の競合があったため、要求ごとに世代番号を持たせて古い方の結果を捨てるようにしています。
-- **資料の見え方（白黒反転・露出低減・シャープネス）の変更が、保存前に画面を離れると失われることがあった不具合を修正しました。** 変更は250ms遅延して保存する仕組みでしたが、その前に画面を離れると保存自体がキャンセルされ、それでいて表示上は変更が反映されたままだったため、後で設定が再取得されると静かに元へ戻っていました。画面を離れるときは保留中の保存を必ず実行するようにし、保存に失敗した場合のトースト通知も追加しています。
-- **アプリ全体のトップレベルにエラーバウンダリを追加しました。** これまでは、資料やAI生成コンテンツの描画中に例外が起きると画面全体が白紙になり、操作不能になっていました。再読み込みで復帰できる画面を出すようにしています。
+- **Projects & ingestion** — self-contained project folders; add PDFs, images,
+  audio, video, spreadsheets, text/Markdown/JSON/code, and web links (with an
+  SSRF guard). PDF text, Office formats, and CJK bi-gram full-text search.
+- **Viewer** — tabbed panes, previews for every format, in-preview find,
+  reader view for web links.
+- **RAG + AI** — one protocol-neutral client (no vendor SDK); connection
+  profiles with keys in the macOS keychain; hybrid FTS + vector search (RRF)
+  with a keyword-only fallback when offline.
+- **Live Illustrator** — on-demand, cached page explanations with citations
+  resolved on the Rust side (the model never invents page numbers).
+- **Audio / video** — local transcription with whisper.cpp (Metal). Download a
+  model in Settings; transcripts are time-stamped and clickable to seek.
+- **Studio** — free chat tabs over a project's sources, with built-in tools
+  (`search_sources`, `read_document`, `read_file`, `write_file`, `run_command`,
+  …), `@`-mention of other tabs, a `workspace/` folder, and artifact cards you
+  can add back as sources or download.
+- **MCP** — connect local stdio MCP servers; per-tool approval policy
+  (ask / always allow / deny), revocable from Settings.
+- **Sandbox** — everything `write_file` / `run_command` touch is confined to
+  `workspace/`: no shell, scrubbed environment, path-traversal and symlink
+  escapes rejected, output capped, timeouts kill the whole process group.
+- **File Modifier** — images → PDF, and paste → organised Markdown/TXT.
+- **Settings & i18n** — English / 日本語 / 简体中文 on every screen; light /
+  dark / system themes; monochrome mode; six display sizes; first-run wizard.
+- **Export / import / archive** — portable `.wakaru.zip` with a schema version
+  and a four-case compatibility policy.
 
-### 見つけて直したもの（Rustバックエンド）
+## Known limitations
 
-- **極端な縦横比を持つPDFページが、アプリ全体を強制終了させ得た問題を修正しました。** ページの描画サイズはPDF自身のMediaBoxから計算しており、上限がありませんでした。巨大な確保要求はRustのアロケータが回復不能な形で処理全体を落とすため、描画前に上限を設けています。
-- **プロジェクトZIPの取り込みで、宣言サイズを実際の展開サイズが上回れる経路を塞ぎました。** サイズ上限の検査がZIPヘッダの申告値に対してのみ行われており、申告と実体が食い違う細工されたエントリで上限を回避できました。実際に読み取ったバイト数そのものを上限で区切るようにしています。
-- **資料の取り込み中に内部エラーが起きると、進捗表示が「実行中」のまま固まり続けることがあった不具合を修正しました。** 完了処理が正常終了の経路でしか呼ばれておらず、途中で異常終了する経路を抜けていました。どの終わり方でも必ず完了処理が呼ばれるようにしています。
-- テキスト・コードファイルの取り込み、画像の取り込みに、他の取り込み経路と同水準のサイズ上限を追加しました。
-- 想定外のMCPサーバー種別に遭遇した場合、アプリを止めずにエラーとして扱うようにしました。
+Documented in `docs/DECISIONS.md`:
 
-いずれも実機での不具合報告を起点にしたものではなく、公開前の内部監査で見つけたものです。`cargo clippy`・`cargo test`・`npm run typecheck`・`npm run lint`・`npm test`・`npm run check:tokens`・`npm run check:i18n`・`npm run check:contrast`はすべて合格しています。
+- **D-09** PDF / slide page-image rendering — the Viewer shows extracted text.
+- **D-10** Local embeddings — remote `/v1/embeddings` only; FTS-only degrade
+  when no search model is set.
+- **D-11** Ingest-time Vision analysis of pages/images.
+- **D-13** Studio chat is request/response, not token-streamed.
+- **D-14** MCP — stdio transport only; Streamable HTTP is deferred.
+- **D-15** Transcription uses an energy-gate VAD (not Silero); video keyframe
+  extraction is not included (audio is still transcribed; the player handles
+  video). Whisper model files are integrity-checked by a recorded SHA-256
+  rather than an upstream-pinned hash.
+- Windows / Linux builds are unverified and not distributed.
 
-## 2026-08-06 の更新（3・4回目の指摘への対応）
+## Verification
 
-バージョンは v0.99.0 のままです。実機のユーザーからの指摘11件に対応しました。
-
-### 資料の表示
-
-- **PDFはアプリが自分で描くようになりました。** これまではファイルをWebViewに渡しており、OS標準のPDFビューアがページの上にコントロールドックを浮かべていました。外側からは消せず、ツールバーのページ番号とも食い違っていました。macOSでは PDFKit でページを描いて表示します（他プラットフォームは従来の埋め込みプレビュー）。総ページ数が取れるので「次へ」の終端も正確になりました。
-- PDF・画像・音声・動画では、その下に抽出テキストを併記しなくなりました。資料そのものを見ている下に本文の劣化コピーを積む形だったためです。ページ内検索は、これらの資料では検索バーに件数と前後の文脈を出します。
-- **資料の見え方**を追加しました。白黒反転・露出低減（スライダー）・シャープネス（スライダー）・アプリのモノトーンの4つで、設定で「『資料を見る』の横に表示」をオンにしたものだけがペイン切替の横に出ます。値は資料やプロジェクトをまたいで引き継がれます。
-
-### Live Illustrator
-
-- **システムプロンプト**を設定で編集できます。空欄なら内蔵のプロンプト、書けば置き換えます。
-- 既定の詳しさ（かんたん／標準／詳しく）と、詳しさの切替をパネルに出すかどうかを設定できます。
-- **AI応答の停止ボタン**を追加しました。止めた時点で待つのをやめ、あとから届いた回答は保存も会話への追加もしません。
-- 設定でオンかつ接続テストに成功したAIプロファイルがあるとき、資料を開くと自動で開きます。
-
-### 操作まわり（4回目の指摘）
-
-- サイドバーの「設定」は最下部に固定した1行になりました。設定のカテゴリはサイドバーには並べません
-- **⌃⌘F（全画面）がアプリに奪われていた不具合を修正しました。** アプリのショートカット判定が Cmd と Ctrl の同時押しも自分のものとして扱っていたためです
-- 全画面や大きなウィンドウでは、資料のページがペインいっぱいに表示されます
-- 「資料を見る」のホームは1行30px程度のリストになりました。同じ欄で資料内検索ができ、行末から削除できます
-- **↓ / ↑ でもページを送れます**（入力中は動きません）
-- 「資料の追加と管理」は「URLから追加」になりました
-- Live Illustrator: 詳しさの切替は既定で非表示になり、オフのときは切替の帯そのものが出ません。再生成は解説の下に移動しました。質問欄は参照範囲と送信を1行にまとめて詰めました
-- ボタンの文字を本文の1.2倍にし、ダークテーマでは白で表示するようにしました
-
-### 読みやすさ（5回目の指摘）
-
-- **文字を大きくしました。** 本文が13px→15px、最小の表示が11px→13px。設定の各行と同じ大きさが下限です
-- Live Illustratorのパネルは太字で表示します
-- **塗りの無いボタンをなくしました。** これまで一部のボタン（ツールバーの操作、削除）は塗りも枠も無く、押せるものだと分かりませんでした
-- **ウィンドウの縦横比に合わせて配置します。** 資料の一覧・ホーム・検索・ファイル変換は、ウィンドウが余っているときは中央に置かれます
-- **1920×1200などの縦長のウィンドウで下部が空白になる不具合を修正しました。** 音声・動画が無いプロジェクトでは資料ペインが内容の高さに縮んでいたためです
-
-### 画面まわり
-
-- サイドバー最下部にアプリ内設定の各カテゴリへの導線を追加しました。プロジェクトの**取り込み**もサイドバーから行えます。
-- **プロジェクトの書き出し・取り込み・アーカイブ・削除は設定→データ**に移しました。ホームは開くための画面に戻ります。
-- Studio: 下部の入力欄が画面外に切れる問題、横スクロール、空の会話に出ていた案内文を直しました。
-- 枠線が太く見える原因を2つ直しました。WebKitがクリック時に描く既定の輪郭と、浮いているパネル（コマンドパレット・ダイアログ・トースト）の枠が制御と同じ太さで描かれていたことです。
-- 文字や操作が左に寄りすぎていた画面（ホーム・検索・ファイル変換・設定）に幅の上限を入れて中央に置きました。
-
-## 2026-08-10 の更新（6回目の指摘への対応）
-
-バージョンは v0.99.0 のままです。実機のユーザーからの指摘2件に対応しました。
-
-- **「資料を追加できませんでした」のポップアップが消えなくなっていた不具合を修正しました。** 常設のエラー表示だったため、消えるための仕組みがありませんでした。他の失敗表示と同じ、既定5秒で自動的に消えるトーストに変更しました。
-- **Studioタブの「Studioタブ / 新しいタブ」という見出し行をやめ、タブ一覧の下に `+` ボタンを置きました。**
-- **Studioで、AIに文書作成・コード作成・コマンド実行を頼んでも実際には何も起きなかった不具合を修正しました。** これまではAIへの依頼文に「Markdown」などの語が含まれる場合に限り、回答をそのまま `summary.md` という固定名で保存するだけで、コマンド実行の経路は呼ばれていませんでした。AIが実際に「ファイルを作る」「コマンドを実行する」を選んだときだけ、その内容をチャット内のカードで確認できるようにし、許可すると実行されます（拒否すれば何も起きません）。ファイル名や内容、実行するコマンドはAIが求めたとおりに反映されます。設定の「書き込みを自動許可」をオンにすると、ファイル作成のみ確認なしで行われます（コマンド実行は常に確認します）。
-
----
-
-## 初版（2026-08-04）の内容
-
-## 使っていて壊れていたところ
-
-- **入力欄に1文字入れるとカーソルが外れ、2文字目以降が入らなかった問題を修正しました。** ダイアログのフォーカス処理が、閉じる関数の同一性が変わるたびに再実行され、入力欄から閉じるボタンへフォーカスを移していたためです。プロジェクト作成と初回セットアップが該当します。回帰テストを追加しています。
-- ダイアログ・ドロワー・トーストが、スクロールできる本文領域の内側に描画されていたため、設定画面のように長い画面でスクロールしたあとに開くと画面外へ出ていました。アプリ直下の単一のオーバーレイ層へ移しました。
-- 設定画面が「表示」と「AIの役割」で別々の下書きを持ち、どちらかを保存するともう一方の変更が消えていました。画面全体でひとつの下書きに統一し、保存も1か所にまとめました。
-- 設定を編集している最中に裏で設定が再取得されると、入力中の値が巻き戻ることがありました。未保存の変更があるあいだは取り込まないようにしました。
-- 数値の設定欄を一度空にすると 0 になり、狙った数字が入れにくくなっていました。空欄のまま入力を続けられるようにしました。
-- Viewerの「次へ」が最終ページで止まらず、存在しないページのエラー表示まで進めました。読み込めなかったページを終端として扱い、そこで止まります。
-- AI接続プロファイルを削除する導線がありませんでした（削除処理自体は以前から実装済みでした）。一覧から削除できます。
-- プロジェクトの完全削除がOS標準の入力ダイアログを選択件数ぶん連続で表示していました。アプリ内の確認ダイアログに変更し、プロジェクト名を入力して確定する方式は維持しています。
-- Studioの承認で「拒否」を押しても実際には送信されていました。「書き込みを許可して送信」「書き込みを許可せず送信」「キャンセル」に分け、ラベルと動作を一致させました。
-
-## 見た目と操作の作り直し
-
-- 意匠を Hallmark の modern-minimal / Cobalt へ作り直しました。冷たい白の地、罫線で面を作る構成、アクセントは一画面にひとつだけ、6pxの角丸に統一しています。設計は `design.md` に固定し、全画面がこれを参照します。
-- **本文フォントが実際には読み込まれていませんでした。** Inter / Source Serif 4 / JetBrains Mono を指定しながら同梱しておらず、全画面がシステム標準の書体で表示されていました。Geist（UI）・Newsreader（資料の本文）・JetBrains Mono（ワードマークとコード）をアプリに同梱しました。日本語・中国語は従来どおり端末の書体を使います。
-- **CSSが5つの未定義な値を参照しており、その指定が丸ごと無効になっていました。** 引用チップや「読み取り専用」表示の角丸が効かず四角のまま、読書フォントの設定が無効、資料本文の行長制限が効かず画面端まで伸び、アクセント色の上の文字色が低コントラストのままでした。すべて定義し、参照先の存在を検査で落とすようにしました。
-- 主ボタンが枠線だけで通常のボタンと見分けがつきませんでした。主ボタンを塗りに変え、操作の主従が読めるようにしました。
-- プロジェクト画面の上下2段が同じ下線付きタブに見えていました。ペインの切り替えをセグメンテッドコントロールに変え、資料タブと区別しています。
-- 資料の追加と管理が折りたたみの中に隠れていました。追加ボタンを常設し、資料のないプロジェクトでは管理パネルを開いた状態で始めます。
-- ホームの先頭に「新規プロジェクト」カードを置きました。
-- 上部バーに現在のプロジェクト名を表示します。
-- コマンドパレット（Cmd/Ctrl+K）を実装しました。あわせて Cmd+Shift+F・Cmd+,・Viewerの ←/→ を追加し、設定画面のショートカット一覧を実装と一致させました（従来の記載は実装と食い違っていました）。
-- 無効なボタンに、なぜ押せないかを示す説明を付けました。
-- 読み込み表示は150ms待ってから出し、出たら最低300msは残るようにしました。回転が220msで1周しており点滅に見えていた読み込み表示も直しています。
-- 動きを減らす設定のとき、これまで読み込み表示が途中で固まっていました。機能的な動きは残したまま、遷移だけを即時完了にしています。
-
-## 検査で落とせるようにしたこと
-
-- `npm run check:tokens` が、未定義のデザイントークン参照・`position: fixed`・書体の直書きを検出します。今回の5件はいずれもこの検査が無かったために気付かれませんでした。
-- `npm run check:contrast` を追加しました。`tokens.css` のOKLCH値から、画面に出る配色の組み合わせを再計算し、本文4.5:1・境界3:1を満たさない場合とsRGB色域を外れる場合に失敗します。
-
-## 2回目のUI修正（実機での指摘を受けて）
-
-- **Live解説が資料に重なって読めなかった問題を修正しました。** オーバーレイをやめ、Viewerを2カラムにしました。開くと資料側が縮み、閉じると全幅に戻ります。あわせて、隣に並ぶだけのパネルが読書中のフォーカスを奪わないようにしました。
-- **AIの解説とStudioの会話をMarkdownで描画するようにしました。** これまで見出し・箇条書き・表・コードブロックが `##` や `|` のまま文字として表示されていました。モデルが出力したHTMLは無効のまま扱い、モデルが提示したURLはクリックできる形にしていません。
-- **Studioを作り直しました。** 会話一覧・会話・作業領域の3カラム構成にし、画面左端に寄っていたレイアウトを直しました。会話を作ると入力欄にカーソルが入るので、作成後に何も起きていないように見えることがなくなります。名前の変更はダブルクリック限定をやめ、一覧の行から辿れるようにしました。Studio表示中に資料パネルが残っていた問題も直しています。
-- **設定画面を作り直しました。** 14セクションの直列スクロールを、左のカテゴリ一覧と右のパネルに分けました。カテゴリは外観・言語・AI接続・AIの動作・文字起こし・検索と取り込み・ツール連携・データ・ショートカット・このアプリについての10個です。設定内検索も付けました。
-- **プロジェクト管理を表にしました。** 名前・資料数・更新日・状態・操作の列を持ち、**各行から選択せずに書き出し・アーカイブ・削除ができます**。複数まとめて操作したいときだけ、選択に応じて一括操作のバーが現れます。
-- **ボタンの縁取りをやめました。** 56個のうち32個に付いていた枠線を外し、押せることは面で示すようにしました。線を引くのは本当に分離が必要な場所だけです。
-- **ウィンドウ幅に追従するようにしました。** 1680px幅のとき設定画面は左右592px（画面の35%）が空白でしたが、現在は余白0で幅を使い切ります。行長の制限はページ枠ではなく本文側に移しました。
-- 見出し下の説明文を全画面から削除しました。
-- 同じ画面に主ボタンが複数並んでいた箇所（資料の追加、ファイル変換）を1つに整理しました。
-- 意味の読み取れない図形（プロジェクト状態の▢、タブの◆）をやめ、状態は言葉で、ピンは実際のピンの形で示すようにしました。
-- 枠の中に枠が入っていたファイル変換画面の面を整理しました。
-
-## 配布条件と既知の制約
-
-- v0.99の検証済み配布対象はApple Silicon Mac（macOS 11以降）です。
-- Developer ID署名とApple公証は未実施です。
-- 画像OCR、スキャンPDFのOCR、Windows／Linux実機検証はこの候補版の対象外です。
-- AI／MCPの互換性は接続先実装に依存します。公開前に利用予定サーバーでも接続テストを行ってください。
-- 今回のUI改修は、ブラウザ上での実描画確認とテストで検証しています。ビルドしたmacOSアプリは起動と正常終了を確認済みですが、ネイティブウィンドウ上での全画面の手動操作は未実施です。詳細は品質報告を参照してください。
+`QUALITY_REPORT.md` records the gate results for the build.
