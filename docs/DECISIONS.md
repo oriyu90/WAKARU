@@ -94,3 +94,13 @@
 - **採用した系**: genre=modern-minimal / macrostructure=Workbench / anchor hue 70（暖色ペーパー）/ 単一アクセント ember hue 40 / Geist・Spectral・JetBrains Mono / tight radii。詳細は リポジトリ直下 `design.md`。コントラストは `npm run check:contrast` で全ペア再計算し合格。
 - **影響**: `src/styles/tokens.css`（唯一の定義元）、全 `*.module.css`。`docs/06` の §2 トークン表・§3–§8 の ASCII レイアウトは「意図」として読む。
 - **差し戻し条件**: 実装中に密度・可読性が `docs/09 §6` を満たせない場合、系を見直して `design.md` を改訂する。
+
+## D-08 · Phase 1 は依存の軽い静的形式のみ先行実装
+
+- **日付**: 2026-08-31
+- **論点**: `docs/04` は PDF ラスタライズ（pdfium）・xlsx（calamine）・画像正規化・Office（OOXML）・Web 取り込みを要求するが、いずれもネイティブライブラリ or 大きめの依存を伴い、Phase 1 の「AI なしで使える土台」(I-2) の検証を遅らせる。
+- **選択肢**: A) `docs/04` の全形式を Phase 1 で一括 ／ B) Phase 1 はピュア Rust で扱える text/md/json/jsonl/code + csv/tsv のみ実装し、PDF テキスト抽出・画像・Office・Web リンクは Phase 1 の追補コミットで、PDF **ラスタライズ**は Viewer が要る Phase 2 で pdfium を判断
+- **採用**: B
+- **理由**: 各コミットを緑に保ちレビュー可能にする（`docs/08 §0`）。チャンク化・CJK bi-gram FTS・プロジェクト土台という Phase 1 の中核は形式に依存しない。
+- **影響**: `services/ingest/`（`text.rs` / `sheet.rs` のみ）、`AC-1-3` は追補コミットで全フィクスチャ形式に拡大。`docs/04` の pdfium 指定は Phase 2 で D-09 として再確認予定。
+- **差し戻し条件**: 追補コミットまでに至らずリリースが近づいた場合、対応形式を README/サイトの実態に合わせて明記する。

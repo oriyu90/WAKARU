@@ -5,13 +5,16 @@ use crate::error::{AppError, AppResult};
 use crate::jobs::JobRegistry;
 use rusqlite::Connection;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 pub struct AppState {
-    /// `app.db`. Project databases are opened per-call by the projects service.
+    /// `app.db` for foreground command handlers. Background jobs open their own
+    /// connection to the same file (WAL allows it) via `app_db_path`.
     pub app_db: Mutex<Connection>,
-    pub jobs: JobRegistry,
+    pub app_db_path: PathBuf,
+    pub jobs: Arc<JobRegistry>,
     pub data_dir: PathBuf,
+    pub projects_dir: PathBuf,
 }
 
 impl AppState {

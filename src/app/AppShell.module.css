@@ -175,3 +175,20 @@
     transition-duration: var(--dur-reduced);
   }
 }
+
+.projName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.projCount {
+  flex: none;
+  font-size: var(--fs-2xs);
+  color: var(--color-neutral);
+}
+.navEmpty {
+  padding: var(--space-xs);
+  font-size: var(--fs-2xs);
+  color: var(--color-muted);
+}

@@ -11,7 +11,8 @@
     "fileModifier": "ファイル変換",
     "search": "検索",
     "settings": "設定",
-    "projects": "プロジェクト"
+    "projects": "プロジェクト",
+    "noProjects": "プロジェクトはまだありません"
   },
   "palette": {
     "title": "コマンドパレット",
@@ -20,11 +21,42 @@
   "home": {
     "title": "プロジェクト",
     "newProject": "新規プロジェクト",
+    "devHint": "この画面はTauriアプリ内で動きます。`npm run tauri dev` で起動してください。",
     "empty": {
       "title": "まだプロジェクトがありません",
       "body": "資料をまとめる場所を作ります。作成後、PDF・画像・音声などをそのまま取り込めます。",
       "cta": "はじめる",
       "import": "ZIPからインポート"
+    },
+    "card": {
+      "sources_other": "{{count}} 件のソース"
+    },
+    "dialog": {
+      "title": "新規プロジェクト",
+      "name": "名前",
+      "namePlaceholder": "量子計算の講義",
+      "nameRequired": "名前を入力してください",
+      "description": "説明",
+      "optional": "任意",
+      "create": "作成",
+      "cancel": "キャンセル"
+    }
+  },
+  "project": {
+    "pane": {
+      "viewer": "資料を見る",
+      "studio": "Studio"
+    },
+    "studioPlaceholder": "Studio は Phase 6 で実装されます。",
+    "sources": {
+      "title": "ソース",
+      "add": "追加",
+      "drop": "ここに資料をドロップ、または「追加」から選択",
+      "empty": "まだソースがありません。対応形式: PDF, 画像, 音声, 動画, 表計算, テキスト, Markdown, JSON, コード, Web リンク。",
+      "reanalyze": "再解析",
+      "delete": "削除",
+      "unsupported": "この形式には対応していません。PDF などに変換してから追加してください。",
+      "count_other": "{{count}} 件"
     }
   },
   "fileModifier": {
@@ -47,6 +79,21 @@
     "saved": "保存済み",
     "details": "詳細"
   },
+  "sourceKind": {
+    "pdf": "PDF",
+    "slides": "スライド",
+    "doc": "文書",
+    "image": "画像",
+    "audio": "音声",
+    "video": "動画",
+    "sheet": "表計算",
+    "text": "テキスト",
+    "markdown": "Markdown",
+    "json": "JSON",
+    "jsonl": "JSONL",
+    "code": "コード",
+    "weblink": "Web リンク"
+  },
   "states": {
     "queued": "待機中",
     "analyzing": "解析中",
@@ -59,6 +106,9 @@
     "db": "データの読み書きに失敗しました。",
     "io": "ファイルの読み書きに失敗しました。",
     "offline": "この操作にはネットワークまたはAI接続の設定が必要です。",
-    "backendUnavailable": "バックエンドに接続できません。アプリを再起動してください。"
+    "backendUnavailable": "バックエンドに接続できません。アプリを再起動してください。",
+    "SOURCE_DUPLICATE": "このファイルはすでにこのプロジェクトにあります。",
+    "SOURCE_UNSUPPORTED_FORMAT": "この形式には対応していません。",
+    "PROJECT_DELETE_NAME_MISMATCH": "プロジェクト名が一致しません。"
   }
 }

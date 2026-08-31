@@ -5,6 +5,8 @@
 use serde::{Deserialize, Serialize};
 
 pub mod job;
+pub mod project;
+pub mod source;
 
 pub use job::*;
 

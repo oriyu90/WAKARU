@@ -9,10 +9,22 @@ use std::path::Path;
 pub mod migrate;
 
 pub const APP_SCHEMA_VERSION: &str = "1.0.0";
+pub const PROJECT_SCHEMA_VERSION: &str = "1.0.0";
 
 /// App-wide migrations, applied in array order. Names are `NNN_desc`; no gaps.
 pub const APP_MIGRATIONS: &[(&str, &str)] =
     &[("001_init", include_str!("../../migrations/app/001_init.sql"))];
+
+/// Per-project database migrations.
+pub const PROJECT_MIGRATIONS: &[(&str, &str)] =
+    &[("001_init", include_str!("../../migrations/project/001_init.sql"))];
+
+/// Open a `project.db`, run its migrations. Called when a project is opened.
+pub fn open_project_db(path: &Path) -> AppResult<Connection> {
+    let conn = open(path)?;
+    migrate::run(&conn, PROJECT_MIGRATIONS, PROJECT_SCHEMA_VERSION)?;
+    Ok(conn)
+}
 
 pub fn open(path: &Path) -> AppResult<Connection> {
     let conn = Connection::open(path)?;

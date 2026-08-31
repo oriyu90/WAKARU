@@ -1,17 +1,23 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { RouterProvider, createMemoryRouter } from "react-router";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, expect, test } from "vitest";
 import { AppShell } from "./AppShell";
 import { useUiStore } from "../stores/ui";
 import "../i18n";
 
 function renderShell() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter(
     [{ path: "/", element: <AppShell />, children: [{ index: true, element: <div>home</div> }] }],
     { initialEntries: ["/"] },
   );
-  return render(<RouterProvider router={router} />);
+  return render(
+    <QueryClientProvider client={qc}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
 }
 
 beforeEach(() => {
@@ -26,8 +32,6 @@ test("AC-0-2 · Cmd/Ctrl+B toggles the sidebar; it overlays (does not push)", as
 
   await user.keyboard("{Control>}b{/Control}");
   expect(sidebar).toHaveAttribute("data-open", "true");
-  // overlay, not a flow element: the sidebar and main are siblings, so opening
-  // it cannot reflow the content (visual overlay verified manually / in E2E).
   expect(sidebar.nextElementSibling?.tagName).toBe("MAIN");
 
   await user.keyboard("{Control>}b{/Control}");

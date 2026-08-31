@@ -25,11 +25,20 @@ serde_json = "1"
 ts-rs = { version = "10", features = ["serde-json-impl", "no-serde-warnings"] }
 
 # storage
-rusqlite = { version = "0.32", features = ["bundled", "backup"] }
+rusqlite = { version = "0.32", features = ["bundled", "backup", "functions"] }
 
 # ids + time
 uuid = { version = "1", features = ["v7"] }
 time = { version = "0.3", features = ["formatting", "parsing", "macros"] }
+
+# ingest (Phase 1 — static formats, pure Rust, no native libs yet)
+sha2 = "0.10"
+walkdir = "2"
+infer = "0.16"                              # magic-byte kind detection
+encoding_rs = "0.8"
+chardetng = "0.1"                           # charset sniffing
+csv = "1"
+tiktoken-rs = "0.6"                         # cl100k_base token estimate (docs/04 §10)
 
 # async + jobs
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "process", "fs"] }

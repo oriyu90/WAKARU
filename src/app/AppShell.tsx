@@ -1,15 +1,19 @@
 import { useEffect, useRef } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import { useUiStore } from "../stores/ui";
 import { FOCUSABLE, trapTab } from "../components/focus";
 import { IconButton } from "../components/IconButton";
+import { projectsApi } from "../ipc/projects";
+import { inTauri } from "../ipc/client";
 import {
   MenuIcon,
   HomeIcon,
   FileSwapIcon,
   SearchIcon,
   SettingsIcon,
+  FileIcon,
 } from "./Icons";
 import styles from "./AppShell.module.css";
 
@@ -26,6 +30,12 @@ export function AppShell() {
   const sidebarRef = useRef<HTMLElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLElement>(null);
+
+  const projects = useQuery({
+    queryKey: ["projects", false],
+    queryFn: () => projectsApi.list(false),
+    enabled: inTauri,
+  });
 
   // Cmd/Ctrl+B toggles; Esc closes (docs/06 §3.2).
   useEffect(() => {
@@ -123,7 +133,18 @@ export function AppShell() {
           </div>
 
           <div className={styles.navProjects}>
-            {/* Project list arrives in Phase 1. */}
+            {(projects.data ?? []).map((p) => (
+              <NavLink key={p.id} to={`/p/${p.id}`} className={navItem}>
+                <FileIcon size={16} />
+                <span className={styles.projName}>{p.name}</span>
+                <span className={`${styles.projCount} u-mono-nums`}>
+                  {p.sourceCount}
+                </span>
+              </NavLink>
+            ))}
+            {projects.data && projects.data.length === 0 ? (
+              <p className={styles.navEmpty}>{t("nav.noProjects")}</p>
+            ) : null}
           </div>
 
           <div className={styles.navBottom}>

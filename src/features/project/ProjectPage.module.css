@@ -1,0 +1,23 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.paneBar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: var(--space-xs) var(--space-md);
+  border-bottom: var(--rule-1) solid var(--color-rule);
+}
+.paneBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.placeholder {
+  margin: var(--space-xl);
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}

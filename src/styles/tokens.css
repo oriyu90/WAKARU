@@ -122,6 +122,13 @@
   --overlay-panel: oklch(96.6% 0.008 70 / 0.86);
   --topbar: oklch(24% 0.022 60);
   --topbar-ink: oklch(96% 0.006 70);
+
+  /* Project colour slots — quiet identifiers, not decoration. */
+  --project-accent-1: oklch(55% 0.13 40);
+  --project-accent-2: oklch(52% 0.11 150);
+  --project-accent-3: oklch(50% 0.12 255);
+  --project-accent-4: oklch(54% 0.12 300);
+  --project-accent-5: oklch(56% 0.11 90);
 }
 
 /* ─── Dark · hue fixed; only L and C move ─────────────────────────────── */

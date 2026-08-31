@@ -11,7 +11,8 @@
     "fileModifier": "File Modifier",
     "search": "Search",
     "settings": "Settings",
-    "projects": "Projects"
+    "projects": "Projects",
+    "noProjects": "No projects yet"
   },
   "palette": {
     "title": "Command palette",
@@ -20,11 +21,44 @@
   "home": {
     "title": "Projects",
     "newProject": "New project",
+    "devHint": "This screen runs inside the Tauri app. Start it with `npm run tauri dev`.",
     "empty": {
       "title": "No projects yet",
       "body": "A project is where your sources live. Once you make one, drop in PDFs, images, audio and more.",
       "cta": "Get started",
       "import": "Import from ZIP"
+    },
+    "card": {
+      "sources_one": "{{count}} source",
+      "sources_other": "{{count}} sources"
+    },
+    "dialog": {
+      "title": "New project",
+      "name": "Name",
+      "namePlaceholder": "Quantum computing lectures",
+      "nameRequired": "Enter a name",
+      "description": "Description",
+      "optional": "Optional",
+      "create": "Create",
+      "cancel": "Cancel"
+    }
+  },
+  "project": {
+    "pane": {
+      "viewer": "Sources",
+      "studio": "Studio"
+    },
+    "studioPlaceholder": "Studio arrives in Phase 6.",
+    "sources": {
+      "title": "Sources",
+      "add": "Add",
+      "drop": "Drop files here, or use Add",
+      "empty": "No sources yet. Supported: PDF, images, audio, video, spreadsheets, text, Markdown, JSON, code, web links.",
+      "reanalyze": "Re-analyze",
+      "delete": "Delete",
+      "unsupported": "This format isn't supported. Convert it (e.g. to PDF) and add it again.",
+      "count_one": "{{count}} item",
+      "count_other": "{{count}} items"
     }
   },
   "fileModifier": {
@@ -47,6 +81,21 @@
     "saved": "Saved",
     "details": "Details"
   },
+  "sourceKind": {
+    "pdf": "PDF",
+    "slides": "Slides",
+    "doc": "Document",
+    "image": "Image",
+    "audio": "Audio",
+    "video": "Video",
+    "sheet": "Spreadsheet",
+    "text": "Text",
+    "markdown": "Markdown",
+    "json": "JSON",
+    "jsonl": "JSONL",
+    "code": "Code",
+    "weblink": "Web link"
+  },
   "states": {
     "queued": "Queued",
     "analyzing": "Analyzing",
@@ -59,6 +108,9 @@
     "db": "Reading or writing data failed.",
     "io": "Reading or writing a file failed.",
     "offline": "This needs a network connection or an AI endpoint set up.",
-    "backendUnavailable": "Can't reach the backend. Restart the app."
+    "backendUnavailable": "Can't reach the backend. Restart the app.",
+    "SOURCE_DUPLICATE": "That file is already in this project.",
+    "SOURCE_UNSUPPORTED_FORMAT": "This format isn't supported.",
+    "PROJECT_DELETE_NAME_MISMATCH": "The project name doesn't match."
   }
 }
