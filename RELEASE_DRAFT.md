@@ -1,8 +1,12 @@
 # v0.2.0 release — draft
 
-Everything here is ready to execute. The only blockers are the local build + the
-manual smoke test + your go-ahead (all three are gates from the approved plan,
-`docs/09 §8`). Nothing below has been run yet.
+Steps 1–4 and 6-verify are **done** (2026-09-01) — see `QUALITY_REPORT.md`.
+The DMG is built and verified at
+`src-tauri/target/release/bundle/dmg/WAKARU_0.2.0_aarch64.dmg`
+(sha256 in `RELEASE_CHECKSUMS.txt` next to it).
+
+**Blocked on:** the `docs/09 §8` 11-step interactive smoke test, your go-ahead,
+then step 6 (`gh release create`) and step 7 (docs/site).
 
 ---
 
