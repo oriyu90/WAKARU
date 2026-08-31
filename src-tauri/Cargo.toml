@@ -45,8 +45,14 @@ kamadak-exif = "0.5"                        # EXIF orientation
 calamine = "0.26"                           # xlsx / xls
 zip = { version = "2", default-features = false, features = ["deflate"] }
 quick-xml = "0.36"                          # OOXML (pptx / docx)
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "gzip", "brotli"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "gzip", "brotli", "json", "stream"] }
 scraper = "0.20"                            # HTML -> readable text (web links)
+
+# AI layer (Phase 3)
+keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
+eventsource-stream = "0.2"                  # SSE parsing for chat/completions
+futures-util = "0.3"
+sqlite-vec = "0.1"                          # vec0 virtual table for chunk_vectors
 
 # async + jobs
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "process", "fs"] }
@@ -60,6 +66,7 @@ tracing-appender = "0.2"
 
 [dev-dependencies]
 tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
 
 [profile.release]
 codegen-units = 1

@@ -69,11 +69,33 @@
   },
   "search": {
     "title": "Search",
-    "placeholder": "Search across every project"
+    "placeholder": "Search across every project",
+    "allProjects": "All projects",
+    "go": "Search",
+    "hint": "Search across your ingested sources by keyword or meaning.",
+    "noResults": "No matching results",
+    "keywordOnly": "Keyword search only — no search model configured",
+    "mode": {
+      "hybrid": "Hybrid",
+      "keyword": "Keyword",
+      "semantic": "Semantic"
+    }
   },
   "settings": {
     "title": "Settings",
-    "illustrator": "Enable Live Illustrator"
+    "illustrator": "Enable Live Illustrator",
+    "section": {
+      "appearance": "Appearance",
+      "ai": "AI"
+    },
+    "themeLabel": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "Follow system",
+    "displaySize": "Display size",
+    "readingFont": "Reading font",
+    "monochrome": "Monochrome",
+    "uiLanguage": "Interface language"
   },
   "common": {
     "loading": "Loading",
@@ -114,7 +136,14 @@
     "backendUnavailable": "Can't reach the backend. Restart the app.",
     "SOURCE_DUPLICATE": "That file is already in this project.",
     "SOURCE_UNSUPPORTED_FORMAT": "This format isn't supported.",
-    "PROJECT_DELETE_NAME_MISMATCH": "The project name doesn't match."
+    "PROJECT_DELETE_NAME_MISMATCH": "The project name doesn't match.",
+    "AI_AUTH": "The API key is wrong or lacks permission.",
+    "AI_UPSTREAM": "The AI endpoint is temporarily not responding.",
+    "AI_NETWORK": "Can't connect to the AI endpoint.",
+    "AI_NOT_CONFIGURED": "No AI connection is set up.",
+    "ai": {
+      "notConfigured": "No AI connection is set up."
+    }
   },
   "viewer": {
     "readonly": "Read-only",
@@ -131,5 +160,33 @@
     "illustrator": "Live Illustrator",
     "illustratorHandle": "Open Live Illustrator",
     "illustratorSoon": "Live Illustrator arrives in Phase 4."
+  },
+  "ai": {
+    "connections": "Connections",
+    "add": "Add",
+    "edit": "Edit",
+    "test": "Test",
+    "addTitle": "Add AI connection",
+    "editTitle": "Edit AI connection",
+    "noneTitle": "No AI connections",
+    "noneBody": "Add an OpenAI-compatible endpoint — a cloud API, LM Studio or Ollama.",
+    "roles": "Role assignments",
+    "roleNone": "(none)",
+    "model": "Model",
+    "preset": "Preset",
+    "name": "Name",
+    "baseUrl": "Base URL",
+    "apiKey": "API key",
+    "defaultModel": "Default model",
+    "optional": "Optional",
+    "keyStored": "Stored — type only to change it",
+    "unreachable": "Couldn't reach the endpoint.",
+    "embeddingNote": "No search model set. Semantic search is off; keyword search still works.",
+    "role": {
+      "chat": "Chat",
+      "vision": "Image understanding",
+      "embedding": "Search",
+      "organizer": "Text organizing"
+    }
   }
 }

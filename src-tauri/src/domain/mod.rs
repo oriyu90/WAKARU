@@ -4,8 +4,10 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod ai;
 pub mod job;
 pub mod project;
+pub mod search;
 pub mod source;
 pub mod viewer;
 

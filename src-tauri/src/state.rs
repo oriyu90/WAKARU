@@ -3,6 +3,7 @@
 
 use crate::error::{AppError, AppResult};
 use crate::jobs::JobRegistry;
+use crate::services::ai::StreamRegistry;
 use rusqlite::Connection;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -13,6 +14,7 @@ pub struct AppState {
     pub app_db: Mutex<Connection>,
     pub app_db_path: PathBuf,
     pub jobs: Arc<JobRegistry>,
+    pub streams: Arc<StreamRegistry>,
     pub data_dir: PathBuf,
     pub projects_dir: PathBuf,
 }

@@ -26,7 +26,21 @@ pub fn open_project_db(path: &Path) -> AppResult<Connection> {
     Ok(conn)
 }
 
+/// Register the `sqlite-vec` extension once, before any connection is opened, so
+/// every connection can use `vec0` virtual tables (docs/03 §4).
+pub fn register_extensions() {
+    use std::sync::Once;
+    static ONCE: Once = Once::new();
+    #[allow(clippy::missing_transmute_annotations)]
+    ONCE.call_once(|| unsafe {
+        rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute(
+            sqlite_vec::sqlite3_vec_init as *const (),
+        )));
+    });
+}
+
 pub fn open(path: &Path) -> AppResult<Connection> {
+    register_extensions();
     let conn = Connection::open(path)?;
     apply_pragmas(&conn)?;
     Ok(conn)
@@ -34,6 +48,7 @@ pub fn open(path: &Path) -> AppResult<Connection> {
 
 #[allow(dead_code)] // used by tests + Phase 1
 pub fn open_in_memory() -> AppResult<Connection> {
+    register_extensions();
     let conn = Connection::open_in_memory()?;
     apply_pragmas(&conn)?;
     Ok(conn)

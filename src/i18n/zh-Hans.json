@@ -67,11 +67,33 @@
   },
   "search": {
     "title": "搜索",
-    "placeholder": "在所有项目中搜索"
+    "placeholder": "在所有项目中搜索",
+    "allProjects": "所有项目",
+    "go": "搜索",
+    "hint": "按关键词或语义在已导入的资料中搜索。",
+    "noResults": "没有匹配的结果",
+    "keywordOnly": "仅关键词搜索——未配置检索模型",
+    "mode": {
+      "hybrid": "混合",
+      "keyword": "关键词",
+      "semantic": "语义"
+    }
   },
   "settings": {
     "title": "设置",
-    "illustrator": "启用实时讲解"
+    "illustrator": "启用实时讲解",
+    "section": {
+      "appearance": "显示",
+      "ai": "AI"
+    },
+    "themeLabel": "显示模式",
+    "light": "浅色",
+    "dark": "深色",
+    "system": "跟随系统",
+    "displaySize": "显示大小",
+    "readingFont": "阅读字体",
+    "monochrome": "单色",
+    "uiLanguage": "界面语言"
   },
   "common": {
     "loading": "加载中",
@@ -112,7 +134,14 @@
     "backendUnavailable": "无法连接后端，请重启应用。",
     "SOURCE_DUPLICATE": "该文件已存在于此项目。",
     "SOURCE_UNSUPPORTED_FORMAT": "不支持此格式。",
-    "PROJECT_DELETE_NAME_MISMATCH": "项目名称不匹配。"
+    "PROJECT_DELETE_NAME_MISMATCH": "项目名称不匹配。",
+    "AI_AUTH": "API 密钥错误或权限不足。",
+    "AI_UPSTREAM": "AI 端点暂时无响应。",
+    "AI_NETWORK": "无法连接 AI 端点。",
+    "AI_NOT_CONFIGURED": "尚未设置 AI 连接。",
+    "ai": {
+      "notConfigured": "尚未设置 AI 连接。"
+    }
   },
   "viewer": {
     "readonly": "只读",
@@ -129,5 +158,33 @@
     "illustrator": "实时讲解",
     "illustratorHandle": "打开实时讲解",
     "illustratorSoon": "实时讲解将在 Phase 4 实现。"
+  },
+  "ai": {
+    "connections": "连接",
+    "add": "添加",
+    "edit": "编辑",
+    "test": "测试",
+    "addTitle": "添加 AI 连接",
+    "editTitle": "编辑 AI 连接",
+    "noneTitle": "没有 AI 连接",
+    "noneBody": "添加一个 OpenAI 兼容端点——云 API、LM Studio 或 Ollama。",
+    "roles": "角色分配",
+    "roleNone": "（无）",
+    "model": "模型",
+    "preset": "预设",
+    "name": "名称",
+    "baseUrl": "Base URL",
+    "apiKey": "API 密钥",
+    "defaultModel": "默认模型",
+    "optional": "可选",
+    "keyStored": "已保存——仅在更改时输入",
+    "unreachable": "无法连接端点。",
+    "embeddingNote": "未设置检索模型。语义搜索已关闭，仅关键词搜索可用。",
+    "role": {
+      "chat": "对话",
+      "vision": "图像理解",
+      "embedding": "检索",
+      "organizer": "文本整理"
+    }
   }
 }

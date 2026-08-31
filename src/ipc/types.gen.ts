@@ -2,6 +2,18 @@
 
 export type AddFilesInput = { projectId: string, paths: Array<string>, };
 
+export type AiProfile = { id: string, name: string, baseUrl: string, 
+/**
+ * The API key is never returned — only whether one is stored.
+ */
+hasKey: boolean, defaultModel: string | null, supportsVision: boolean, supportsTools: boolean, supportsEmbed: boolean, jsonSchema: boolean, extraHeaders: Record<string, string>, timeoutMs: number, createdAt: string, lastOkAt: string | null, };
+
+export type AiProfileInput = { id: string | null, name: string, baseUrl: string, 
+/**
+ * Present only when the user typed or changed it. `""` clears the key.
+ */
+apiKey: string | null, defaultModel: string | null, extraHeaders: Record<string, string> | null, timeoutMs: number | null, };
+
 export type AppError = { code: string, message: string, i18nKey: string, details: unknown | null, retriable: boolean, };
 
 export type AppInfo = { version: string, buildDate: string, dataDir: string, license: string, };
@@ -49,6 +61,32 @@ export type ProjectColor = "accent-1" | "accent-2" | "accent-3" | "accent-4" | "
  */
 export type ProjectSummary = { id: string, name: string, description: string, color: ProjectColor, archived: boolean, sourceCount: number, lastOpenedAt: string | null, updatedAt: string, };
 
+/**
+ * A model role (docs/03 §3 `model_roles`). `organizer` falls back to `chat`,
+ * `embedding` falls back to local (Phase 3+: to "none / FTS only").
+ */
+export type Role = "chat" | "vision" | "embedding" | "organizer";
+
+export type RoleBinding = { profileId: string, model: string, params: Record<string, unknown>, };
+
+export type RoleBindings = { chat: RoleBinding | null, vision: RoleBinding | null, embedding: RoleBinding | null, organizer: RoleBinding | null, };
+
+export type SearchHit = { projectId: string, projectName: string, sourceId: string, sourceName: string, documentId: string | null, ordinal: number | null, snippet: string, locator: unknown, };
+
+export type SearchQuery = { scope: SearchScope, projectId: string | null, q: string, sourceId: string | null, limit: number, 
+/**
+ * "keyword" | "semantic" | "hybrid" (docs/06 §7). Ignored for global scope.
+ */
+mode: string | null, };
+
+export type SearchResults = { hits: Array<SearchHit>, 
+/**
+ * true when a semantic component ran (vs. FTS-only fallback).
+ */
+semantic: boolean, };
+
+export type SearchScope = "global" | "project";
+
 export type Source = { id: string, kind: SourceKind, originalName: string, url: string | null, mime: string | null, bytes: number, sha256: string | null, status: SourceStatus, errorCode: string | null, errorMessage: string | null, lang: string | null, pageCount: number | null, durationMs: number | null, summary: string | null, addedAt: string, analyzedAt: string | null, };
 
 /**
@@ -70,6 +108,29 @@ export type SourceStatus = "queued" | "analyzing" | "ready" | "ready_partial" | 
  * Emitted on `source://status` (docs/02 §5).
  */
 export type SourceStatusEvent = { projectId: string, sourceId: string, status: SourceStatus, errorCode: string | null, };
+
+/**
+ * `stream://delta` payload (docs/02 §5).
+ */
+export type StreamDelta = { streamId: string, 
+/**
+ * "text" | "reasoning"
+ */
+kind: string, text: string, };
+
+/**
+ * `stream://done` payload.
+ */
+export type StreamDone = { streamId: string, cancelled: boolean, truncated: boolean, usage: TokenUsage | null, };
+
+/**
+ * `stream://error` payload.
+ */
+export type StreamError = { streamId: string, error: AppError, };
+
+export type TestResult = { ok: boolean, models: Array<string>, latencyMs: number, supportsVision: boolean, supportsTools: boolean, supportsEmbed: boolean, jsonSchema: boolean, note: string | null, };
+
+export type TokenUsage = { promptTokens: number, completionTokens: number, };
 
 export type UpdateProjectInput = { id: string, name: string | null, description: string | null, color: ProjectColor | null, };
 

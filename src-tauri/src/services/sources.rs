@@ -412,6 +412,19 @@ fn spawn_ingest(
             let final_status = if outcome.partial { "ready_partial" } else { "ready" };
             set_status(&app, &project_db, &project_id, &source_id, final_status, None, None);
             tracing::info!(source = %source_id, docs = outcome.documents, chunks = outcome.chunks, "ingest done");
+
+            // Vector index (docs/05 §2). No-op when no embedding endpoint is set —
+            // search stays FTS-only (I-2).
+            match tauri::async_runtime::block_on(crate::services::embed::index_source(
+                &app_db,
+                &project_db,
+                &source_id,
+                |_, _| {},
+            )) {
+                Ok(n) if n > 0 => tracing::info!(source = %source_id, embedded = n, "vector index updated"),
+                Ok(_) => {}
+                Err(e) => tracing::warn!(source = %source_id, error = %e, "embedding failed (search stays FTS-only)"),
+            }
             Ok(())
         })();
 

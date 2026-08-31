@@ -1,7 +1,10 @@
 pub mod assets;
+pub mod ai;
 pub mod chunk;
+pub mod embed;
 pub mod ingest;
 pub mod projects;
 pub mod retrieval;
+pub mod search;
 pub mod sources;
 pub mod viewer;

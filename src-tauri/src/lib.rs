@@ -18,6 +18,7 @@ pub use domain::source::SourceKind;
 pub use services::retrieval::keyword_search;
 
 use jobs::JobRegistry;
+use services::ai::StreamRegistry;
 use state::AppState;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
@@ -52,6 +53,7 @@ pub fn run() {
                 app_db: Mutex::new(conn),
                 app_db_path: db_path,
                 jobs: Arc::new(JobRegistry::default()),
+                streams: Arc::new(StreamRegistry::default()),
                 data_dir,
                 projects_dir,
             });
@@ -87,6 +89,16 @@ pub fn run() {
             commands::viewer_update_locator,
             commands::viewer_pin_tab,
             commands::viewer_reorder_tabs,
+            commands::ai_list_profiles,
+            commands::ai_upsert_profile,
+            commands::ai_delete_profile,
+            commands::ai_test_profile,
+            commands::ai_get_role_bindings,
+            commands::ai_set_role_binding,
+            commands::ai_clear_role_binding,
+            commands::ai_cancel_request,
+            commands::ai_debug_chat,
+            commands::search_query,
         ])
         .run(tauri::generate_context!())
         .expect("error while running WAKARU");

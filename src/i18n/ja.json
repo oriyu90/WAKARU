@@ -67,11 +67,33 @@
   },
   "search": {
     "title": "検索",
-    "placeholder": "すべてのプロジェクトを横断して検索"
+    "placeholder": "すべてのプロジェクトを横断して検索",
+    "allProjects": "すべてのプロジェクト",
+    "go": "検索",
+    "hint": "キーワードまたは意味で、取り込んだ資料の中を検索します。",
+    "noResults": "該当する結果がありません",
+    "keywordOnly": "検索用モデル未設定のためキーワード検索のみ",
+    "mode": {
+      "hybrid": "ハイブリッド",
+      "keyword": "キーワード",
+      "semantic": "意味検索"
+    }
   },
   "settings": {
     "title": "設定",
-    "illustrator": "ライブ解説を有効化"
+    "illustrator": "ライブ解説を有効化",
+    "section": {
+      "appearance": "表示",
+      "ai": "AI"
+    },
+    "themeLabel": "表示モード",
+    "light": "ライト",
+    "dark": "ダーク",
+    "system": "システムに従う",
+    "displaySize": "表示サイズ",
+    "readingFont": "読み物フォント",
+    "monochrome": "モノトーン",
+    "uiLanguage": "表示言語"
   },
   "common": {
     "loading": "読み込み中",
@@ -112,7 +134,14 @@
     "backendUnavailable": "バックエンドに接続できません。アプリを再起動してください。",
     "SOURCE_DUPLICATE": "このファイルはすでにこのプロジェクトにあります。",
     "SOURCE_UNSUPPORTED_FORMAT": "この形式には対応していません。",
-    "PROJECT_DELETE_NAME_MISMATCH": "プロジェクト名が一致しません。"
+    "PROJECT_DELETE_NAME_MISMATCH": "プロジェクト名が一致しません。",
+    "AI_AUTH": "API キーが正しくないか、権限がありません。",
+    "AI_UPSTREAM": "AI エンドポイントが一時的に応答していません。",
+    "AI_NETWORK": "AI エンドポイントに接続できません。",
+    "AI_NOT_CONFIGURED": "AI 接続が設定されていません。",
+    "ai": {
+      "notConfigured": "AI 接続が設定されていません。"
+    }
   },
   "viewer": {
     "readonly": "閲覧専用",
@@ -129,5 +158,33 @@
     "illustrator": "ライブ解説",
     "illustratorHandle": "ライブ解説を開く",
     "illustratorSoon": "ライブ解説は Phase 4 で実装されます。"
+  },
+  "ai": {
+    "connections": "接続先",
+    "add": "追加",
+    "edit": "編集",
+    "test": "接続テスト",
+    "addTitle": "AI 接続を追加",
+    "editTitle": "AI 接続を編集",
+    "noneTitle": "AI 接続がありません",
+    "noneBody": "OpenAI 互換のエンドポイント（クラウド API・LM Studio・Ollama）を登録します。",
+    "roles": "役割の割り当て",
+    "roleNone": "（なし）",
+    "model": "モデル名",
+    "preset": "プリセット",
+    "name": "名前",
+    "baseUrl": "Base URL",
+    "apiKey": "API キー",
+    "defaultModel": "既定モデル",
+    "optional": "任意",
+    "keyStored": "保存済み（変更する場合のみ入力）",
+    "unreachable": "エンドポイントに到達できませんでした。",
+    "embeddingNote": "検索用モデルが未設定です。意味検索は無効で、キーワード検索のみ動作します。",
+    "role": {
+      "chat": "チャット",
+      "vision": "画像理解",
+      "embedding": "検索",
+      "organizer": "テキスト整形"
+    }
   }
 }
