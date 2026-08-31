@@ -56,7 +56,9 @@
       "reanalyze": "再解析",
       "delete": "削除",
       "unsupported": "この形式には対応していません。PDF などに変換してから追加してください。",
-      "count_other": "{{count}} 件"
+      "count_other": "{{count}} 件",
+      "addLink": "リンクを追加",
+      "linkHint": "http(s) の URL。本文を抽出して保存します。"
     }
   },
   "fileModifier": {

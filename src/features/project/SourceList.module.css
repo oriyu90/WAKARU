@@ -133,3 +133,8 @@
 .dropHint[data-dragging="true"] {
   color: var(--color-accent);
 }
+
+.toolbarActions {
+  display: inline-flex;
+  gap: var(--space-xs);
+}

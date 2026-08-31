@@ -58,7 +58,9 @@
       "delete": "Delete",
       "unsupported": "This format isn't supported. Convert it (e.g. to PDF) and add it again.",
       "count_one": "{{count}} item",
-      "count_other": "{{count}} items"
+      "count_other": "{{count}} items",
+      "addLink": "Add link",
+      "linkHint": "An http(s) URL. The readable text is extracted and saved."
     }
   },
   "fileModifier": {

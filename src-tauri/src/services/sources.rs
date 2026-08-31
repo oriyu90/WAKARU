@@ -6,7 +6,7 @@
 use crate::domain::source::*;
 use crate::error::{AppError, AppResult};
 use crate::jobs::JobRegistry;
-use crate::services::ingest::{self, IngestCtx};
+use crate::services::ingest::{self, IngestCtx, IngestInput};
 use crate::services::projects;
 use crate::storage::{self, migrate::now_iso8601};
 use rusqlite::{params, Connection, OptionalExtension};
@@ -148,13 +148,53 @@ pub fn add_files(
                 project_id.to_string(),
                 added.source.id.clone(),
                 kind,
-                added.dest,
+                IngestInput::File(added.dest),
             );
         }
         created.push(added.source);
     }
 
     Ok(created)
+}
+
+/// Add a web link as a source (docs/04 §8). The row is created immediately;
+/// fetch + parse happen on the ingest job.
+pub fn add_url(
+    app: &AppHandle,
+    app_db_path: &Path,
+    projects_root: &Path,
+    jobs: Arc<JobRegistry>,
+    project_id: &str,
+    url: &str,
+) -> AppResult<Source> {
+    let url = url.trim();
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err(AppError::new(
+            "WEB_BLOCKED",
+            "error.web.blocked",
+            "only http(s) URLs can be added",
+        ));
+    }
+    let project_db = projects::open_db(projects_root, project_id)?;
+    let id = Uuid::now_v7().to_string();
+    project_db.execute(
+        "INSERT INTO sources (id, kind, original_name, rel_path, url, bytes, status, added_at)
+         VALUES (?1, 'weblink', ?2, '', ?3, 0, 'queued', ?4)",
+        params![id, url, url, now_iso8601()],
+    )?;
+    let source = get(&project_db, &id)?;
+    emit_status(app, project_id, &source);
+    spawn_ingest(
+        app.clone(),
+        app_db_path.to_path_buf(),
+        projects_root.to_path_buf(),
+        jobs,
+        project_id.to_string(),
+        id,
+        SourceKind::Weblink,
+        IngestInput::Url(url.to_string()),
+    );
+    Ok(source)
 }
 
 #[derive(Debug)]
@@ -259,7 +299,13 @@ pub fn reanalyze(
         "UPDATE sources SET status='queued', error_code=NULL, error_message=NULL WHERE id=?1",
         [source_id],
     )?;
-    let dest = projects::project_dir(projects_root, project_id).join(rel_path_of(&project_db, source_id)?);
+    let input = if source.kind == SourceKind::Weblink {
+        IngestInput::Url(source.url.clone().unwrap_or_default())
+    } else {
+        IngestInput::File(
+            projects::project_dir(projects_root, project_id).join(rel_path_of(&project_db, source_id)?),
+        )
+    };
     spawn_ingest(
         app.clone(),
         app_db_path.to_path_buf(),
@@ -268,7 +314,7 @@ pub fn reanalyze(
         project_id.to_string(),
         source_id.to_string(),
         kind,
-        dest,
+        input,
     );
     Ok(())
 }
@@ -318,7 +364,7 @@ fn spawn_ingest(
     project_id: String,
     source_id: String,
     kind: SourceKind,
-    abs_path: PathBuf,
+    input: IngestInput,
 ) {
     use crate::domain::JobKind;
     let (job_id, token) = jobs.create(JobKind::Ingest, Some(project_id.clone()), Some(source_id.clone()));
@@ -347,14 +393,20 @@ fn spawn_ingest(
                 source_name: &name,
                 project_dir: &projects::project_dir(&projects_root, &project_id),
             };
-            let outcome = ingest::run(&ctx, kind, &abs_path)?;
+            let outcome = ingest::run(&ctx, kind, &input)?;
             project_db.execute(
-                "UPDATE sources SET status=?2, lang=?3, analyzed_at=?4, error_code=NULL, error_message=NULL WHERE id=?1",
+                "UPDATE sources
+                   SET status=?2, lang=?3, page_count=?4, analyzed_at=?5,
+                       original_name=COALESCE(?6, original_name),
+                       error_code=NULL, error_message=NULL
+                 WHERE id=?1",
                 params![
                     source_id,
                     if outcome.partial { "ready_partial" } else { "ready" },
                     outcome.lang,
-                    now_iso8601()
+                    outcome.page_count.map(|v| v as i64),
+                    now_iso8601(),
+                    outcome.title_override,
                 ],
             )?;
             let final_status = if outcome.partial { "ready_partial" } else { "ready" };

@@ -33,6 +33,23 @@ pub fn source_add_files(
 }
 
 #[tauri::command]
+pub fn source_add_url(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    project_id: String,
+    url: String,
+) -> AppResult<crate::domain::source::Source> {
+    sources::add_url(
+        &app,
+        &state.app_db_path,
+        &state.projects_dir,
+        state.jobs.clone(),
+        &project_id,
+        &url,
+    )
+}
+
+#[tauri::command]
 pub fn source_reanalyze(
     app: AppHandle,
     state: State<'_, AppState>,

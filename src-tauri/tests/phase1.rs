@@ -4,7 +4,7 @@
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 use wakaru_lib::domain::project::CreateProjectInput;
-use wakaru_lib::services::ingest::{self, IngestCtx};
+use wakaru_lib::services::ingest::{self, IngestCtx, IngestInput};
 use wakaru_lib::services::{projects, sources};
 use wakaru_lib::storage;
 use wakaru_lib::SourceKind;
@@ -59,11 +59,19 @@ impl Env {
             source_name: &name,
             project_dir: &projects::project_dir(&self.projects_dir, project_id),
         };
-        let out = ingest::run(&ctx, added.kind.unwrap_or(kind_hint), &added.dest)
-            .map_err(|e| e.code.clone())?;
+        let out = ingest::run(
+            &ctx,
+            added.kind.unwrap_or(kind_hint),
+            &IngestInput::File(added.dest.clone()),
+        )
+        .map_err(|e| e.code.clone())?;
         pdb.execute(
-            "UPDATE sources SET status='ready', analyzed_at='now' WHERE id=?1",
-            [&added.source.id],
+            "UPDATE sources SET status=?2, page_count=?3, analyzed_at='now' WHERE id=?1",
+            rusqlite::params![
+                added.source.id,
+                if out.partial { "ready_partial" } else { "ready" },
+                out.page_count.map(|v| v as i64),
+            ],
         )
         .unwrap();
         Ok((added.source.id, out.documents, out.chunks))
@@ -186,6 +194,40 @@ fn ac_1_10_delete_removes_documents_chunks_and_files() {
     let chunks: i64 = pdb.query_row("SELECT count(*) FROM chunks WHERE source_id=?1", [&sid], |r| r.get(0)).unwrap();
     assert_eq!((docs, chunks), (0, 0));
     assert!(!env.projects_dir.join(&id).join("derived").join(&sid).exists());
+}
+
+#[test]
+fn image_ingest_normalises_and_writes_a_derived_page() {
+    let env = Env::new();
+    let id = env.create_project("p");
+    let tmp = tempfile::tempdir().unwrap();
+    let p = tmp.path().join("photo.png");
+    // 4000px wide -> must be resized to <= 2048.
+    let buf = image::RgbImage::from_fn(4000, 100, |x, _| {
+        image::Rgb([(x % 256) as u8, 0, 0])
+    });
+    buf.save(&p).unwrap();
+
+    let (sid, docs, chunks) = env.add_and_ingest(&id, &p, SourceKind::Image).unwrap();
+    assert_eq!(docs, 1);
+    assert!(chunks >= 1);
+    let derived = env.projects_dir.join(&id).join("derived").join(&sid).join("pages").join("0001.png");
+    assert!(derived.is_file(), "normalised image not written");
+    let (w, _) = image::image_dimensions(&derived).unwrap();
+    assert!(w <= 2048, "image not resized: {w}px");
+
+    let pdb = env.pdb(&id);
+    let (status, image_rel): (String, Option<String>) = pdb
+        .query_row(
+            "SELECT s.status, d.image_rel FROM sources s
+             JOIN documents d ON d.source_id = s.id WHERE s.id = ?1",
+            [&sid],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    // No Vision yet -> ready_partial, and the document points at the derived page.
+    assert_eq!(status, "ready_partial");
+    assert_eq!(image_rel.as_deref(), Some("pages/0001.png"));
 }
 
 #[test]

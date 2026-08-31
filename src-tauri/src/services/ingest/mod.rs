@@ -1,10 +1,15 @@
 //! Ingest pipeline (docs/04). Phase 1 covers the AI-free static formats:
-//! text / markdown / json / jsonl / code and csv / tsv. PDF, images, office and
-//! web links land in a follow-up commit; audio/video in Phase 5; Vision analysis
-//! in Phase 4.
+//! text / markdown / json / jsonl / code, csv / tsv, PDF text, images
+//! (normalise + EXIF), pptx / docx / xlsx (no office engine), and web links
+//! (fetch + SSRF guard + readable text). Audio / video are Phase 5; PDF/slide
+//! rasterisation is Phase 2 (D-09); Vision analysis of pages/images is Phase 4.
 
+mod image;
+mod office;
+mod pdf;
 mod sheet;
 mod text;
+mod web;
 
 use crate::domain::source::SourceKind;
 use crate::error::{AppError, AppResult};
@@ -24,6 +29,12 @@ pub struct Unit {
     pub locator: serde_json::Value,
 }
 
+/// What a source points at: a copied file, or a URL (weblink).
+pub enum IngestInput {
+    File(PathBuf),
+    Url(String),
+}
+
 pub struct IngestCtx<'a> {
     pub project_db: &'a Connection,
     pub app_db: &'a Connection,
@@ -37,8 +48,21 @@ pub struct Outcome {
     pub documents: u32,
     pub chunks: u32,
     pub lang: Option<String>,
+    pub page_count: Option<u32>,
+    /// Set by the weblink parser from the page `<title>`.
+    pub title_override: Option<String>,
     /// true if some non-fatal step (AI) was skipped — caller sets ready_partial.
     pub partial: bool,
+}
+
+struct Parsed {
+    units: Vec<Unit>,
+    page_count: Option<u32>,
+    /// derived-relative image for `documents[0].image_rel` (images, PDF raster).
+    first_image_rel: Option<String>,
+    title_override: Option<String>,
+    /// AI step skipped (image with no Vision yet) — ready_partial.
+    partial: bool,
 }
 
 pub fn derived_dir(project_dir: &Path, source_id: &str) -> PathBuf {
@@ -47,7 +71,7 @@ pub fn derived_dir(project_dir: &Path, source_id: &str) -> PathBuf {
 
 /// Run the whole pipeline for one source. Idempotent: wipes `derived/<sid>/`
 /// and the source's documents/chunks first (docs/04 §0).
-pub fn run(ctx: &IngestCtx, kind: SourceKind, abs_path: &Path) -> AppResult<Outcome> {
+pub fn run(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput) -> AppResult<Outcome> {
     let dd = derived_dir(ctx.project_dir, ctx.source_id);
     if dd.exists() {
         std::fs::remove_dir_all(&dd)?;
@@ -60,19 +84,14 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, abs_path: &Path) -> AppResult<Outc
         [ctx.source_id],
     )?;
 
-    let units = match kind {
-        SourceKind::Text | SourceKind::Markdown | SourceKind::Code => text::parse_text(kind, abs_path)?,
-        SourceKind::Json => text::parse_json(abs_path)?,
-        SourceKind::Jsonl => text::parse_jsonl(abs_path)?,
-        SourceKind::Sheet => sheet::parse_sheet(abs_path)?,
-        other => {
-            return Err(AppError::new(
-                "SOURCE_UNSUPPORTED_FORMAT",
-                "error.source.unsupported",
-                format!("ingest for {other:?} is not implemented yet"),
-            ))
-        }
-    };
+    let parsed = parse(kind, input, &dd)?;
+    let Parsed {
+        units,
+        page_count,
+        first_image_rel,
+        title_override,
+        partial,
+    } = parsed;
 
     if units.is_empty() {
         return Err(AppError::new(
@@ -98,11 +117,12 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, abs_path: &Path) -> AppResult<Outc
     let now = now_iso8601();
     let mut total_chunks = 0u32;
 
-    for u in &units {
+    for (di, u) in units.iter().enumerate() {
         let doc_id = Uuid::now_v7().to_string();
+        let image_rel = if di == 0 { first_image_rel.as_deref() } else { None };
         ctx.project_db.execute(
-            "INSERT INTO documents (id, source_id, ordinal, kind, title, text, locator)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO documents (id, source_id, ordinal, kind, title, text, image_rel, locator)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 doc_id,
                 ctx.source_id,
@@ -110,6 +130,7 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, abs_path: &Path) -> AppResult<Outc
                 u.kind,
                 u.title,
                 u.text,
+                image_rel,
                 u.locator.to_string()
             ],
         )?;
@@ -169,8 +190,91 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, abs_path: &Path) -> AppResult<Outc
         documents: units.len() as u32,
         chunks: total_chunks,
         lang,
-        partial: false,
+        page_count: page_count.or(Some(units.len() as u32)),
+        title_override,
+        partial,
     })
+}
+
+/// Dispatch to the format parser. `dd` is `derived/<sid>/`.
+fn parse(kind: SourceKind, input: &IngestInput, dd: &Path) -> AppResult<Parsed> {
+    let file = |input: &IngestInput| -> AppResult<PathBuf> {
+        match input {
+            IngestInput::File(p) => Ok(p.clone()),
+            IngestInput::Url(_) => Err(AppError::internal("expected a file, got a URL")),
+        }
+    };
+
+    Ok(match kind {
+        SourceKind::Text | SourceKind::Markdown | SourceKind::Code => Parsed::plain(
+            text::parse_text(kind, &file(input)?)?,
+        ),
+        SourceKind::Json => Parsed::plain(text::parse_json(&file(input)?)?),
+        SourceKind::Jsonl => Parsed::plain(text::parse_jsonl(&file(input)?)?),
+        SourceKind::Pdf => {
+            let units = pdf::parse_pdf(&file(input)?)?;
+            let pc = units.len() as u32;
+            Parsed { page_count: Some(pc), ..Parsed::plain(units) }
+        }
+        SourceKind::Sheet => {
+            let p = file(input)?;
+            let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+            let units = if ext == "xlsx" || ext == "xls" || ext == "xlsm" {
+                office::parse_office(SourceKind::Sheet, &p)?
+            } else {
+                sheet::parse_sheet(&p)?
+            };
+            Parsed::plain(units)
+        }
+        SourceKind::Slides | SourceKind::Doc => {
+            let units = office::parse_office(kind, &file(input)?)?;
+            let pc = if kind == SourceKind::Slides { Some(units.len() as u32) } else { None };
+            Parsed { page_count: pc, ..Parsed::plain(units) }
+        }
+        SourceKind::Image => {
+            let r = image::parse_image(&file(input)?, dd)?;
+            Parsed {
+                units: r.units,
+                page_count: Some(1),
+                first_image_rel: Some(r.derived_rel),
+                title_override: None,
+                partial: true, // no Vision analysis until Phase 4
+            }
+        }
+        SourceKind::Weblink => {
+            let url = match input {
+                IngestInput::Url(u) => u.clone(),
+                IngestInput::File(_) => return Err(AppError::internal("weblink needs a URL")),
+            };
+            let r = web::fetch_and_parse(&url, dd, false)?;
+            Parsed {
+                units: r.units,
+                page_count: None,
+                first_image_rel: None,
+                title_override: r.title,
+                partial: false,
+            }
+        }
+        SourceKind::Audio | SourceKind::Video => {
+            return Err(AppError::new(
+                "SOURCE_UNSUPPORTED_FORMAT",
+                "error.source.unsupported",
+                "audio/video transcription arrives in Phase 5",
+            ))
+        }
+    })
+}
+
+impl Parsed {
+    fn plain(units: Vec<Unit>) -> Self {
+        Parsed {
+            units,
+            page_count: None,
+            first_image_rel: None,
+            title_override: None,
+            partial: false,
+        }
+    }
 }
 
 fn provenance_header(source_name: &str, u: &Unit) -> String {

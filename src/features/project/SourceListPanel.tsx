@@ -5,6 +5,9 @@ import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { ErrorState } from "../../components/ErrorState";
 import { Skeleton } from "../../components/Skeleton";
+import { Dialog } from "../../components/Dialog";
+import { Field } from "../../components/Field";
+import { Input } from "../../components/Input";
 import { PlusIcon } from "../../app/Icons";
 import { sourcesApi, pickSourceFiles } from "../../ipc/sources";
 import { useToast } from "../../components/useToast";
@@ -18,6 +21,8 @@ export function SourceListPanel({ projectId }: { projectId: string }) {
   const qc = useQueryClient();
   const toast = useToast();
   const [dragging, setDragging] = useState(false);
+  const [urlDialog, setUrlDialog] = useState(false);
+  const [url, setUrl] = useState("");
 
   const key = ["sources", projectId];
   const sources = useQuery({
@@ -51,6 +56,24 @@ export function SourceListPanel({ projectId }: { projectId: string }) {
       } else {
         toast.push({ tone: "error", message: t("errors.internal") });
       }
+    },
+  });
+
+  const addUrl = useMutation({
+    mutationFn: (u: string) => sourcesApi.addUrl(projectId, u),
+    onSuccess: () => {
+      setUrl("");
+      setUrlDialog(false);
+      qc.invalidateQueries({ queryKey: key });
+    },
+    onError: (err) => {
+      toast.push({
+        tone: "error",
+        message:
+          err instanceof IpcError
+            ? t([`errors.${err.code}`, "errors.internal"])
+            : t("errors.internal"),
+      });
     },
   });
 
@@ -90,15 +113,20 @@ export function SourceListPanel({ projectId }: { projectId: string }) {
         <span className={styles.count}>
           {t("project.sources.count", { count: list.length })}
         </span>
-        <Button
-          size="sm"
-          variant="primary"
-          icon={<PlusIcon size={14} />}
-          loading={add.isPending}
-          onClick={onAddClick}
-        >
-          {t("project.sources.add")}
-        </Button>
+        <span className={styles.toolbarActions}>
+          <Button size="sm" variant="quiet" onClick={() => setUrlDialog(true)}>
+            {t("project.sources.addLink")}
+          </Button>
+          <Button
+            size="sm"
+            variant="primary"
+            icon={<PlusIcon size={14} />}
+            loading={add.isPending}
+            onClick={onAddClick}
+          >
+            {t("project.sources.add")}
+          </Button>
+        </span>
       </header>
 
       <div className={styles.body}>
@@ -129,6 +157,40 @@ export function SourceListPanel({ projectId }: { projectId: string }) {
       <p className={styles.dropHint} data-dragging={dragging}>
         {t("project.sources.drop")}
       </p>
+
+      <Dialog
+        open={urlDialog}
+        onClose={() => setUrlDialog(false)}
+        title={t("project.sources.addLink")}
+        footer={
+          <>
+            <Button variant="quiet" onClick={() => setUrlDialog(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              loading={addUrl.isPending}
+              disabled={!/^https?:\/\//i.test(url.trim())}
+              onClick={() => addUrl.mutate(url.trim())}
+            >
+              {t("project.sources.add")}
+            </Button>
+          </>
+        }
+      >
+        <Field label="URL" hint={t("project.sources.linkHint")}>
+          {({ id }) => (
+            <Input
+              id={id}
+              type="url"
+              value={url}
+              autoFocus
+              placeholder="https://example.com/article"
+              onChange={(e) => setUrl(e.target.value)}
+            />
+          )}
+        </Field>
+      </Dialog>
     </div>
   );
 }

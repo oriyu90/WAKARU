@@ -72,6 +72,7 @@ pub fn run() {
             commands::source_list,
             commands::source_get,
             commands::source_add_files,
+            commands::source_add_url,
             commands::source_reanalyze,
             commands::source_delete,
         ])

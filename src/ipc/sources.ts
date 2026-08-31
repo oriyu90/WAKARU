@@ -7,6 +7,8 @@ export const sourcesApi = {
     call<Source>("source_get", { projectId, sourceId }),
   addFiles: (projectId: string, paths: string[]) =>
     call<Source[]>("source_add_files", { input: { projectId, paths } }),
+  addUrl: (projectId: string, url: string) =>
+    call<Source>("source_add_url", { projectId, url }),
   reanalyze: (projectId: string, sourceId: string) =>
     call<void>("source_reanalyze", { projectId, sourceId }),
   delete: (projectId: string, sourceId: string) =>
