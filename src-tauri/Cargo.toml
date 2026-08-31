@@ -54,6 +54,10 @@ eventsource-stream = "0.2"                  # SSE parsing for chat/completions
 futures-util = "0.3"
 sqlite-vec = "0.1"                          # vec0 virtual table for chunk_vectors
 
+# File Modifier (Phase 8)
+printpdf = "0.7"                            # images -> PDF
+base64 = "0.22"                             # small image previews
+
 # async + jobs
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "process", "fs"] }
 tokio-util = { version = "0.7", features = ["rt"] }

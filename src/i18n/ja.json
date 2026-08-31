@@ -63,7 +63,39 @@
   },
   "fileModifier": {
     "title": "ファイル変換",
-    "subtitle": "プロジェクトに属さない単発の変換。"
+    "subtitle": "プロジェクトに属さない単発の変換。",
+    "imagesToPdf": "画像をPDFにまとめる",
+    "textToDoc": "テキストを整理して保存",
+    "addImages": "画像を追加",
+    "imagesEmpty": "「画像を追加」から複数の画像を選び、順序を並べ替えてPDF化します。",
+    "pageSize": "ページサイズ",
+    "fitImage": "画像に合わせる",
+    "orientation": "向き",
+    "auto": "自動",
+    "portrait": "縦",
+    "landscape": "横",
+    "margin": "余白",
+    "marginNone": "なし",
+    "fit": "合わせ方",
+    "contain": "全体を収める",
+    "cover": "埋める（一部が切れます）",
+    "outputDir": "出力先",
+    "choose": "選択",
+    "fileName": "ファイル名",
+    "createPdf": "PDFを作成",
+    "overwrite": "同名のファイルがあります。上書きしますか？",
+    "wrote": "保存しました: {{path}}",
+    "pasted": "貼り付けたテキスト",
+    "pastePlaceholder": "ここに貼り付け…",
+    "organised": "整理後（Markdown）",
+    "willOrganise": "「整形」で AI が構造化します（要約はしません）。",
+    "organise": "整形",
+    "showDiff": "差分を表示",
+    "shrunkWarn": "元の70%未満です。情報が落ちていないか差分で確認してください。",
+    "saveAs": "保存形式",
+    "organisedMd": "整理されたMD",
+    "plainTxt": "そのままTXT",
+    "count": "文字"
   },
   "search": {
     "title": "検索",
@@ -160,6 +192,9 @@
     "AI_NOT_CONFIGURED": "AI 接続が設定されていません。",
     "ai": {
       "notConfigured": "AI 接続が設定されていません。"
+    },
+    "fm": {
+      "badImage": "画像を読み込めませんでした。"
     }
   },
   "viewer": {

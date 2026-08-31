@@ -65,7 +65,39 @@
   },
   "fileModifier": {
     "title": "File Modifier",
-    "subtitle": "One-off conversions that don't belong to a project."
+    "subtitle": "One-off conversions that don't belong to a project.",
+    "imagesToPdf": "Images → PDF",
+    "textToDoc": "Text → MD / TXT",
+    "addImages": "Add images",
+    "imagesEmpty": "Add several images, reorder them, and combine into a PDF.",
+    "pageSize": "Page size",
+    "fitImage": "Fit to image",
+    "orientation": "Orientation",
+    "auto": "Auto",
+    "portrait": "Portrait",
+    "landscape": "Landscape",
+    "margin": "Margin",
+    "marginNone": "None",
+    "fit": "Fit",
+    "contain": "Contain",
+    "cover": "Cover (crops)",
+    "outputDir": "Output folder",
+    "choose": "Choose",
+    "fileName": "File name",
+    "createPdf": "Create PDF",
+    "overwrite": "A file with that name exists. Overwrite?",
+    "wrote": "Saved: {{path}}",
+    "pasted": "Pasted text",
+    "pastePlaceholder": "Paste here…",
+    "organised": "Organised (Markdown)",
+    "willOrganise": "\"Organise\" structures it with AI — it does not summarise.",
+    "organise": "Organise",
+    "showDiff": "Show diff",
+    "shrunkWarn": "Under 70% of the original — check the diff for lost content.",
+    "saveAs": "Save as",
+    "organisedMd": "Organised MD",
+    "plainTxt": "Plain TXT",
+    "count": "chars"
   },
   "search": {
     "title": "Search",
@@ -162,6 +194,9 @@
     "AI_NOT_CONFIGURED": "No AI connection is set up.",
     "ai": {
       "notConfigured": "No AI connection is set up."
+    },
+    "fm": {
+      "badImage": "Couldn't read the image."
     }
   },
   "viewer": {

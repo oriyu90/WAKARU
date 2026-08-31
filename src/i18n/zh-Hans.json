@@ -63,7 +63,39 @@
   },
   "fileModifier": {
     "title": "文件转换",
-    "subtitle": "不属于任何项目的一次性转换。"
+    "subtitle": "不属于任何项目的一次性转换。",
+    "imagesToPdf": "图片 → PDF",
+    "textToDoc": "文本 → MD / TXT",
+    "addImages": "添加图片",
+    "imagesEmpty": "添加多张图片，排序后合并为 PDF。",
+    "pageSize": "页面大小",
+    "fitImage": "适应图片",
+    "orientation": "方向",
+    "auto": "自动",
+    "portrait": "纵向",
+    "landscape": "横向",
+    "margin": "边距",
+    "marginNone": "无",
+    "fit": "适应方式",
+    "contain": "完整显示",
+    "cover": "填满（会裁剪）",
+    "outputDir": "输出文件夹",
+    "choose": "选择",
+    "fileName": "文件名",
+    "createPdf": "创建 PDF",
+    "overwrite": "已存在同名文件，是否覆盖？",
+    "wrote": "已保存：{{path}}",
+    "pasted": "粘贴的文本",
+    "pastePlaceholder": "在此粘贴…",
+    "organised": "整理后（Markdown）",
+    "willOrganise": "「整理」用 AI 进行结构化，不做摘要。",
+    "organise": "整理",
+    "showDiff": "显示差异",
+    "shrunkWarn": "少于原文 70%，请通过差异检查是否丢失内容。",
+    "saveAs": "保存格式",
+    "organisedMd": "整理后的 MD",
+    "plainTxt": "原样 TXT",
+    "count": "字符"
   },
   "search": {
     "title": "搜索",
@@ -160,6 +192,9 @@
     "AI_NOT_CONFIGURED": "尚未设置 AI 连接。",
     "ai": {
       "notConfigured": "尚未设置 AI 连接。"
+    },
+    "fm": {
+      "badImage": "无法读取图片。"
     }
   },
   "viewer": {
