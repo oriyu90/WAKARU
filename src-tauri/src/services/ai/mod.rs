@@ -3,8 +3,8 @@
 //! and Studio (P6) build on.
 
 pub mod client;
-pub mod profiles;
 pub mod probe;
+pub mod profiles;
 
 use crate::domain::ai::*;
 use crate::error::{AppError, AppResult};
@@ -26,7 +26,10 @@ impl StreamRegistry {
     pub fn start(&self) -> (String, CancellationToken) {
         let id = Uuid::now_v7().to_string();
         let token = CancellationToken::new();
-        self.inner.lock().unwrap().insert(id.clone(), token.clone());
+        self.inner
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(id.clone(), token.clone());
         (id, token)
     }
     /// Register a token under a caller-chosen key (Studio uses `studio:<tabId>`
@@ -34,11 +37,14 @@ impl StreamRegistry {
     /// Any existing token under the key is replaced.
     pub fn start_keyed(&self, key: &str) -> CancellationToken {
         let token = CancellationToken::new();
-        self.inner.lock().unwrap().insert(key.to_string(), token.clone());
+        self.inner
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(key.to_string(), token.clone());
         token
     }
     pub fn cancel(&self, id: &str) -> bool {
-        if let Some(t) = self.inner.lock().unwrap().get(id) {
+        if let Some(t) = self.inner.lock().unwrap_or_else(|e| e.into_inner()).get(id) {
             t.cancel();
             true
         } else {
@@ -46,30 +52,41 @@ impl StreamRegistry {
         }
     }
     pub fn finish(&self, id: &str) {
-        self.inner.lock().unwrap().remove(id);
+        self.inner
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(id);
     }
 }
 
 /// `ai_test_profile` — probe reachability + capabilities and persist them.
-pub async fn test_profile(app_db_path: &std::path::Path, profile_id: &str) -> AppResult<TestResult> {
+pub async fn test_profile(
+    app_db_path: &std::path::Path,
+    profile_id: &str,
+) -> AppResult<TestResult> {
     // Read the profile with a short-lived connection (this runs off the command thread).
-    let (base_url, headers, timeout, model) = {
+    let (base_url, protocol, headers, timeout, model) = {
         let conn = crate::storage::open(app_db_path)?;
         let p = profiles::get(&conn, profile_id)?;
         let headers: Vec<(String, String)> = p
             .extra_headers
             .as_object()
-            .map(|o| o.iter().filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string()))).collect())
+            .map(|o| {
+                o.iter()
+                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                    .collect()
+            })
             .unwrap_or_default();
         (
             p.base_url,
+            p.protocol,
             headers,
             p.timeout_ms,
             p.default_model.unwrap_or_else(|| "gpt-4o-mini".into()),
         )
     };
     let key = profiles::get_key(profile_id);
-    let cl = AiClient::new(&base_url, key, headers, timeout)?;
+    let cl = AiClient::new(protocol, &base_url, key, headers, timeout)?;
     let result = probe::probe(&cl, &model).await?;
 
     let conn = crate::storage::open(app_db_path)?;
@@ -92,11 +109,15 @@ pub async fn stream_chat(
     let emit_err = |e: AppError| {
         let _ = app.emit(
             "stream://error",
-            StreamError { stream_id: stream_id.clone(), error: e },
+            StreamError {
+                stream_id: stream_id.clone(),
+                error: e,
+            },
         );
     };
 
     let client = match AiClient::new(
+        resolved.protocol,
         &resolved.base_url,
         resolved.api_key,
         resolved.extra_headers,
@@ -113,12 +134,22 @@ pub async fn stream_chat(
     let sid = stream_id.clone();
     let app2 = app.clone();
     let res = client
-        .chat_stream(&resolved.model, messages, &resolved.params, &token, move |kind, text| {
-            let _ = app2.emit(
-                "stream://delta",
-                StreamDelta { stream_id: sid.clone(), kind: kind.to_string(), text: text.to_string() },
-            );
-        })
+        .chat_stream(
+            &resolved.model,
+            messages,
+            &resolved.params,
+            &token,
+            move |kind, text| {
+                let _ = app2.emit(
+                    "stream://delta",
+                    StreamDelta {
+                        stream_id: sid.clone(),
+                        kind: kind.to_string(),
+                        text: text.to_string(),
+                    },
+                );
+            },
+        )
         .await;
 
     match res {
@@ -141,7 +172,11 @@ pub async fn stream_chat(
 /// e5-family models need `query: ` / `passage: ` prefixes (docs/05 §2.1).
 pub fn e5_prefix(model: &str, is_query: bool) -> &'static str {
     if model.to_lowercase().contains("e5") {
-        if is_query { "query: " } else { "passage: " }
+        if is_query {
+            "query: "
+        } else {
+            "passage: "
+        }
     } else {
         ""
     }
@@ -170,7 +205,13 @@ pub async fn embed_with(
 ) -> AppResult<(String, Vec<Vec<f32>>)> {
     let prefix = e5_prefix(&role.model, is_query);
     let inputs: Vec<String> = texts.iter().map(|t| format!("{prefix}{t}")).collect();
-    let client = AiClient::new(&role.base_url, role.api_key, role.extra_headers, role.timeout_ms)?;
+    let client = AiClient::new(
+        role.protocol,
+        &role.base_url,
+        role.api_key,
+        role.extra_headers,
+        role.timeout_ms,
+    )?;
     let vectors = client.embeddings(&role.model, &inputs).await?;
     Ok((role.model, vectors))
 }

@@ -7,7 +7,10 @@ use std::path::Path;
 use tauri::{AppHandle, State};
 
 #[tauri::command]
-pub fn studio_list_tabs(state: State<'_, AppState>, project_id: String) -> AppResult<Vec<StudioTab>> {
+pub fn studio_list_tabs(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> AppResult<Vec<StudioTab>> {
     let db = projects::open_db(&state.projects_dir, &project_id)?;
     studio::list_tabs(&db)
 }
@@ -82,7 +85,16 @@ pub async fn studio_resolve_tool(
     let reg = state.streams.clone();
     let app_db_path = state.app_db_path.clone();
     let projects_dir = state.projects_dir.clone();
-    studio::resolve_tool(&reg, &app_db_path, &projects_dir, project_id, tab_id, approved, ui_lang).await
+    studio::resolve_tool(
+        &reg,
+        &app_db_path,
+        &projects_dir,
+        project_id,
+        tab_id,
+        approved,
+        ui_lang,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -114,7 +126,11 @@ pub fn studio_import_artifact_as_source(
         vec![abs.to_string_lossy().to_string()],
     )?;
     let source = created.into_iter().next().ok_or_else(|| {
-        AppError::new("STUDIO_IMPORT_FAILED", "error.studio.importFailed", "nothing imported")
+        AppError::new(
+            "STUDIO_IMPORT_FAILED",
+            "error.studio.importFailed",
+            "nothing imported",
+        )
     })?;
     let db = projects::open_db(&state.projects_dir, &project_id)?;
     studio::mark_artifact_imported(&db, &artifact_id, &source.id)?;

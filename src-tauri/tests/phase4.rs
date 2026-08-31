@@ -18,7 +18,17 @@ fn env() -> (tempfile::TempDir, std::path::PathBuf, rusqlite::Connection) {
 #[test]
 fn ac_4_5_thread_and_messages_persist_across_reopen() {
     let (_tmp, root, app_db) = env();
-    let pid = projects::create(&app_db, &root, CreateProjectInput { name: "p".into(), description: None, color: None }).unwrap().id;
+    let pid = projects::create(
+        &app_db,
+        &root,
+        CreateProjectInput {
+            name: "p".into(),
+            description: None,
+            color: None,
+        },
+    )
+    .unwrap()
+    .id;
 
     // A source + a document so the thread has something to attach to.
     {
@@ -27,7 +37,8 @@ fn ac_4_5_thread_and_messages_persist_across_reopen() {
             "INSERT INTO sources (id, kind, original_name, rel_path, status, added_at)
              VALUES ('s1','markdown','n.md','sources/s1/n.md','ready','now')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
     }
 
     let tid = {
@@ -37,12 +48,14 @@ fn ac_4_5_thread_and_messages_persist_across_reopen() {
             "INSERT INTO messages (id, thread_id, role, content, created_at)
              VALUES ('m1', ?1, 'user', 'what is this?', 'now')",
             params![th.id],
-        ).unwrap();
+        )
+        .unwrap();
         pdb.execute(
             "INSERT INTO messages (id, thread_id, role, content, created_at)
              VALUES ('m2', ?1, 'assistant', 'it is a heading', 'now')",
             params![th.id],
-        ).unwrap();
+        )
+        .unwrap();
         th.id
     };
 
@@ -62,13 +75,24 @@ fn ac_4_5_thread_and_messages_persist_across_reopen() {
 #[test]
 fn fr_l6_import_to_studio_copies_messages_into_a_new_tab() {
     let (_tmp, root, app_db) = env();
-    let pid = projects::create(&app_db, &root, CreateProjectInput { name: "p".into(), description: None, color: None }).unwrap().id;
+    let pid = projects::create(
+        &app_db,
+        &root,
+        CreateProjectInput {
+            name: "p".into(),
+            description: None,
+            color: None,
+        },
+    )
+    .unwrap()
+    .id;
     let pdb = projects::open_db(&root, &pid).unwrap();
     pdb.execute(
         "INSERT INTO sources (id, kind, original_name, rel_path, status, added_at)
          VALUES ('s1','markdown','n.md','sources/s1/n.md','ready','now')",
         [],
-    ).unwrap();
+    )
+    .unwrap();
 
     let th = illustrator::get_or_create_thread(&pdb, "s1", "page:1").unwrap();
     for (i, (role, body)) in [("user", "q"), ("assistant", "a")].iter().enumerate() {
@@ -90,15 +114,27 @@ fn fr_l6_import_to_studio_copies_messages_into_a_new_tab() {
     .unwrap();
 
     let studio_thread: String = pdb
-        .query_row("SELECT thread_id FROM studio_tabs WHERE id = ?1", [&tab_id], |r| r.get(0))
+        .query_row(
+            "SELECT thread_id FROM studio_tabs WHERE id = ?1",
+            [&tab_id],
+            |r| r.get(0),
+        )
         .unwrap();
     let n: i64 = pdb
-        .query_row("SELECT count(*) FROM messages WHERE thread_id = ?1", [&studio_thread], |r| r.get(0))
+        .query_row(
+            "SELECT count(*) FROM messages WHERE thread_id = ?1",
+            [&studio_thread],
+            |r| r.get(0),
+        )
         .unwrap();
     assert_eq!(n, 2);
     // The Illustrator thread is unchanged (copy, not move).
     let orig: i64 = pdb
-        .query_row("SELECT count(*) FROM messages WHERE thread_id = ?1", [&th.id], |r| r.get(0))
+        .query_row(
+            "SELECT count(*) FROM messages WHERE thread_id = ?1",
+            [&th.id],
+            |r| r.get(0),
+        )
         .unwrap();
     assert_eq!(orig, 2);
 }

@@ -134,13 +134,13 @@ fn dir_size(dir: &Path) -> u64 {
     let mut total = 0;
     let mut stack = vec![dir.to_path_buf()];
     while let Some(d) = stack.pop() {
-        let Ok(rd) = std::fs::read_dir(&d) else { continue };
+        let Ok(rd) = std::fs::read_dir(&d) else {
+            continue;
+        };
         for entry in rd.flatten() {
             match entry.file_type() {
                 Ok(ft) if ft.is_dir() => stack.push(entry.path()),
-                Ok(ft) if ft.is_file() => {
-                    total += entry.metadata().map(|m| m.len()).unwrap_or(0)
-                }
+                Ok(ft) if ft.is_file() => total += entry.metadata().map(|m| m.len()).unwrap_or(0),
                 _ => {}
             }
         }
@@ -169,7 +169,7 @@ static RUNNING: Mutex<Option<HashSet<String>>> = Mutex::new(None);
 
 impl BusyGuard {
     fn acquire(project_id: &str) -> AppResult<Self> {
-        let mut g = RUNNING.lock().unwrap();
+        let mut g = RUNNING.lock().unwrap_or_else(|e| e.into_inner());
         let set = g.get_or_insert_with(HashSet::new);
         if !set.insert(project_id.to_string()) {
             return Err(AppError::new(
@@ -183,7 +183,7 @@ impl BusyGuard {
 }
 impl Drop for BusyGuard {
     fn drop(&mut self) {
-        if let Some(set) = RUNNING.lock().unwrap().as_mut() {
+        if let Some(set) = RUNNING.lock().unwrap_or_else(|e| e.into_inner()).as_mut() {
             set.remove(&self.0);
         }
     }
@@ -199,7 +199,11 @@ pub async fn run_command(
     timeout: Duration,
 ) -> AppResult<CommandOutput> {
     if program.trim().is_empty() {
-        return Err(AppError::new("SANDBOX_BAD_COMMAND", "error.sandbox.badCommand", "no program"));
+        return Err(AppError::new(
+            "SANDBOX_BAD_COMMAND",
+            "error.sandbox.badCommand",
+            "no program",
+        ));
     }
     let _busy = BusyGuard::acquire(project_id)?;
 
@@ -221,9 +225,13 @@ pub async fn run_command(
     #[cfg(unix)]
     cmd.process_group(0); // own group, so we can signal children too
 
-    let child = cmd
-        .spawn()
-        .map_err(|e| AppError::new("SANDBOX_SPAWN_FAILED", "error.sandbox.spawnFailed", e.to_string()))?;
+    let child = cmd.spawn().map_err(|e| {
+        AppError::new(
+            "SANDBOX_SPAWN_FAILED",
+            "error.sandbox.spawnFailed",
+            e.to_string(),
+        )
+    })?;
     let pid = child.id();
 
     match tokio::time::timeout(timeout, child.wait_with_output()).await {
@@ -344,7 +352,10 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(!out.stdout.contains("WAKARU_SECRET_KEY"), "no secrets in child env");
+        assert!(
+            !out.stdout.contains("WAKARU_SECRET_KEY"),
+            "no secrets in child env"
+        );
         assert!(!out.stdout.contains("sk-must-not-leak"));
         assert!(dir.path().exists(), "nothing was deleted");
     }
@@ -363,7 +374,10 @@ mod tests {
         .await
         .unwrap();
         assert!(out.timed_out);
-        assert!(start.elapsed() < Duration::from_secs(5), "returned promptly after kill");
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "returned promptly after kill"
+        );
     }
 
     #[tokio::test]
@@ -388,10 +402,23 @@ mod tests {
         let dir = ws();
         let sleep_args = ["2".to_string()];
         let echo_args = ["hi".to_string()];
-        let a = run_command("busy", dir.path(), "/bin/sleep", &sleep_args, Duration::from_secs(3));
+        let a = run_command(
+            "busy",
+            dir.path(),
+            "/bin/sleep",
+            &sleep_args,
+            Duration::from_secs(3),
+        );
         let b = async {
             tokio::time::sleep(Duration::from_millis(100)).await;
-            run_command("busy", dir.path(), "/bin/echo", &echo_args, Duration::from_secs(3)).await
+            run_command(
+                "busy",
+                dir.path(),
+                "/bin/echo",
+                &echo_args,
+                Duration::from_secs(3),
+            )
+            .await
         };
         let (ra, rb) = tokio::join!(a, b);
         assert!(ra.is_ok());

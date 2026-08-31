@@ -19,9 +19,17 @@ fn env() -> (tempfile::TempDir, std::path::PathBuf, rusqlite::Connection) {
 #[test]
 fn ac_6_1_tabs_can_be_created_renamed_reordered_and_closed() {
     let (_tmp, root, app_db) = env();
-    let pid = projects::create(&app_db, &root, CreateProjectInput { name: "p".into(), description: None, color: None })
-        .unwrap()
-        .id;
+    let pid = projects::create(
+        &app_db,
+        &root,
+        CreateProjectInput {
+            name: "p".into(),
+            description: None,
+            color: None,
+        },
+    )
+    .unwrap()
+    .id;
     let db = projects::open_db(&root, &pid).unwrap();
 
     let a = studio::create_tab(&db, None).unwrap();
@@ -44,9 +52,17 @@ fn ac_6_1_tabs_can_be_created_renamed_reordered_and_closed() {
 #[test]
 fn ac_6_10_closing_a_tab_keeps_its_workspace_files_and_artifacts() {
     let (_tmp, root, app_db) = env();
-    let pid = projects::create(&app_db, &root, CreateProjectInput { name: "p".into(), description: None, color: None })
-        .unwrap()
-        .id;
+    let pid = projects::create(
+        &app_db,
+        &root,
+        CreateProjectInput {
+            name: "p".into(),
+            description: None,
+            color: None,
+        },
+    )
+    .unwrap()
+    .id;
     let db = projects::open_db(&root, &pid).unwrap();
     let ws = projects::project_dir(&root, &pid).join("workspace");
 
@@ -66,7 +82,10 @@ fn ac_6_10_closing_a_tab_keeps_its_workspace_files_and_artifacts() {
     studio::close_tab(&db, &tab.id).unwrap();
 
     // File on disk survives; artifact row survives with a null thread_id.
-    assert!(ws.join("summary.md").is_file(), "workspace file must survive tab close");
+    assert!(
+        ws.join("summary.md").is_file(),
+        "workspace file must survive tab close"
+    );
     let arts = studio::list_artifacts(&db).unwrap();
     assert_eq!(arts.len(), 1);
     assert_eq!(arts[0].thread_id, None);
@@ -75,9 +94,17 @@ fn ac_6_10_closing_a_tab_keeps_its_workspace_files_and_artifacts() {
 #[test]
 fn write_file_rejects_paths_outside_the_workspace() {
     let (_tmp, root, app_db) = env();
-    let pid = projects::create(&app_db, &root, CreateProjectInput { name: "p".into(), description: None, color: None })
-        .unwrap()
-        .id;
+    let pid = projects::create(
+        &app_db,
+        &root,
+        CreateProjectInput {
+            name: "p".into(),
+            description: None,
+            color: None,
+        },
+    )
+    .unwrap()
+    .id;
     let db = projects::open_db(&root, &pid).unwrap();
     let ws = projects::project_dir(&root, &pid).join("workspace");
     let tab = studio::create_tab(&db, None).unwrap();
@@ -91,15 +118,25 @@ fn write_file_rejects_paths_outside_the_workspace() {
     )
     .unwrap_err();
     assert_eq!(err.code, "SANDBOX_PATH_DENIED");
-    assert!(!projects::project_dir(&root, &pid).join("escape.txt").exists());
+    assert!(!projects::project_dir(&root, &pid)
+        .join("escape.txt")
+        .exists());
 }
 
 #[test]
 fn read_only_tools_report_project_state() {
     let (_tmp, root, app_db) = env();
-    let pid = projects::create(&app_db, &root, CreateProjectInput { name: "p".into(), description: None, color: None })
-        .unwrap()
-        .id;
+    let pid = projects::create(
+        &app_db,
+        &root,
+        CreateProjectInput {
+            name: "p".into(),
+            description: None,
+            color: None,
+        },
+    )
+    .unwrap()
+    .id;
     let db = projects::open_db(&root, &pid).unwrap();
     let ws = projects::project_dir(&root, &pid).join("workspace");
     db.execute(
@@ -113,19 +150,35 @@ fn read_only_tools_report_project_state() {
     let sources = studio::dispatch_tool(&db, &ws, &tab.thread_id, "list_sources", "{}").unwrap();
     assert!(sources.contains("notes.md"));
 
-    studio::dispatch_tool(&db, &ws, &tab.thread_id, "write_file", r#"{"path":"a.txt","content":"AAA"}"#).unwrap();
+    studio::dispatch_tool(
+        &db,
+        &ws,
+        &tab.thread_id,
+        "write_file",
+        r#"{"path":"a.txt","content":"AAA"}"#,
+    )
+    .unwrap();
     let files = studio::dispatch_tool(&db, &ws, &tab.thread_id, "list_files", "{}").unwrap();
     assert!(files.contains("a.txt"));
-    let body = studio::dispatch_tool(&db, &ws, &tab.thread_id, "read_file", r#"{"path":"a.txt"}"#).unwrap();
+    let body = studio::dispatch_tool(&db, &ws, &tab.thread_id, "read_file", r#"{"path":"a.txt"}"#)
+        .unwrap();
     assert_eq!(body, "AAA");
 }
 
 #[test]
 fn read_tab_lets_one_conversation_read_another() {
     let (_tmp, root, app_db) = env();
-    let pid = projects::create(&app_db, &root, CreateProjectInput { name: "p".into(), description: None, color: None })
-        .unwrap()
-        .id;
+    let pid = projects::create(
+        &app_db,
+        &root,
+        CreateProjectInput {
+            name: "p".into(),
+            description: None,
+            color: None,
+        },
+    )
+    .unwrap()
+    .id;
     let db = projects::open_db(&root, &pid).unwrap();
     let ws = projects::project_dir(&root, &pid).join("workspace");
 
@@ -144,6 +197,13 @@ fn read_tab_lets_one_conversation_read_another() {
     .unwrap();
 
     let here = studio::create_tab(&db, None).unwrap();
-    let dump = studio::dispatch_tool(&db, &ws, &here.thread_id, "read_tab", r#"{"title":"research"}"#).unwrap();
+    let dump = studio::dispatch_tool(
+        &db,
+        &ws,
+        &here.thread_id,
+        "read_tab",
+        r#"{"title":"research"}"#,
+    )
+    .unwrap();
     assert!(dump.contains("the market doubled"));
 }

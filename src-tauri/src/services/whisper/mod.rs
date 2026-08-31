@@ -54,13 +54,21 @@ const CATALOG: &[Catalog] = &[
 static CANCELS: Mutex<Option<std::collections::HashSet<String>>> = Mutex::new(None);
 
 pub fn request_cancel(name: &str) {
-    CANCELS.lock().unwrap().get_or_insert_with(Default::default).insert(name.to_string());
+    CANCELS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get_or_insert_with(Default::default)
+        .insert(name.to_string());
 }
 pub fn is_cancel_requested(name: &str) -> bool {
-    CANCELS.lock().unwrap().as_ref().is_some_and(|s| s.contains(name))
+    CANCELS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()
+        .is_some_and(|s| s.contains(name))
 }
 pub fn clear_cancel(name: &str) {
-    if let Some(s) = CANCELS.lock().unwrap().as_mut() {
+    if let Some(s) = CANCELS.lock().unwrap_or_else(|e| e.into_inner()).as_mut() {
         s.remove(name);
     }
 }
@@ -89,7 +97,11 @@ pub fn list(app_db: &Connection, data_dir: &Path, selected: &str) -> AppResult<V
             let path = root.join(c.file);
             let downloaded = path.is_file();
             let sha256: Option<String> = app_db
-                .query_row("SELECT sha256 FROM whisper_models WHERE name = ?1", [c.name], |r| r.get(0))
+                .query_row(
+                    "SELECT sha256 FROM whisper_models WHERE name = ?1",
+                    [c.name],
+                    |r| r.get(0),
+                )
                 .optional()?
                 .flatten();
             Ok(WhisperModel {
@@ -110,7 +122,11 @@ pub fn disk_check(data_dir: &Path, name: &str) -> AppResult<DiskCheck> {
     let root = models_root(data_dir);
     std::fs::create_dir_all(&root)?;
     let free = free_bytes(&root).unwrap_or(u64::MAX);
-    Ok(DiskCheck { ok: free >= needed, needed_bytes: needed, free_bytes: free })
+    Ok(DiskCheck {
+        ok: free >= needed,
+        needed_bytes: needed,
+        free_bytes: free,
+    })
 }
 
 #[cfg(unix)]
@@ -140,9 +156,15 @@ pub fn download(
         return Err(AppError::new(
             "WHISPER_DISK_FULL",
             "error.whisper.diskFull",
-            format!("need ~{} MB, have {} MB", check.needed_bytes / 1_048_576, check.free_bytes / 1_048_576),
+            format!(
+                "need ~{} MB, have {} MB",
+                check.needed_bytes / 1_048_576,
+                check.free_bytes / 1_048_576
+            ),
         )
-        .with_details(serde_json::json!({ "needed": check.needed_bytes, "free": check.free_bytes })));
+        .with_details(
+            serde_json::json!({ "needed": check.needed_bytes, "free": check.free_bytes }),
+        ));
     }
 
     let root = models_root(data_dir);
@@ -159,9 +181,13 @@ pub fn download(
     if have > 0 {
         req = req.header(reqwest::header::RANGE, format!("bytes={have}-"));
     }
-    let mut resp = req
-        .send()
-        .map_err(|e| AppError::new("WHISPER_DOWNLOAD_FAILED", "error.whisper.downloadFailed", e.to_string()))?;
+    let mut resp = req.send().map_err(|e| {
+        AppError::new(
+            "WHISPER_DOWNLOAD_FAILED",
+            "error.whisper.downloadFailed",
+            e.to_string(),
+        )
+    })?;
     let status = resp.status();
     if !status.is_success() {
         // A 416 means our `.part` is already the whole file.
@@ -190,11 +216,19 @@ pub fn download(
     let mut done = have;
     loop {
         if cancelled() {
-            return Err(AppError::new("WHISPER_DOWNLOAD_CANCELLED", "error.whisper.cancelled", "cancelled"));
+            return Err(AppError::new(
+                "WHISPER_DOWNLOAD_CANCELLED",
+                "error.whisper.cancelled",
+                "cancelled",
+            ));
         }
-        let n = resp
-            .read(&mut buf)
-            .map_err(|e| AppError::new("WHISPER_DOWNLOAD_FAILED", "error.whisper.downloadFailed", e.to_string()))?;
+        let n = resp.read(&mut buf).map_err(|e| {
+            AppError::new(
+                "WHISPER_DOWNLOAD_FAILED",
+                "error.whisper.downloadFailed",
+                e.to_string(),
+            )
+        })?;
         if n == 0 {
             break;
         }
@@ -225,7 +259,11 @@ fn finish(app_db: &Connection, name: &str, path: &Path) -> AppResult<()> {
 
     // Reject a re-download whose hash changed against what we recorded before.
     let prev: Option<String> = app_db
-        .query_row("SELECT sha256 FROM whisper_models WHERE name = ?1", [name], |r| r.get(0))
+        .query_row(
+            "SELECT sha256 FROM whisper_models WHERE name = ?1",
+            [name],
+            |r| r.get(0),
+        )
         .optional()?
         .flatten();
     if let Some(prev) = prev {
@@ -245,7 +283,13 @@ fn finish(app_db: &Connection, name: &str, path: &Path) -> AppResult<()> {
          ON CONFLICT(name) DO UPDATE SET
            file_name = excluded.file_name, size_bytes = excluded.size_bytes,
            sha256 = excluded.sha256, downloaded_at = excluded.downloaded_at",
-        params![name, path.to_string_lossy(), size as i64, sha, now_iso8601()],
+        params![
+            name,
+            path.to_string_lossy(),
+            size as i64,
+            sha,
+            now_iso8601()
+        ],
     )?;
     Ok(())
 }
@@ -278,7 +322,7 @@ pub fn transcribe_media(
     model_name: &str,
     language: Option<&str>,
 ) -> AppResult<Transcript> {
-    let _guard = TRANSCRIBE_LOCK.lock().unwrap();
+    let _guard = TRANSCRIBE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
 
     let model = model_path(data_dir, model_name)?;
     if !model.is_file() {
@@ -303,8 +347,15 @@ pub fn transcribe_media(
             raw.push(seg);
         }
     }
-    raw.sort_by(|a, b| a.start.partial_cmp(&b.start).unwrap_or(std::cmp::Ordering::Equal));
-    Ok(Transcript { segments: audio::merge_segments(raw), mostly_silent })
+    raw.sort_by(|a, b| {
+        a.start
+            .partial_cmp(&b.start)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    Ok(Transcript {
+        segments: audio::merge_segments(raw),
+        mostly_silent,
+    })
 }
 
 #[cfg(test)]

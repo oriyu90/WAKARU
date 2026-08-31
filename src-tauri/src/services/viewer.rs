@@ -23,7 +23,8 @@ pub fn get_tabs(project_db: &Connection) -> AppResult<Vec<ViewerTab>> {
                 source_id: r.get(1)?,
                 kind: kind_from_str(&r.get::<_, String>(2)?),
                 name: r.get(3)?,
-                locator: serde_json::from_str(&r.get::<_, String>(4)?).unwrap_or(serde_json::json!({})),
+                locator: serde_json::from_str(&r.get::<_, String>(4)?)
+                    .unwrap_or(serde_json::json!({})),
                 pinned: r.get::<_, i64>(5)? != 0,
                 ordinal: r.get(6)?,
             })
@@ -59,7 +60,11 @@ pub fn open_tab(
 
     let id = Uuid::now_v7().to_string();
     let next: i32 = project_db
-        .query_row("SELECT COALESCE(MAX(ordinal), 0) + 1 FROM viewer_tabs", [], |r| r.get(0))
+        .query_row(
+            "SELECT COALESCE(MAX(ordinal), 0) + 1 FROM viewer_tabs",
+            [],
+            |r| r.get(0),
+        )
         .unwrap_or(1);
     project_db.execute(
         "INSERT INTO viewer_tabs (id, source_id, locator, pinned, ordinal, opened_at)
@@ -137,7 +142,8 @@ fn single(project_db: &Connection, tab_id: &str) -> AppResult<ViewerTab> {
                     source_id: r.get(1)?,
                     kind: kind_from_str(&r.get::<_, String>(2)?),
                     name: r.get(3)?,
-                    locator: serde_json::from_str(&r.get::<_, String>(4)?).unwrap_or(serde_json::json!({})),
+                    locator: serde_json::from_str(&r.get::<_, String>(4)?)
+                        .unwrap_or(serde_json::json!({})),
                     pinned: r.get::<_, i64>(5)? != 0,
                     ordinal: r.get(6)?,
                 })
@@ -171,15 +177,22 @@ pub fn get_document(
     }
     let ordinal = ordinal.clamp(1, total);
 
-    let (kind, title, text, image_rel): (String, Option<String>, String, Option<String>) = project_db
-        .query_row(
-            "SELECT kind, title, text, image_rel FROM documents
+    let (kind, title, text, image_rel): (String, Option<String>, String, Option<String>) =
+        project_db
+            .query_row(
+                "SELECT kind, title, text, image_rel FROM documents
              WHERE source_id = ?1 AND ordinal = ?2",
-            params![source_id, ordinal],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
-        )
-        .optional()?
-        .ok_or_else(|| AppError::new("DOCUMENT_NOT_FOUND", "error.document.notFound", "ordinal out of range"))?;
+                params![source_id, ordinal],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .optional()?
+            .ok_or_else(|| {
+                AppError::new(
+                    "DOCUMENT_NOT_FOUND",
+                    "error.document.notFound",
+                    "ordinal out of range",
+                )
+            })?;
 
     let image_url = image_rel.map(|rel| {
         crate::services::assets::url(project_id, source_id, &format!("derived/{source_id}/{rel}"))
@@ -218,9 +231,11 @@ pub fn source_detail(
         // Audio / video play back from the original file via `wakaru-asset://`
         // (docs/04 §6 — no copy is made).
         SourceKind::Audio | SourceKind::Video => project_db
-            .query_row("SELECT rel_path FROM sources WHERE id = ?1", [source_id], |r| {
-                r.get::<_, String>(0)
-            })
+            .query_row(
+                "SELECT rel_path FROM sources WHERE id = ?1",
+                [source_id],
+                |r| r.get::<_, String>(0),
+            )
             .ok()
             .map(|rel| crate::services::assets::url(project_id, source_id, &rel)),
         _ => None,

@@ -24,7 +24,16 @@ struct Inner {
 
 #[allow(dead_code)] // methods wired in Phase 1+
 impl JobRegistry {
-    pub fn create(&self, kind: JobKind, project_id: Option<String>, source_id: Option<String>) -> (String, CancellationToken) {
+    fn lock(&self) -> std::sync::MutexGuard<'_, Inner> {
+        self.inner.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    pub fn create(
+        &self,
+        kind: JobKind,
+        project_id: Option<String>,
+        source_id: Option<String>,
+    ) -> (String, CancellationToken) {
         let id = Uuid::now_v7().to_string();
         let token = CancellationToken::new();
         let job = Job {
@@ -40,7 +49,7 @@ impl JobRegistry {
             started_at: None,
             ended_at: None,
         };
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.lock();
         inner.jobs.insert(id.clone(), job);
         inner.tokens.insert(id.clone(), token.clone());
         inner.order.push(id.clone());
@@ -48,14 +57,14 @@ impl JobRegistry {
     }
 
     pub fn mark_running(&self, id: &str) {
-        if let Some(j) = self.inner.lock().unwrap().jobs.get_mut(id) {
+        if let Some(j) = self.lock().jobs.get_mut(id) {
             j.status = JobStatus::Running;
             j.started_at = Some(now_iso8601());
         }
     }
 
     pub fn finish(&self, id: &str, status: JobStatus, message: Option<String>) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.lock();
         if let Some(j) = inner.jobs.get_mut(id) {
             j.status = status;
             j.ended_at = Some(now_iso8601());
@@ -65,7 +74,7 @@ impl JobRegistry {
     }
 
     pub fn progress(&self, app: &AppHandle, p: JobProgress) {
-        if let Some(j) = self.inner.lock().unwrap().jobs.get_mut(&p.job_id) {
+        if let Some(j) = self.lock().jobs.get_mut(&p.job_id) {
             j.phase = Some(p.phase.clone());
             j.done = p.done;
             j.total = p.total;
@@ -74,7 +83,7 @@ impl JobRegistry {
     }
 
     pub fn list(&self, project_id: Option<&str>) -> Vec<Job> {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.lock();
         inner
             .order
             .iter()
@@ -85,7 +94,7 @@ impl JobRegistry {
     }
 
     pub fn cancel(&self, id: &str) -> bool {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.lock();
         if let Some(tok) = inner.tokens.get(id) {
             tok.cancel();
             true

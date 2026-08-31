@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "WAKARU",
-  "version": "0.2.0",
+  "version": "0.0.0",
   "identifier": "com.yukiorita.wakaru",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -41,6 +41,6 @@
     "copyright": "Copyright © 2026 Yuki Orita",
     "licenseFile": "../LICENSE",
     "shortDescription": "AI notebook for your own documents",
-    "longDescription": "WAKARU explains the page you are reading, and lets you ask your own sources anything. Works with any OpenAI-compatible endpoint, including local models."
+    "longDescription": "WAKARU explains the page you are reading and lets you ask your own sources anything. Works with OpenAI-compatible and Anthropic-compatible endpoints, including local models."
   }
 }

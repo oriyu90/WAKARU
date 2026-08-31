@@ -19,11 +19,13 @@ pub fn run(conn: &Connection, migrations: &[(&str, &str)], target_version: &str)
     ))?;
 
     for (name, sql) in migrations {
-        let already: bool = conn.query_row(
-            &format!("SELECT 1 FROM {APPLIED_TABLE} WHERE name = ?1"),
-            [name],
-            |_| Ok(true),
-        ).unwrap_or(false);
+        let already: bool = conn
+            .query_row(
+                &format!("SELECT 1 FROM {APPLIED_TABLE} WHERE name = ?1"),
+                [name],
+                |_| Ok(true),
+            )
+            .unwrap_or(false);
         if already {
             continue;
         }
@@ -67,7 +69,11 @@ pub fn version_verdict(stored: &str, current: &str) -> crate::domain::export::Ve
     use crate::domain::export::VersionVerdict::*;
     let parse = |v: &str| -> (u32, u32, u32) {
         let mut it = v.split('.').map(|p| p.parse::<u32>().unwrap_or(0));
-        (it.next().unwrap_or(0), it.next().unwrap_or(0), it.next().unwrap_or(0))
+        (
+            it.next().unwrap_or(0),
+            it.next().unwrap_or(0),
+            it.next().unwrap_or(0),
+        )
     };
     let (sm, sn, _sp) = parse(stored);
     let (cm, cn, _cp) = parse(current);
@@ -140,7 +146,10 @@ mod tests {
         let conn = open_in_memory().unwrap();
         let m: &[(&str, &str)] = &[
             ("001_ok", "CREATE TABLE ok (id INTEGER PRIMARY KEY);"),
-            ("002_bad", "CREATE TABLE bad (id INTEGER PRIMARY KEY); INSERT INTO nope VALUES (1);"),
+            (
+                "002_bad",
+                "CREATE TABLE bad (id INTEGER PRIMARY KEY); INSERT INTO nope VALUES (1);",
+            ),
         ];
         let err = run(&conn, m, "1.0.0").unwrap_err();
         assert_eq!(err.code, "MIGRATION_FAILED");

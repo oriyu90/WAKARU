@@ -1,16 +1,17 @@
 # 05 · AI層とRAG
 
-## 1. AI Gateway（OpenAI互換クライアント）
+## 1. AI Gateway（OpenAI互換 / Anthropic互換）
 
 **I-1：ベンダ固有SDKを入れない。** `reqwest` の上に薄いクライアントを1本だけ書く。
 
 ### 1.1 使うエンドポイント
 
-| エンドポイント | 用途 | 必須 |
-|---|---|---|
-| `POST {base}/chat/completions` | チャット・Vision・ツール呼び出し（`stream: true`） | 必須 |
-| `POST {base}/embeddings` | 埋め込み（リモート選択時のみ） | 任意 |
-| `GET  {base}/models` | 接続テスト・モデル一覧 | 任意（無くても動くこと） |
+| API形式 | エンドポイント | 用途 | 必須 |
+|---|---|---|---|
+| OpenAI互換 | `POST {base}/chat/completions` | チャット・Vision・ツール呼び出し（`stream: true`） | 必須 |
+| Anthropic互換 | `POST {base}/messages` | チャット・Vision・ツール呼び出し（`stream: true`） | 必須 |
+| OpenAI互換 | `POST {base}/embeddings` | 埋め込み（リモート選択時のみ） | 任意 |
+| 共通 | `GET {base}/models` | 接続テスト・モデル一覧 | 任意（無くても実チャットで接続判定） |
 
 `base_url` はユーザーが `/v1` まで含めて入力する。末尾スラッシュは正規化して除去する。
 
@@ -23,9 +24,10 @@
 | LM Studio | `http://localhost:1234/v1` | APIキー不要（空でよい） |
 | Ollama | `http://localhost:11434/v1` | APIキー不要 |
 | OpenAI | `https://api.openai.com/v1` | |
-| カスタム | （空） | 任意のOpenAI互換 |
+| Anthropic | `https://api.anthropic.com/v1` | Anthropic互換 |
+| カスタム | （空） | OpenAI互換 / Anthropic互換を選択 |
 
-> Gemini を使う場合は OpenAI互換エンドポイント（`https://generativelanguage.googleapis.com/v1beta/openai/`）を「カスタム」として入れる。ネイティブAPIには対応しない（C-1）。
+> Gemini を使う場合は OpenAI互換エンドポイント（`https://generativelanguage.googleapis.com/v1beta/openai/`）を「カスタム」として入れる。Anthropic互換では `system`、画像、tools/tool_result、structured output、SSEイベントを共通内部形式へ相互変換する。
 
 ### 1.3 能力判定（Capability detection）
 
@@ -60,7 +62,7 @@ pub struct Capabilities {
 
 ### 1.4 ストリーミング
 
-- SSE を `eventsource-stream` で読み、`choices[0].delta.content` を `stream://delta` として流す
+- SSE を `eventsource-stream` で読み、OpenAIの `choices[0].delta` またはAnthropicの `content_block_delta` を `stream://delta` として流す
 - **`data: [DONE]` を受け取らずに接続が切れた場合もエラーにせず `stream://done`（`truncated: true`）を出す**。ローカルサーバではよくある
 - `reasoning_content` / `reasoning` フィールドを持つレスポンス（推論モデル）は `kind: "reasoning"` として別に流し、UIでは折りたたみ表示にする
 - キャンセルは `CancellationToken` → HTTP接続を drop。**必ず `stream://done` を出してから終わる**

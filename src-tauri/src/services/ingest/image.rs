@@ -19,7 +19,11 @@ pub struct ImageResult {
 
 pub fn parse_image(abs_path: &Path, derived_dir: &Path) -> AppResult<ImageResult> {
     let img = image::open(abs_path).map_err(|e| {
-        AppError::new("SOURCE_PARSE", "error.source.parse", format!("bad image: {e}"))
+        AppError::new(
+            "SOURCE_PARSE",
+            "error.source.parse",
+            format!("bad image: {e}"),
+        )
     })?;
 
     let orientation = read_exif_orientation(abs_path).unwrap_or(1);

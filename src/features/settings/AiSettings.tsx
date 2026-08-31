@@ -12,7 +12,7 @@ import { Spinner } from "../../components/Spinner";
 import { CloseIcon, PlusIcon, InfoIcon } from "../../app/Icons";
 import { aiApi, AI_PRESETS } from "../../ipc/ai";
 import { useToast } from "../../components/useToast";
-import type { AiProfile, Role, TestResult } from "../../ipc/types.gen";
+import type { AiProfile, ApiProtocol, Role, TestResult } from "../../ipc/types.gen";
 import styles from "./AiSettings.module.css";
 
 const ROLES: Role[] = ["chat", "vision", "embedding", "organizer"];
@@ -33,6 +33,7 @@ export function AiSettings() {
       void qc.invalidateQueries({ queryKey: ["ai-profiles"] });
       void qc.invalidateQueries({ queryKey: ["ai-bindings"] });
     },
+    onError: () => toast.push({ tone: "error", message: t("ai.deleteFailed") }),
   });
 
   const test = useMutation({
@@ -49,6 +50,7 @@ export function AiSettings() {
     mutationFn: ({ role, profileId, model }: { role: Role; profileId: string; model: string }) =>
       profileId ? aiApi.setRoleBinding(role, profileId, model) : aiApi.clearRoleBinding(role),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ai-bindings"] }),
+    onError: () => toast.push({ tone: "error", message: t("ai.bindingFailed") }),
   });
 
   const list = profiles.data ?? [];
@@ -72,6 +74,7 @@ export function AiSettings() {
               <li key={p.id} className={styles.profile}>
                 <div className={styles.profileMain}>
                   <span className={styles.profileName}>{p.name}</span>
+                  <span className={styles.cap}>{t(`ai.protocol.${p.protocol}`)}</span>
                   <span className={styles.profileUrl}>{p.baseUrl}</span>
                   <span className={styles.caps}>
                     {p.hasKey ? <span className={styles.cap}>key</span> : null}
@@ -171,10 +174,12 @@ function ProfileDialog({
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
+  const toast = useToast();
   const [name, setName] = useState(profile?.name ?? "");
   const [baseUrl, setBaseUrl] = useState(profile?.baseUrl ?? "");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState(profile?.defaultModel ?? "");
+  const [protocol, setProtocol] = useState<ApiProtocol>(profile?.protocol ?? "openai");
 
   const save = useMutation({
     mutationFn: () =>
@@ -182,12 +187,14 @@ function ProfileDialog({
         id: profile?.id ?? null,
         name,
         baseUrl,
+        protocol,
         apiKey: apiKey || null,
         defaultModel: model || null,
         extraHeaders: null,
         timeoutMs: null,
       }),
     onSuccess: onSaved,
+    onError: () => toast.push({ tone: "error", message: t("ai.saveFailed") }),
   });
 
   return (
@@ -218,7 +225,10 @@ function ProfileDialog({
               id={id}
               onChange={(e) => {
                 const p = AI_PRESETS.find((x) => x.label === e.target.value);
-                if (p && p.baseUrl) setBaseUrl(p.baseUrl);
+                if (p) {
+                  setProtocol(p.protocol);
+                  if (p.baseUrl) setBaseUrl(p.baseUrl);
+                }
               }}
             >
               {AI_PRESETS.map((p) => (
@@ -227,10 +237,18 @@ function ProfileDialog({
             </Select>
           )}
         </Field>
+        <Field label={t("ai.protocolLabel")} required>
+          {({ id }) => (
+            <Select id={id} value={protocol} onChange={(e) => setProtocol(e.target.value as ApiProtocol)}>
+              <option value="openai">{t("ai.protocol.openai")}</option>
+              <option value="anthropic">{t("ai.protocol.anthropic")}</option>
+            </Select>
+          )}
+        </Field>
         <Field label={t("ai.name")} required>
           {({ id }) => <Input id={id} value={name} autoFocus onChange={(e) => setName(e.target.value)} />}
         </Field>
-        <Field label={t("ai.baseUrl")} required hint="…/v1">
+        <Field label={t("ai.baseUrl")} required hint={t("ai.baseUrlHint")}>
           {({ id }) => (
             <Input id={id} value={baseUrl} placeholder="http://localhost:1234/v1" onChange={(e) => setBaseUrl(e.target.value)} />
           )}

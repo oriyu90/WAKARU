@@ -5,7 +5,10 @@ use crate::state::AppState;
 use tauri::State;
 
 #[tauri::command]
-pub fn viewer_get_tabs(state: State<'_, AppState>, project_id: String) -> AppResult<Vec<ViewerTab>> {
+pub fn viewer_get_tabs(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> AppResult<Vec<ViewerTab>> {
     let db = projects::open_db(&state.projects_dir, &project_id)?;
     viewer::get_tabs(&db)
 }
@@ -17,7 +20,11 @@ pub fn viewer_open_tab(state: State<'_, AppState>, input: OpenTabInput) -> AppRe
 }
 
 #[tauri::command]
-pub fn viewer_close_tab(state: State<'_, AppState>, project_id: String, tab_id: String) -> AppResult<()> {
+pub fn viewer_close_tab(
+    state: State<'_, AppState>,
+    project_id: String,
+    tab_id: String,
+) -> AppResult<()> {
     let db = projects::open_db(&state.projects_dir, &project_id)?;
     viewer::close_tab(&db, &tab_id)
 }

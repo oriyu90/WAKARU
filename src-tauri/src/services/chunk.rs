@@ -71,7 +71,11 @@ pub fn split(text: &str) -> Vec<Chunk> {
             push_chunk(&mut chunks, &cur, cur_start, cur_end);
             // Overlap: carry the tail of the previous chunk.
             let tail = overlap_tail(&cur);
-            cur = if tail.is_empty() { String::new() } else { format!("{tail}\n") };
+            cur = if tail.is_empty() {
+                String::new()
+            } else {
+                format!("{tail}\n")
+            };
             cur_start = atom.start.saturating_sub(tail.len());
         }
         if cur.is_empty() {
@@ -246,14 +250,22 @@ mod tests {
     fn long_english_splits_and_overlaps() {
         let para = "Sentence number one is here. ".repeat(400); // well over target
         let chunks = split(&para);
-        assert!(chunks.len() > 1, "expected multiple chunks, got {}", chunks.len());
+        assert!(
+            chunks.len() > 1,
+            "expected multiple chunks, got {}",
+            chunks.len()
+        );
         for c in &chunks {
             assert!(c.tokens <= MAX_TOKENS, "chunk over MAX: {}", c.tokens);
         }
         // consecutive chunks share a tail (overlap)
         let a_tail: String = chunks[0].text.chars().rev().take(30).collect();
         let a_tail: String = a_tail.chars().rev().collect();
-        assert!(chunks[1].text.contains(a_tail.trim_end_matches(|c: char| !c.is_alphanumeric()).trim()));
+        assert!(chunks[1].text.contains(
+            a_tail
+                .trim_end_matches(|c: char| !c.is_alphanumeric())
+                .trim()
+        ));
     }
 
     #[test]

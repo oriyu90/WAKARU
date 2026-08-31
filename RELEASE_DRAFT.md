@@ -1,12 +1,12 @@
-# v0.2.0 release — draft
+# v0.0.0 release record
 
-Steps 1–4 and 6-verify are **done** (2026-09-01) — see `QUALITY_REPORT.md`.
-The DMG is built and verified at
-`src-tauri/target/release/bundle/dmg/WAKARU_0.2.0_aarch64.dmg`
-(sha256 in `RELEASE_CHECKSUMS.txt` next to it).
+Implementation, automated verification, native startup/migration testing, and
+bundle verification are complete (2026-09-01) — see `QUALITY_REPORT.md`.
+The verified DMG is
+`src-tauri/target/release/bundle/dmg/WAKARU_0.0.0_aarch64.dmg`.
 
-**Blocked on:** the `docs/09 §8` 11-step interactive smoke test, your go-ahead,
-then step 6 (`gh release create`) and step 7 (docs/site).
+SHA-256:
+`92b615bd511f2a226b0c6e5168cd4ba2086062c1d7aa2b4909e0f4255822d672`.
 
 ---
 
@@ -25,16 +25,16 @@ then step 6 (`gh release create`) and step 7 (docs/site).
 
 ```bash
 cd ~/places/適当/work/WAKARU
-APPLE_SIGNING_IDENTITY="-" npm run tauri build -- --bundles dmg,app
+APPLE_SIGNING_IDENTITY="-" MACOSX_DEPLOYMENT_TARGET=12.0 npm run tauri build -- --bundles app
 ```
 
-Output: `src-tauri/target/release/bundle/dmg/WAKARU_0.2.0_aarch64.dmg`
+Output app: `src-tauri/target/release/bundle/macos/WAKARU.app`
 (ad-hoc signed, **not notarized** — matches v0.1.0).
 
 ## 2. Verify the bundle
 
 ```bash
-DMG=src-tauri/target/release/bundle/dmg/WAKARU_0.2.0_aarch64.dmg
+DMG=src-tauri/target/release/bundle/dmg/WAKARU_0.0.0_aarch64.dmg
 hdiutil verify "$DMG"
 MP=$(mktemp -d); hdiutil attach "$DMG" -mountpoint "$MP" -nobrowse
 codesign --verify --deep --strict --verbose=2 "$MP/WAKARU.app"
@@ -59,7 +59,7 @@ hdiutil detach "$MP"
 
 ```bash
 cd src-tauri/target/release/bundle/dmg
-shasum -a 256 WAKARU_0.2.0_aarch64.dmg | tee RELEASE_CHECKSUMS.txt
+shasum -a 256 WAKARU_0.0.0_aarch64.dmg
 ```
 
 ## 5. Owner confirmation
@@ -73,13 +73,13 @@ Run the app once end-to-end and confirm it's good. (Plan Part 4 step 6 /
 
 ```bash
 cd ~/places/適当/work/WAKARU
-gh release create v0.2.0 \
+gh release create v0.0.0 \
   --repo oriyu90/WAKARU \
   --prerelease \
-  --title "WAKARU v0.2.0" \
+  --title "WAKARU v0.0.0" \
   --notes-file RELEASE_NOTES.md \
-  src-tauri/target/release/bundle/dmg/WAKARU_0.2.0_aarch64.dmg \
-  src-tauri/target/release/bundle/dmg/RELEASE_CHECKSUMS.txt
+  src-tauri/target/release/bundle/dmg/WAKARU_0.0.0_aarch64.dmg \
+  src-tauri/target/release/bundle/dmg/WAKARU_0.0.0_aarch64.dmg.sha256
 ```
 
 Add `--draft` instead of `--prerelease` first if you want to eyeball it on
@@ -116,7 +116,7 @@ Commit as `Yuki <yukiseno0911@gmail.com>`.
 
 ### 7c. Private `common-rules-document/WAKARU.md`
 
-Bump: current version → `0.2.0`, scope note (full re-development, Tauri v2 +
+Bump: current version → `0.0.0`, scope note (full re-development, Tauri v2 +
 Rust + Hallmark React), open TODOs (PDF raster D-09, local embeddings D-10,
 Vision D-11, Studio streaming D-13, MCP HTTP D-14, Silero/keyframes D-15,
 Win/Linux unverified).
@@ -138,19 +138,19 @@ you configure.
 
 ## Install (macOS, Apple Silicon)
 
-Download `WAKARU_0.2.0_aarch64.dmg` from the [latest release](../../releases/latest).
+Download `WAKARU_0.0.0_aarch64.dmg` from the [latest release](../../releases/latest).
 The app is ad-hoc signed and **not notarized** — on first launch, right-click
 it and choose **Open** to get past Gatekeeper.
 
 Verify the download:
 
-    shasum -a 256 WAKARU_0.2.0_aarch64.dmg
+    shasum -a 256 WAKARU_0.0.0_aarch64.dmg
     # compare against RELEASE_CHECKSUMS.txt in the release
 
 ## Requirements
 
 - macOS 12+ on Apple Silicon.
-- An OpenAI-compatible endpoint for AI features (optional — ingestion, viewing
+- An OpenAI-compatible or Anthropic-compatible endpoint for AI features (optional — ingestion, viewing
   and keyword search work offline).
 - For audio/video transcription: download a Whisper model in Settings
   (~150 MB–3 GB depending on size).
@@ -175,7 +175,7 @@ Verify the download:
   explicitly add, Whisper model downloads you start, and the update check
   (which can be turned off).
 
-## Limitations (v0.2.0)
+## Limitations (v0.0.0)
 
 - Windows / Linux builds are unverified and not distributed.
 - PDF/slide pages show extracted text, not rendered images.

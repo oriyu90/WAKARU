@@ -18,11 +18,21 @@ pub async fn mcp_list_servers(state: State<'_, AppState>) -> AppResult<Vec<McpSe
 }
 
 #[tauri::command]
-pub fn mcp_upsert_server(state: State<'_, AppState>, input: McpUpsertInput) -> AppResult<McpServer> {
+pub fn mcp_upsert_server(
+    state: State<'_, AppState>,
+    input: McpUpsertInput,
+) -> AppResult<McpServer> {
     if input.name.trim().is_empty() {
-        return Err(AppError::new("MCP_NAME_REQUIRED", "error.mcp.nameRequired", "server name is required"));
+        return Err(AppError::new(
+            "MCP_NAME_REQUIRED",
+            "error.mcp.nameRequired",
+            "server name is required",
+        ));
     }
-    let id = input.id.clone().unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
+    let id = input
+        .id
+        .clone()
+        .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
 
     // Every env value is treated as a secret: the real value goes to the OS
     // keychain, the row stores only `keychain:<KEY>` (I-4).
@@ -33,7 +43,9 @@ pub fn mcp_upsert_server(state: State<'_, AppState>, input: McpUpsertInput) -> A
             let stored = if let Some(reference) = val.strip_prefix("keychain:") {
                 format!("keychain:{reference}")
             } else {
-                if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, &format!("mcp_env:{id}:{k}")) {
+                if let Ok(entry) =
+                    keyring::Entry::new(KEYRING_SERVICE, &format!("mcp_env:{id}:{k}"))
+                {
                     let _ = entry.set_password(val);
                 }
                 format!("keychain:{k}")
@@ -75,7 +87,9 @@ pub async fn mcp_delete_server(state: State<'_, AppState>, id: String) -> AppRes
         // Best-effort keychain cleanup for this server's env secrets.
         if let Ok(row) = mcp::get_server(db, &id) {
             for k in row.env.keys() {
-                if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, &format!("mcp_env:{id}:{k}")) {
+                if let Ok(entry) =
+                    keyring::Entry::new(KEYRING_SERVICE, &format!("mcp_env:{id}:{k}"))
+                {
                     let _ = entry.delete_credential();
                 }
             }
@@ -87,9 +101,8 @@ pub async fn mcp_delete_server(state: State<'_, AppState>, id: String) -> AppRes
 
 #[tauri::command]
 pub async fn mcp_connect(state: State<'_, AppState>, id: String) -> AppResult<McpConnectResult> {
-    let (row, policies) = state.with_db(|db| {
-        Ok((mcp::get_server(db, &id)?, mcp::policy_map(db)?))
-    })?;
+    let (row, policies) =
+        state.with_db(|db| Ok((mcp::get_server(db, &id)?, mcp::policy_map(db)?)))?;
     let tools = mcp::connect(row, &policies).await?;
     Ok(McpConnectResult { tools })
 }

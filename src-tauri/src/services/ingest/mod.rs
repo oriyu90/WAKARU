@@ -78,8 +78,10 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput) -> AppResult<
         std::fs::remove_dir_all(&dd)?;
     }
     std::fs::create_dir_all(&dd)?;
-    ctx.project_db
-        .execute("DELETE FROM documents WHERE source_id = ?1", [ctx.source_id])?;
+    ctx.project_db.execute(
+        "DELETE FROM documents WHERE source_id = ?1",
+        [ctx.source_id],
+    )?;
     ctx.app_db.execute(
         "DELETE FROM global_index WHERE source_id = ?1",
         [ctx.source_id],
@@ -120,7 +122,11 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput) -> AppResult<
 
     for (di, u) in units.iter().enumerate() {
         let doc_id = Uuid::now_v7().to_string();
-        let image_rel = if di == 0 { first_image_rel.as_deref() } else { None };
+        let image_rel = if di == 0 {
+            first_image_rel.as_deref()
+        } else {
+            None
+        };
         ctx.project_db.execute(
             "INSERT INTO documents (id, source_id, ordinal, kind, title, text, image_rel, locator)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -140,7 +146,8 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput) -> AppResult<
             let header = provenance_header(ctx.source_name, u);
             let body = format!("{header}\n{}", piece.text);
             let chunk_id = Uuid::now_v7().to_string();
-            let locator = serde_json::json!({ "t": "line", "start": piece.start, "end": piece.end });
+            let locator =
+                serde_json::json!({ "t": "line", "start": piece.start, "end": piece.end });
             ctx.project_db.execute(
                 "INSERT INTO chunks
                    (id, source_id, document_id, ordinal, text, text_bigram, tokens, locator, created_at)
@@ -217,19 +224,26 @@ fn parse(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput, dd: &Path) -> A
     };
 
     Ok(match kind {
-        SourceKind::Text | SourceKind::Markdown | SourceKind::Code => Parsed::plain(
-            text::parse_text(kind, &file(input)?)?,
-        ),
+        SourceKind::Text | SourceKind::Markdown | SourceKind::Code => {
+            Parsed::plain(text::parse_text(kind, &file(input)?)?)
+        }
         SourceKind::Json => Parsed::plain(text::parse_json(&file(input)?)?),
         SourceKind::Jsonl => Parsed::plain(text::parse_jsonl(&file(input)?)?),
         SourceKind::Pdf => {
             let units = pdf::parse_pdf(&file(input)?)?;
             let pc = units.len() as u32;
-            Parsed { page_count: Some(pc), ..Parsed::plain(units) }
+            Parsed {
+                page_count: Some(pc),
+                ..Parsed::plain(units)
+            }
         }
         SourceKind::Sheet => {
             let p = file(input)?;
-            let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+            let ext = p
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase();
             let units = if ext == "xlsx" || ext == "xls" || ext == "xlsm" {
                 office::parse_office(SourceKind::Sheet, &p)?
             } else {
@@ -239,8 +253,15 @@ fn parse(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput, dd: &Path) -> A
         }
         SourceKind::Slides | SourceKind::Doc => {
             let units = office::parse_office(kind, &file(input)?)?;
-            let pc = if kind == SourceKind::Slides { Some(units.len() as u32) } else { None };
-            Parsed { page_count: pc, ..Parsed::plain(units) }
+            let pc = if kind == SourceKind::Slides {
+                Some(units.len() as u32)
+            } else {
+                None
+            };
+            Parsed {
+                page_count: pc,
+                ..Parsed::plain(units)
+            }
         }
         SourceKind::Image => {
             let r = image::parse_image(&file(input)?, dd)?;
@@ -269,7 +290,10 @@ fn parse(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput, dd: &Path) -> A
         SourceKind::Audio | SourceKind::Video => {
             let units = av::parse_av(ctx.app_db, data_dir_of(ctx.project_dir), &file(input)?)?;
             let n = units.len() as u32;
-            Parsed { page_count: Some(n), ..Parsed::plain(units) }
+            Parsed {
+                page_count: Some(n),
+                ..Parsed::plain(units)
+            }
         }
     })
 }

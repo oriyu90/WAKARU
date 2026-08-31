@@ -27,7 +27,11 @@ pub fn parse_pdf(path: &Path) -> AppResult<Vec<Unit>> {
                 ordinal: (i + 1) as u32,
                 kind: "page",
                 title: Some(format!("p.{}", i + 1)),
-                text: format!("[ページ {} / {}] （テキスト層なし。解析は後で補完されます）", i + 1, total),
+                text: format!(
+                    "[ページ {} / {}] （テキスト層なし。解析は後で補完されます）",
+                    i + 1,
+                    total
+                ),
                 locator: serde_json::json!({ "t": "page", "page": i + 1 }),
             });
             continue;

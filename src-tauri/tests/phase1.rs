@@ -21,14 +21,22 @@ impl Env {
         let projects_dir = tmp.path().join("projects");
         std::fs::create_dir_all(&projects_dir).unwrap();
         let app_db = storage::open_app_db(&tmp.path().join("app.db")).unwrap();
-        Env { _tmp: tmp, projects_dir, app_db }
+        Env {
+            _tmp: tmp,
+            projects_dir,
+            app_db,
+        }
     }
 
     fn create_project(&self, name: &str) -> String {
         projects::create(
             &self.app_db,
             &self.projects_dir,
-            CreateProjectInput { name: name.into(), description: None, color: None },
+            CreateProjectInput {
+                name: name.into(),
+                description: None,
+                color: None,
+            },
         )
         .unwrap()
         .id
@@ -49,7 +57,11 @@ impl Env {
         let added = sources::add_one(&pdb, &self.projects_dir, project_id, src)
             .map_err(|e| e.code.clone())?;
         let name: String = pdb
-            .query_row("SELECT original_name FROM sources WHERE id=?1", [&added.source.id], |r| r.get(0))
+            .query_row(
+                "SELECT original_name FROM sources WHERE id=?1",
+                [&added.source.id],
+                |r| r.get(0),
+            )
             .unwrap();
         let ctx = IngestCtx {
             project_db: &pdb,
@@ -69,7 +81,11 @@ impl Env {
             "UPDATE sources SET status=?2, page_count=?3, analyzed_at='now' WHERE id=?1",
             rusqlite::params![
                 added.source.id,
-                if out.partial { "ready_partial" } else { "ready" },
+                if out.partial {
+                    "ready_partial"
+                } else {
+                    "ready"
+                },
                 out.page_count.map(|v| v as i64),
             ],
         )
@@ -104,18 +120,39 @@ fn ac_1_3_text_family_produces_documents_and_chunks() {
     let s = tmp.path();
 
     let cases = [
-        (write(s, "notes.md", "# 概要\n\n量子ビットは重ね合わせ状態を取る。\n\n# 詳細\n\nこれは説明です。"), SourceKind::Markdown),
-        (write(s, "data.json", r#"[{"k":1},{"k":2},{"k":3}]"#), SourceKind::Json),
-        (write(s, "t.csv", "name,age\nAlice,30\nBob,25\n"), SourceKind::Sheet),
-        (write(s, "log.txt", "line one\n\nline two paragraph\n\nline three"), SourceKind::Text),
+        (
+            write(
+                s,
+                "notes.md",
+                "# 概要\n\n量子ビットは重ね合わせ状態を取る。\n\n# 詳細\n\nこれは説明です。",
+            ),
+            SourceKind::Markdown,
+        ),
+        (
+            write(s, "data.json", r#"[{"k":1},{"k":2},{"k":3}]"#),
+            SourceKind::Json,
+        ),
+        (
+            write(s, "t.csv", "name,age\nAlice,30\nBob,25\n"),
+            SourceKind::Sheet,
+        ),
+        (
+            write(s, "log.txt", "line one\n\nline two paragraph\n\nline three"),
+            SourceKind::Text,
+        ),
     ];
     for (path, kind) in cases {
         let (_, docs, chunks) = env.add_and_ingest(&id, &path, kind).unwrap();
-        assert!(docs >= 1 && chunks >= 1, "{kind:?}: docs={docs} chunks={chunks}");
+        assert!(
+            docs >= 1 && chunks >= 1,
+            "{kind:?}: docs={docs} chunks={chunks}"
+        );
     }
 
     let pdb = env.pdb(&id);
-    let fts: i64 = pdb.query_row("SELECT count(*) FROM chunks_fts", [], |r| r.get(0)).unwrap();
+    let fts: i64 = pdb
+        .query_row("SELECT count(*) FROM chunks_fts", [], |r| r.get(0))
+        .unwrap();
     assert!(fts >= 4, "fts rows = {fts}");
 }
 
@@ -124,7 +161,11 @@ fn ac_1_7_japanese_keyword_search_hits() {
     let env = Env::new();
     let id = env.create_project("p");
     let tmp = tempfile::tempdir().unwrap();
-    let md = write(tmp.path(), "q.md", "# 章1\n\n量子計算は重ね合わせと干渉を利用する計算方式である。");
+    let md = write(
+        tmp.path(),
+        "q.md",
+        "# 章1\n\n量子計算は重ね合わせと干渉を利用する計算方式である。",
+    );
     env.add_and_ingest(&id, &md, SourceKind::Markdown).unwrap();
 
     let pdb = env.pdb(&id);
@@ -161,9 +202,11 @@ fn ac_1_5_unsupported_format_is_kept_and_marked_failed() {
     let added = sources::add_one(&pdb, &env.projects_dir, &id, &bin).expect("row still created");
     assert!(added.kind.is_none());
     let (status, code): (String, Option<String>) = pdb
-        .query_row("SELECT status, error_code FROM sources WHERE id=?1", [&added.source.id], |r| {
-            Ok((r.get(0)?, r.get(1)?))
-        })
+        .query_row(
+            "SELECT status, error_code FROM sources WHERE id=?1",
+            [&added.source.id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
         .unwrap();
     assert_eq!(status, "failed");
     assert_eq!(code.as_deref(), Some("SOURCE_UNSUPPORTED_FORMAT"));
@@ -184,16 +227,37 @@ fn ac_1_10_delete_removes_documents_chunks_and_files() {
     let env = Env::new();
     let id = env.create_project("p");
     let tmp = tempfile::tempdir().unwrap();
-    let md = write(tmp.path(), "x.md", "# h\n\nsome body text here, long enough to chunk once.");
+    let md = write(
+        tmp.path(),
+        "x.md",
+        "# h\n\nsome body text here, long enough to chunk once.",
+    );
     let (sid, _, _) = env.add_and_ingest(&id, &md, SourceKind::Markdown).unwrap();
 
     sources::delete(&env.app_db, &env.projects_dir, &id, &sid).unwrap();
 
     let pdb = env.pdb(&id);
-    let docs: i64 = pdb.query_row("SELECT count(*) FROM documents WHERE source_id=?1", [&sid], |r| r.get(0)).unwrap();
-    let chunks: i64 = pdb.query_row("SELECT count(*) FROM chunks WHERE source_id=?1", [&sid], |r| r.get(0)).unwrap();
+    let docs: i64 = pdb
+        .query_row(
+            "SELECT count(*) FROM documents WHERE source_id=?1",
+            [&sid],
+            |r| r.get(0),
+        )
+        .unwrap();
+    let chunks: i64 = pdb
+        .query_row(
+            "SELECT count(*) FROM chunks WHERE source_id=?1",
+            [&sid],
+            |r| r.get(0),
+        )
+        .unwrap();
     assert_eq!((docs, chunks), (0, 0));
-    assert!(!env.projects_dir.join(&id).join("derived").join(&sid).exists());
+    assert!(!env
+        .projects_dir
+        .join(&id)
+        .join("derived")
+        .join(&sid)
+        .exists());
 }
 
 #[test]
@@ -203,15 +267,19 @@ fn image_ingest_normalises_and_writes_a_derived_page() {
     let tmp = tempfile::tempdir().unwrap();
     let p = tmp.path().join("photo.png");
     // 4000px wide -> must be resized to <= 2048.
-    let buf = image::RgbImage::from_fn(4000, 100, |x, _| {
-        image::Rgb([(x % 256) as u8, 0, 0])
-    });
+    let buf = image::RgbImage::from_fn(4000, 100, |x, _| image::Rgb([(x % 256) as u8, 0, 0]));
     buf.save(&p).unwrap();
 
     let (sid, docs, chunks) = env.add_and_ingest(&id, &p, SourceKind::Image).unwrap();
     assert_eq!(docs, 1);
     assert!(chunks >= 1);
-    let derived = env.projects_dir.join(&id).join("derived").join(&sid).join("pages").join("0001.png");
+    let derived = env
+        .projects_dir
+        .join(&id)
+        .join("derived")
+        .join(&sid)
+        .join("pages")
+        .join("0001.png");
     assert!(derived.is_file(), "normalised image not written");
     let (w, _) = image::image_dimensions(&derived).unwrap();
     assert!(w <= 2048, "image not resized: {w}px");
@@ -237,7 +305,11 @@ fn ac_1_11_ingest_and_search_work_offline() {
     let env = Env::new();
     let id = env.create_project("p");
     let tmp = tempfile::tempdir().unwrap();
-    let md = write(tmp.path(), "n.md", "# t\n\nprice and value are synonyms in this note.");
+    let md = write(
+        tmp.path(),
+        "n.md",
+        "# t\n\nprice and value are synonyms in this note.",
+    );
     env.add_and_ingest(&id, &md, SourceKind::Markdown).unwrap();
     let hits = wakaru_lib::keyword_search(&env.pdb(&id), "value", 5).unwrap();
     assert!(!hits.is_empty());

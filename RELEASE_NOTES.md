@@ -1,9 +1,8 @@
-# WAKARU v0.2.0
+# WAKARU v0.0.0
 
-A full re-development of WAKARU on Tauri v2 (Rust backend + a from-scratch
-React frontend built to the Hallmark design system). v0.1.0's application source
-was never published and could not be recovered; v0.2.0 is a clean
-re-implementation from the product specification and the v0.1.0 IPC contract.
+A reliability-focused build of the fully redeveloped WAKARU app on Tauri v2,
+Rust, and React. This release number intentionally follows the requested
+`v0.0.0` label even though an earlier public prerelease was tagged `v0.1.0`.
 
 macOS (Apple Silicon) only for this release, ad-hoc signed and **not
 notarized** — on first launch, right-click the app and choose *Open* to get
@@ -11,12 +10,25 @@ past Gatekeeper.
 
 ## What's in it
 
+- **Two API formats** — choose OpenAI-compatible or Anthropic-compatible per
+  connection. The Anthropic adapter supports native authentication, top-level
+  system instructions, image blocks, tool definitions/results, structured
+  output mapping, text/thinking/tool SSE events, usage, and provider errors.
+- **Built-in response quality** — Studio continuously avoids canned AI prose,
+  filler, repetition, and unnecessary structure. Live Illustrator combines a
+  plain-language first explanation with examples, misconception handling, and
+  an optional short understanding check. No external Skill source is bundled.
+- **Reliability hardening** — validated endpoint URLs, safe database migration
+  for existing profiles, incomplete-stream detection, no caching of truncated
+  explanations, recoverable poisoned locks, safe corrupt-ZIP errors, and
+  visible failures when saving AI settings.
+
 - **Projects & ingestion** — self-contained project folders; add PDFs, images,
   audio, video, spreadsheets, text/Markdown/JSON/code, and web links (with an
   SSRF guard). PDF text, Office formats, and CJK bi-gram full-text search.
 - **Viewer** — tabbed panes, previews for every format, in-preview find,
   reader view for web links.
-- **RAG + AI** — one OpenAI-compatible client (no vendor SDK); connection
+- **RAG + AI** — one protocol-neutral client (no vendor SDK); connection
   profiles with keys in the macOS keychain; hybrid FTS + vector search (RRF)
   with a keyword-only fallback when offline.
 - **Live Illustrator** — on-demand, cached page explanations with citations
@@ -56,4 +68,4 @@ Documented in `docs/DECISIONS.md`:
 
 ## Verification
 
-`docs/QUALITY_REPORT.md` (this repo) records the gate results for the build.
+`QUALITY_REPORT.md` records the gate results for the build.

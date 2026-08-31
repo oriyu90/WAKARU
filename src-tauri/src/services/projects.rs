@@ -56,7 +56,11 @@ pub fn create(app_db: &Connection, root: &Path, input: CreateProjectInput) -> Ap
     let _conn = storage::open_project_db(&project_db_path(root, &id))?;
 
     let sort_order: i32 = app_db
-        .query_row("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM projects", [], |r| r.get(0))
+        .query_row(
+            "SELECT COALESCE(MAX(sort_order), 0) + 1 FROM projects",
+            [],
+            |r| r.get(0),
+        )
         .unwrap_or(1);
 
     app_db.execute(
@@ -92,7 +96,11 @@ pub fn create(app_db: &Connection, root: &Path, input: CreateProjectInput) -> Ap
     })
 }
 
-pub fn list(app_db: &Connection, root: &Path, include_archived: bool) -> AppResult<Vec<ProjectSummary>> {
+pub fn list(
+    app_db: &Connection,
+    root: &Path,
+    include_archived: bool,
+) -> AppResult<Vec<ProjectSummary>> {
     let sql = if include_archived {
         "SELECT id, name, description, color, archived_at, opened_at, updated_at
          FROM projects ORDER BY sort_order"

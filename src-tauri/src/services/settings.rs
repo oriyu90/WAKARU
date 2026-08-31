@@ -10,7 +10,9 @@ const KEY: &str = "app";
 
 pub fn get(app_db: &Connection) -> AppResult<Settings> {
     let raw: Option<String> = app_db
-        .query_row("SELECT value FROM settings WHERE key = ?1", [KEY], |r| r.get(0))
+        .query_row("SELECT value FROM settings WHERE key = ?1", [KEY], |r| {
+            r.get(0)
+        })
         .optional()?;
     Ok(match raw {
         Some(json) => merge_defaults(&json),
@@ -64,7 +66,11 @@ mod tests {
         let s0 = get(&db).unwrap();
         assert_eq!(s0.illustrator.default_level, "standard");
 
-        let s1 = update(&db, serde_json::json!({ "illustrator": { "enabled": true } })).unwrap();
+        let s1 = update(
+            &db,
+            serde_json::json!({ "illustrator": { "enabled": true } }),
+        )
+        .unwrap();
         assert!(s1.illustrator.enabled);
         assert_eq!(s1.illustrator.default_level, "standard"); // untouched
 

@@ -26,7 +26,10 @@ pub async fn query(
 fn global(app_db: &rusqlite::Connection, q: &SearchQuery) -> AppResult<SearchResults> {
     let expr = retrieval::fts_match_expr(&q.q);
     if expr.is_empty() {
-        return Ok(SearchResults { hits: vec![], semantic: false });
+        return Ok(SearchResults {
+            hits: vec![],
+            semantic: false,
+        });
     }
     let mut names: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     {
@@ -51,7 +54,10 @@ fn global(app_db: &rusqlite::Connection, q: &SearchQuery) -> AppResult<SearchRes
             let ref_id: String = r.get(3)?;
             let title: String = r.get(4)?;
             let body_raw: String = r.get(5)?;
-            let ordinal = ref_id.rsplit('#').next().and_then(|s| s.parse::<u32>().ok());
+            let ordinal = ref_id
+                .rsplit('#')
+                .next()
+                .and_then(|s| s.parse::<u32>().ok());
             Ok(SearchHit {
                 project_name: names.get(&project_id).cloned().unwrap_or_default(),
                 project_id,
@@ -65,7 +71,10 @@ fn global(app_db: &rusqlite::Connection, q: &SearchQuery) -> AppResult<SearchRes
         })?
         .collect::<rusqlite::Result<_>>()?;
 
-    Ok(SearchResults { hits, semantic: false })
+    Ok(SearchResults {
+        hits,
+        semantic: false,
+    })
 }
 
 async fn project_scoped(
@@ -74,7 +83,10 @@ async fn project_scoped(
     q: &SearchQuery,
 ) -> AppResult<SearchResults> {
     let Some(pid) = q.project_id.as_deref() else {
-        return Ok(SearchResults { hits: vec![], semantic: false });
+        return Ok(SearchResults {
+            hits: vec![],
+            semantic: false,
+        });
     };
     let mode = q.mode.as_deref().unwrap_or("hybrid");
     let want_vec = mode != "keyword";
@@ -88,7 +100,9 @@ async fn project_scoped(
             None
         };
         let name: String = app_db
-            .query_row("SELECT name FROM projects WHERE id = ?1", [pid], |r| r.get(0))
+            .query_row("SELECT name FROM projects WHERE id = ?1", [pid], |r| {
+                r.get(0)
+            })
             .unwrap_or_default();
         (role, name)
     };

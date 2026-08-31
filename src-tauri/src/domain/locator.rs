@@ -83,10 +83,21 @@ mod tests {
 
     #[test]
     fn page_key() {
-        assert_eq!(Locator::Page { page: 12, bbox: None }.to_key(), "page:12");
+        assert_eq!(
+            Locator::Page {
+                page: 12,
+                bbox: None
+            }
+            .to_key(),
+            "page:12"
+        );
         // bbox does not change the key (it points at the same page).
         assert_eq!(
-            Locator::Page { page: 12, bbox: Some([0.1, 0.2, 0.3, 0.4]) }.to_key(),
+            Locator::Page {
+                page: 12,
+                bbox: Some([0.1, 0.2, 0.3, 0.4])
+            }
+            .to_key(),
             "page:12"
         );
     }
@@ -94,7 +105,12 @@ mod tests {
     #[test]
     fn time_key_is_zero_padded_to_3_decimals() {
         assert_eq!(
-            Locator::Time { t_start: 90.0, t_end: 104.8, speaker: None }.to_key(),
+            Locator::Time {
+                t_start: 90.0,
+                t_end: 104.8,
+                speaker: None
+            }
+            .to_key(),
             "time:0090.000-0104.800"
         );
     }
@@ -109,25 +125,56 @@ mod tests {
     #[test]
     fn region_rounds_to_3dp() {
         assert_eq!(
-            Locator::Region { bbox: [0.1000001, 0.2, 0.5, 0.639999] }.to_key(),
+            Locator::Region {
+                bbox: [0.1000001, 0.2, 0.5, 0.639999]
+            }
+            .to_key(),
             "region:0.100-0.200-0.500-0.640"
         );
     }
 
     #[test]
     fn cell_and_line_and_path_and_anchor() {
-        assert_eq!(Locator::Cell { sheet: "Q1".into(), range: "A1:D20".into() }.to_key(), "cell:Q1!A1:D20");
-        assert_eq!(Locator::Line { start: 120, end: 160 }.to_key(), "line:120-160");
-        assert_eq!(Locator::Path { pointer: "/items/3/title".into() }.to_key(), "path:/items/3/title");
         assert_eq!(
-            Locator::Anchor { selector: "#sec-2".into(), char_start: None, char_end: None }.to_key(),
+            Locator::Cell {
+                sheet: "Q1".into(),
+                range: "A1:D20".into()
+            }
+            .to_key(),
+            "cell:Q1!A1:D20"
+        );
+        assert_eq!(
+            Locator::Line {
+                start: 120,
+                end: 160
+            }
+            .to_key(),
+            "line:120-160"
+        );
+        assert_eq!(
+            Locator::Path {
+                pointer: "/items/3/title".into()
+            }
+            .to_key(),
+            "path:/items/3/title"
+        );
+        assert_eq!(
+            Locator::Anchor {
+                selector: "#sec-2".into(),
+                char_start: None,
+                char_end: None
+            }
+            .to_key(),
             "anchor:#sec-2"
         );
     }
 
     #[test]
     fn unknown_json_is_whole() {
-        assert_eq!(Locator::from_value(&json!({ "weird": 1 })).to_key(), "whole");
+        assert_eq!(
+            Locator::from_value(&json!({ "weird": 1 })).to_key(),
+            "whole"
+        );
         assert_eq!(Locator::from_value(&json!({})).to_key(), "whole");
     }
 }

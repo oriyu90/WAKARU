@@ -3,27 +3,42 @@
 //! same pragmas and the same forward-only migration runner.
 
 use crate::error::{AppError, AppResult};
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use std::path::Path;
 
 pub mod migrate;
 
-pub const APP_SCHEMA_VERSION: &str = "1.0.0";
+pub const APP_SCHEMA_VERSION: &str = "1.1.0";
 pub const PROJECT_SCHEMA_VERSION: &str = "1.0.0";
 
 /// App-wide migrations, applied in array order. Names are `NNN_desc`; no gaps.
-pub const APP_MIGRATIONS: &[(&str, &str)] =
-    &[("001_init", include_str!("../../migrations/app/001_init.sql"))];
+pub const APP_MIGRATIONS: &[(&str, &str)] = &[
+    (
+        "001_init",
+        include_str!("../../migrations/app/001_init.sql"),
+    ),
+    (
+        "002_ai_protocol",
+        include_str!("../../migrations/app/002_ai_protocol.sql"),
+    ),
+];
 
 /// Per-project database migrations.
 pub const PROJECT_MIGRATIONS: &[(&str, &str)] = &[
-    ("001_init", include_str!("../../migrations/project/001_init.sql")),
-    ("002_studio", include_str!("../../migrations/project/002_studio.sql")),
+    (
+        "001_init",
+        include_str!("../../migrations/project/001_init.sql"),
+    ),
+    (
+        "002_studio",
+        include_str!("../../migrations/project/002_studio.sql"),
+    ),
 ];
 
 /// Open a `project.db`, run its migrations. Called when a project is opened.
 pub fn open_project_db(path: &Path) -> AppResult<Connection> {
     let conn = open(path)?;
+    adopt_legacy_project_schema(&conn)?;
     migrate::run(&conn, PROJECT_MIGRATIONS, PROJECT_SCHEMA_VERSION)?;
     Ok(conn)
 }
@@ -79,6 +94,154 @@ pub fn open_app_db(path: &Path) -> AppResult<Connection> {
             format!("integrity_check returned: {ok}"),
         ));
     }
+    adopt_legacy_app_schema(&conn)?;
     migrate::run(&conn, APP_MIGRATIONS, APP_SCHEMA_VERSION)?;
     Ok(conn)
+}
+
+/// Builds before the forward-only runner was introduced created the complete
+/// tables but no `schema_migrations` rows. Adopt only a recognisable complete
+/// baseline, then let normal migrations add newer fields. This prevents an
+/// upgrade from trying to recreate `projects` and aborting at launch.
+fn adopt_legacy_app_schema(conn: &Connection) -> AppResult<()> {
+    ensure_tracking_tables(conn)?;
+    if migration_applied(conn, "001_init")? || !table_exists(conn, "projects")? {
+        return Ok(());
+    }
+    for required in [
+        "settings",
+        "ai_profiles",
+        "model_roles",
+        "whisper_models",
+        "mcp_servers",
+        "mcp_tool_policies",
+        "global_index",
+    ] {
+        if !table_exists(conn, required)? {
+            return Err(AppError::new(
+                "MIGRATION_FAILED",
+                "error.db.migration",
+                format!("legacy app database is incomplete: missing {required}"),
+            ));
+        }
+    }
+    if !column_exists(conn, "ai_profiles", "json_schema")? {
+        conn.execute(
+            "ALTER TABLE ai_profiles ADD COLUMN json_schema INTEGER NOT NULL DEFAULT 0",
+            [],
+        )?;
+    }
+    mark_migration_applied(conn, "001_init")?;
+    if column_exists(conn, "ai_profiles", "protocol")? {
+        mark_migration_applied(conn, "002_ai_protocol")?;
+    }
+    tracing::info!("adopted legacy app database baseline");
+    Ok(())
+}
+
+fn adopt_legacy_project_schema(conn: &Connection) -> AppResult<()> {
+    ensure_tracking_tables(conn)?;
+    if !migration_applied(conn, "001_init")? && table_exists(conn, "sources")? {
+        for required in ["documents", "chunks", "threads", "messages", "studio_tabs"] {
+            if !table_exists(conn, required)? {
+                return Err(AppError::new(
+                    "MIGRATION_FAILED",
+                    "error.db.migration",
+                    format!("legacy project database is incomplete: missing {required}"),
+                ));
+            }
+        }
+        mark_migration_applied(conn, "001_init")?;
+        tracing::info!("adopted legacy project database baseline");
+    }
+    if column_exists(conn, "studio_tabs", "scope")? && !migration_applied(conn, "002_studio")? {
+        mark_migration_applied(conn, "002_studio")?;
+    }
+    Ok(())
+}
+
+fn ensure_tracking_tables(conn: &Connection) -> AppResult<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS schema_migrations (
+            name TEXT PRIMARY KEY,
+            applied_at TEXT NOT NULL
+         );
+         CREATE TABLE IF NOT EXISTS schema_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+         );",
+    )?;
+    Ok(())
+}
+
+fn migration_applied(conn: &Connection, name: &str) -> AppResult<bool> {
+    Ok(conn
+        .query_row(
+            "SELECT 1 FROM schema_migrations WHERE name = ?1",
+            [name],
+            |_| Ok(true),
+        )
+        .optional()?
+        .unwrap_or(false))
+}
+
+fn mark_migration_applied(conn: &Connection, name: &str) -> AppResult<()> {
+    conn.execute(
+        "INSERT OR IGNORE INTO schema_migrations (name, applied_at) VALUES (?1, ?2)",
+        rusqlite::params![name, migrate::now_iso8601()],
+    )?;
+    Ok(())
+}
+
+fn table_exists(conn: &Connection, table: &str) -> AppResult<bool> {
+    Ok(conn
+        .query_row(
+            "SELECT 1 FROM sqlite_master WHERE type IN ('table','view') AND name = ?1",
+            [table],
+            |_| Ok(true),
+        )
+        .optional()?
+        .unwrap_or(false))
+}
+
+fn column_exists(conn: &Connection, table: &str, column: &str) -> AppResult<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let names = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(names.iter().any(|name| name == column))
+}
+
+#[cfg(test)]
+mod legacy_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_app_schema_is_adopted_and_upgraded_without_recreating_tables() {
+        let conn = open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE projects(id TEXT PRIMARY KEY);
+             CREATE TABLE settings(key TEXT PRIMARY KEY);
+             CREATE TABLE ai_profiles(
+                id TEXT PRIMARY KEY, name TEXT NOT NULL, base_url TEXT NOT NULL,
+                api_key_ref TEXT, default_model TEXT, supports_vision INTEGER NOT NULL DEFAULT 0,
+                supports_tools INTEGER NOT NULL DEFAULT 0, supports_embed INTEGER NOT NULL DEFAULT 0,
+                extra_headers TEXT NOT NULL DEFAULT '{}', timeout_ms INTEGER NOT NULL DEFAULT 120000,
+                created_at TEXT NOT NULL, last_ok_at TEXT
+             );
+             CREATE TABLE model_roles(role TEXT PRIMARY KEY);
+             CREATE TABLE whisper_models(name TEXT PRIMARY KEY);
+             CREATE TABLE mcp_servers(id TEXT PRIMARY KEY);
+             CREATE TABLE mcp_tool_policies(server_id TEXT, tool_name TEXT);
+             CREATE TABLE global_index(body TEXT);",
+        )
+        .unwrap();
+
+        adopt_legacy_app_schema(&conn).unwrap();
+        migrate::run(&conn, APP_MIGRATIONS, APP_SCHEMA_VERSION).unwrap();
+        assert!(column_exists(&conn, "ai_profiles", "json_schema").unwrap());
+        assert!(column_exists(&conn, "ai_profiles", "protocol").unwrap());
+        assert!(migration_applied(&conn, "001_init").unwrap());
+        assert!(migration_applied(&conn, "002_ai_protocol").unwrap());
+    }
 }

@@ -12,7 +12,12 @@ pub fn init(logs_dir: &Path) {
 
     let _ = tracing_subscriber::registry()
         .with(filter)
-        .with(fmt::layer().with_target(false).with_ansi(false).with_writer(file_appender))
+        .with(
+            fmt::layer()
+                .with_target(false)
+                .with_ansi(false)
+                .with_writer(file_appender),
+        )
         .with(fmt::layer().with_target(false))
         .try_init();
 }

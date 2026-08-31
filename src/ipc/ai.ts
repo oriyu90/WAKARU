@@ -5,6 +5,7 @@ import type {
   RoleBindings,
   TestResult,
   Role,
+  ApiProtocol,
 } from "./types.gen";
 
 export const aiApi = {
@@ -22,9 +23,11 @@ export const aiApi = {
   debugChat: (prompt: string) => call<string>("ai_debug_chat", { prompt }),
 };
 
-export const AI_PRESETS: { label: string; baseUrl: string; note?: string }[] = [
-  { label: "LM Studio", baseUrl: "http://localhost:1234/v1", note: "No API key needed" },
-  { label: "Ollama", baseUrl: "http://localhost:11434/v1", note: "No API key needed" },
-  { label: "OpenAI", baseUrl: "https://api.openai.com/v1" },
-  { label: "Custom", baseUrl: "" },
+export const AI_PRESETS: { label: string; baseUrl: string; protocol: ApiProtocol }[] = [
+  { label: "LM Studio", baseUrl: "http://localhost:1234/v1", protocol: "openai" },
+  { label: "Ollama", baseUrl: "http://localhost:11434/v1", protocol: "openai" },
+  { label: "OpenAI", baseUrl: "https://api.openai.com/v1", protocol: "openai" },
+  { label: "Anthropic", baseUrl: "https://api.anthropic.com/v1", protocol: "anthropic" },
+  { label: "Custom (OpenAI-compatible)", baseUrl: "", protocol: "openai" },
+  { label: "Custom (Anthropic-compatible)", baseUrl: "", protocol: "anthropic" },
 ];

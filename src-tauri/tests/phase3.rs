@@ -50,10 +50,24 @@ fn ac_3_fts_only_hybrid_search_still_returns_hits_without_vectors() {
     let root = tmp.path().join("projects");
     std::fs::create_dir_all(&root).unwrap();
     let app_db = storage::open_app_db(&tmp.path().join("app.db")).unwrap();
-    let pid = projects::create(&app_db, &root, CreateProjectInput { name: "p".into(), description: None, color: None })
-        .unwrap()
-        .id;
-    ingest_md(&app_db, &root, &pid, "q.md", "# 章1\n\n量子計算は重ね合わせを利用する。価格と価値についても触れる。");
+    let pid = projects::create(
+        &app_db,
+        &root,
+        CreateProjectInput {
+            name: "p".into(),
+            description: None,
+            color: None,
+        },
+    )
+    .unwrap()
+    .id;
+    ingest_md(
+        &app_db,
+        &root,
+        &pid,
+        "q.md",
+        "# 章1\n\n量子計算は重ね合わせを利用する。価格と価値についても触れる。",
+    );
 
     let pdb = projects::open_db(&root, &pid).unwrap();
     // No chunk_vectors table exists -> query_vec None -> FTS path only.
@@ -70,21 +84,64 @@ async fn ac_3_search_query_global_scope_spans_projects_via_fts() {
     let app_db_path = tmp.path().join("app.db");
     let app_db = storage::open_app_db(&app_db_path).unwrap();
 
-    let p1 = projects::create(&app_db, &root, CreateProjectInput { name: "Alpha".into(), description: None, color: None }).unwrap().id;
-    let p2 = projects::create(&app_db, &root, CreateProjectInput { name: "Beta".into(), description: None, color: None }).unwrap().id;
-    ingest_md(&app_db, &root, &p1, "a.md", "# a\n\nquantum entanglement notes");
-    ingest_md(&app_db, &root, &p2, "b.md", "# b\n\nquantum computing lecture");
+    let p1 = projects::create(
+        &app_db,
+        &root,
+        CreateProjectInput {
+            name: "Alpha".into(),
+            description: None,
+            color: None,
+        },
+    )
+    .unwrap()
+    .id;
+    let p2 = projects::create(
+        &app_db,
+        &root,
+        CreateProjectInput {
+            name: "Beta".into(),
+            description: None,
+            color: None,
+        },
+    )
+    .unwrap()
+    .id;
+    ingest_md(
+        &app_db,
+        &root,
+        &p1,
+        "a.md",
+        "# a\n\nquantum entanglement notes",
+    );
+    ingest_md(
+        &app_db,
+        &root,
+        &p2,
+        "b.md",
+        "# b\n\nquantum computing lecture",
+    );
     drop(app_db);
 
     let res = search::query(
         &app_db_path,
         &root,
-        SearchQuery { scope: SearchScope::Global, project_id: None, q: "quantum".into(), source_id: None, limit: 30, mode: None },
+        SearchQuery {
+            scope: SearchScope::Global,
+            project_id: None,
+            q: "quantum".into(),
+            source_id: None,
+            limit: 30,
+            mode: None,
+        },
     )
     .await
     .unwrap();
 
     assert!(!res.semantic);
-    let names: std::collections::HashSet<_> = res.hits.iter().map(|h| h.project_name.clone()).collect();
-    assert!(names.contains("Alpha") && names.contains("Beta"), "{names:?}");
+    let names: std::collections::HashSet<_> =
+        res.hits.iter().map(|h| h.project_name.clone()).collect();
+    assert!(
+        names.contains("Alpha") && names.contains("Beta"),
+        "{names:?}"
+    );
 }

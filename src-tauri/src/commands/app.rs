@@ -7,7 +7,9 @@ use tauri::State;
 pub fn app_get_info(state: State<'_, AppState>) -> AppResult<AppInfo> {
     Ok(AppInfo {
         version: env!("CARGO_PKG_VERSION").to_string(),
-        build_date: option_env!("WAKARU_BUILD_DATE").unwrap_or("dev").to_string(),
+        build_date: option_env!("WAKARU_BUILD_DATE")
+            .unwrap_or("dev")
+            .to_string(),
         data_dir: state.data_dir.display().to_string(),
         license: "MIT".to_string(),
     })

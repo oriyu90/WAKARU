@@ -52,7 +52,11 @@ pub async fn whisper_download_model(
                     last = done;
                     let _ = app.emit(
                         "whisper://download",
-                        DownloadProgress { name: name2.clone(), done, total },
+                        DownloadProgress {
+                            name: name2.clone(),
+                            done,
+                            total,
+                        },
                     );
                 }
             },
@@ -80,7 +84,10 @@ pub fn whisper_delete_model(state: State<'_, AppState>, name: String) -> AppResu
 #[tauri::command]
 pub fn whisper_select_model(state: State<'_, AppState>, name: String) -> AppResult<()> {
     state.with_db(|db| {
-        settings::update(db, serde_json::json!({ "transcription": { "whisperModel": name } }))?;
+        settings::update(
+            db,
+            serde_json::json!({ "transcription": { "whisperModel": name } }),
+        )?;
         Ok(())
     })
 }

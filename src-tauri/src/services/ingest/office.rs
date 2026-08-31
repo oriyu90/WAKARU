@@ -15,14 +15,22 @@ pub fn parse_office(kind: SourceKind, path: &Path) -> AppResult<Vec<Unit>> {
         SourceKind::Slides => parse_pptx(path),
         SourceKind::Doc => parse_docx(path),
         SourceKind::Sheet => parse_xlsx(path),
-        _ => Err(AppError::new("SOURCE_UNSUPPORTED_FORMAT", "error.source.unsupported", "not office")),
+        _ => Err(AppError::new(
+            "SOURCE_UNSUPPORTED_FORMAT",
+            "error.source.unsupported",
+            "not office",
+        )),
     }
 }
 
 fn open_zip(path: &Path) -> AppResult<zip::ZipArchive<std::fs::File>> {
     let f = std::fs::File::open(path)?;
     zip::ZipArchive::new(f).map_err(|e| {
-        AppError::new("SOURCE_PARSE", "error.source.parse", format!("not a valid OOXML file: {e}"))
+        AppError::new(
+            "SOURCE_PARSE",
+            "error.source.parse",
+            format!("not a valid OOXML file: {e}"),
+        )
     })
 }
 
@@ -100,7 +108,11 @@ fn parse_pptx(path: &Path) -> AppResult<Vec<Unit>> {
         });
     }
     if units.is_empty() {
-        return Err(AppError::new("SOURCE_EMPTY", "error.source.empty", "no slides"));
+        return Err(AppError::new(
+            "SOURCE_EMPTY",
+            "error.source.empty",
+            "no slides",
+        ));
     }
     Ok(units)
 }
@@ -115,8 +127,9 @@ fn slide_num(name: &str) -> u32 {
 
 fn parse_docx(path: &Path) -> AppResult<Vec<Unit>> {
     let mut zip = open_zip(path)?;
-    let xml = entry_text(&mut zip, "word/document.xml")
-        .ok_or_else(|| AppError::new("SOURCE_PARSE", "error.source.parse", "no word/document.xml"))?;
+    let xml = entry_text(&mut zip, "word/document.xml").ok_or_else(|| {
+        AppError::new("SOURCE_PARSE", "error.source.parse", "no word/document.xml")
+    })?;
 
     // Walk paragraphs; a paragraph whose pStyle val starts with "Heading" opens
     // a new section (docs/04 §4 — DOCX has no stable page concept).
@@ -137,7 +150,11 @@ fn parse_docx(path: &Path) -> AppResult<Vec<Unit>> {
                     p_heading = None;
                 }
                 b"pStyle" => {
-                    if let Some(v) = e.attributes().flatten().find(|a| local_name(a.key.as_ref()) == b"val") {
+                    if let Some(v) = e
+                        .attributes()
+                        .flatten()
+                        .find(|a| local_name(a.key.as_ref()) == b"val")
+                    {
                         if let Ok(val) = v.unescape_value() {
                             if let Some(rest) = val.strip_prefix("Heading") {
                                 p_heading = rest.trim().parse::<u8>().ok();
@@ -149,7 +166,11 @@ fn parse_docx(path: &Path) -> AppResult<Vec<Unit>> {
                 _ => {}
             },
             Ok(Event::Empty(e)) if local_name(e.name().as_ref()) == b"pStyle" => {
-                if let Some(v) = e.attributes().flatten().find(|a| local_name(a.key.as_ref()) == b"val") {
+                if let Some(v) = e
+                    .attributes()
+                    .flatten()
+                    .find(|a| local_name(a.key.as_ref()) == b"val")
+                {
                     if let Ok(val) = v.unescape_value() {
                         if let Some(rest) = val.strip_prefix("Heading") {
                             p_heading = rest.trim().parse::<u8>().ok();
@@ -209,7 +230,11 @@ fn parse_docx(path: &Path) -> AppResult<Vec<Unit>> {
         ordinal += 1;
     }
     if units.is_empty() {
-        return Err(AppError::new("SOURCE_EMPTY", "error.source.empty", "empty document"));
+        return Err(AppError::new(
+            "SOURCE_EMPTY",
+            "error.source.empty",
+            "empty document",
+        ));
     }
     Ok(units)
 }
@@ -217,7 +242,11 @@ fn parse_docx(path: &Path) -> AppResult<Vec<Unit>> {
 fn parse_xlsx(path: &Path) -> AppResult<Vec<Unit>> {
     use calamine::{open_workbook_auto, Reader as _};
     let mut wb = open_workbook_auto(path).map_err(|e| {
-        AppError::new("SOURCE_PARSE", "error.source.parse", format!("cannot open spreadsheet: {e}"))
+        AppError::new(
+            "SOURCE_PARSE",
+            "error.source.parse",
+            format!("cannot open spreadsheet: {e}"),
+        )
     })?;
 
     let mut units = Vec::new();
@@ -275,7 +304,11 @@ fn parse_xlsx(path: &Path) -> AppResult<Vec<Unit>> {
         }
     }
     if units.is_empty() {
-        return Err(AppError::new("SOURCE_EMPTY", "error.source.empty", "empty spreadsheet"));
+        return Err(AppError::new(
+            "SOURCE_EMPTY",
+            "error.source.empty",
+            "empty spreadsheet",
+        ));
     }
     Ok(units)
 }
@@ -304,7 +337,11 @@ fn cell_to_string(c: &calamine::Data) -> String {
 fn md_row(cells: &[String]) -> String {
     format!(
         "| {} |\n",
-        cells.iter().map(|c| c.replace('|', "\\|")).collect::<Vec<_>>().join(" | ")
+        cells
+            .iter()
+            .map(|c| c.replace('|', "\\|"))
+            .collect::<Vec<_>>()
+            .join(" | ")
     )
 }
 fn md_sep(n: usize) -> String {

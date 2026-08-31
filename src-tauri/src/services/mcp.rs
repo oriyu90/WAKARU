@@ -47,10 +47,20 @@ fn conns() -> &'static Registry {
 pub fn slugify(name: &str) -> String {
     let s: String = name
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
         .collect();
     let trimmed = s.trim_matches('_').to_string();
-    if trimmed.is_empty() { "server".into() } else { trimmed }
+    if trimmed.is_empty() {
+        "server".into()
+    } else {
+        trimmed
+    }
 }
 
 // ───────────────────────── persistence helpers ─────────────────────────
@@ -96,9 +106,11 @@ pub fn get_server(app_db: &Connection, id: &str) -> AppResult<McpServerRow> {
                     name: r.get(1)?,
                     transport: r.get(2)?,
                     command: r.get(3)?,
-                    args: serde_json::from_str::<Vec<String>>(&r.get::<_, String>(4)?).unwrap_or_default(),
+                    args: serde_json::from_str::<Vec<String>>(&r.get::<_, String>(4)?)
+                        .unwrap_or_default(),
                     url: r.get(5)?,
-                    env: serde_json::from_str::<Map<String, Value>>(&r.get::<_, String>(6)?).unwrap_or_default(),
+                    env: serde_json::from_str::<Map<String, Value>>(&r.get::<_, String>(6)?)
+                        .unwrap_or_default(),
                 })
             },
         )
@@ -134,7 +146,11 @@ pub fn policy_map(app_db: &Connection) -> AppResult<HashMap<String, String>> {
 
 pub fn set_policy(app_db: &Connection, server_id: &str, tool: &str, policy: &str) -> AppResult<()> {
     if !matches!(policy, "ask" | "always_allow" | "deny") {
-        return Err(AppError::new("MCP_BAD_POLICY", "error.mcp.badPolicy", policy));
+        return Err(AppError::new(
+            "MCP_BAD_POLICY",
+            "error.mcp.badPolicy",
+            policy,
+        ));
     }
     app_db.execute(
         "INSERT INTO mcp_tool_policies (server_id, tool_name, policy)
@@ -149,7 +165,10 @@ pub fn set_policy(app_db: &Connection, server_id: &str, tool: &str, policy: &str
 
 /// Connect (or reconnect) one stdio server and cache its tool list. HTTP is not
 /// supported yet (D-14).
-pub async fn connect(row: McpServerRow, policies: &HashMap<String, String>) -> AppResult<Vec<McpTool>> {
+pub async fn connect(
+    row: McpServerRow,
+    policies: &HashMap<String, String>,
+) -> AppResult<Vec<McpTool>> {
     if row.transport != "stdio" {
         return Err(AppError::new(
             "MCP_TRANSPORT_UNSUPPORTED",
@@ -161,7 +180,13 @@ pub async fn connect(row: McpServerRow, policies: &HashMap<String, String>) -> A
         .command
         .clone()
         .filter(|c| !c.trim().is_empty())
-        .ok_or_else(|| AppError::new("MCP_NO_COMMAND", "error.mcp.noCommand", "stdio server needs a command"))?;
+        .ok_or_else(|| {
+            AppError::new(
+                "MCP_NO_COMMAND",
+                "error.mcp.noCommand",
+                "stdio server needs a command",
+            )
+        })?;
 
     // Build a shell-free command with a scrubbed environment (docs/05 §6.4).
     let mut cmd = tokio::process::Command::new(&program);
@@ -196,7 +221,7 @@ pub async fn connect(row: McpServerRow, policies: &HashMap<String, String>) -> A
             use tokio::io::{AsyncBufReadExt, BufReader};
             let mut lines = BufReader::new(err).lines();
             while let Ok(Some(line)) = lines.next_line().await {
-                let mut g = buf.lock().unwrap();
+                let mut g = buf.lock().unwrap_or_else(|e| e.into_inner());
                 g.push(line);
                 let overflow = g.len().saturating_sub(STDERR_KEEP_LINES);
                 if overflow > 0 {
@@ -206,15 +231,21 @@ pub async fn connect(row: McpServerRow, policies: &HashMap<String, String>) -> A
         });
     }
 
-    let service = ()
-        .serve(proc)
-        .await
-        .map_err(|e| AppError::new("MCP_HANDSHAKE_FAILED", "error.mcp.handshakeFailed", e.to_string()))?;
+    let service = ().serve(proc).await.map_err(|e| {
+        AppError::new(
+            "MCP_HANDSHAKE_FAILED",
+            "error.mcp.handshakeFailed",
+            e.to_string(),
+        )
+    })?;
 
-    let raw = service
-        .list_all_tools()
-        .await
-        .map_err(|e| AppError::new("MCP_LIST_TOOLS_FAILED", "error.mcp.listToolsFailed", e.to_string()))?;
+    let raw = service.list_all_tools().await.map_err(|e| {
+        AppError::new(
+            "MCP_LIST_TOOLS_FAILED",
+            "error.mcp.listToolsFailed",
+            e.to_string(),
+        )
+    })?;
 
     let slug = slugify(&row.name);
     let tools: Vec<ToolInfo> = raw
@@ -222,7 +253,8 @@ pub async fn connect(row: McpServerRow, policies: &HashMap<String, String>) -> A
         .map(|t| ToolInfo {
             name: t.name.to_string(),
             description: t.description.map(|d| d.to_string()),
-            schema: serde_json::to_value(&*t.input_schema).unwrap_or_else(|_| json!({ "type": "object" })),
+            schema: serde_json::to_value(&*t.input_schema)
+                .unwrap_or_else(|_| json!({ "type": "object" })),
         })
         .collect();
 
@@ -235,7 +267,10 @@ pub async fn connect(row: McpServerRow, policies: &HashMap<String, String>) -> A
                 server_name: row.name.clone(),
                 name: t.name.clone(),
                 description: t.description.clone(),
-                policy: policies.get(&qualified).cloned().unwrap_or_else(|| "ask".into()),
+                policy: policies
+                    .get(&qualified)
+                    .cloned()
+                    .unwrap_or_else(|| "ask".into()),
                 qualified_name: qualified,
             }
         })
@@ -248,7 +283,13 @@ pub async fn connect(row: McpServerRow, policies: &HashMap<String, String>) -> A
     }
     g.insert(
         row.id.clone(),
-        Conn { service, slug, server_name: row.name.clone(), tools, stderr: stderr_buf },
+        Conn {
+            service,
+            slug,
+            server_name: row.name.clone(),
+            tools,
+            stderr: stderr_buf,
+        },
     );
     Ok(out)
 }
@@ -261,7 +302,7 @@ pub async fn disconnect(server_id: &str) {
 
 pub async fn stderr_lines(server_id: &str) -> Vec<String> {
     match conns().lock().await.get(server_id) {
-        Some(c) => c.stderr.lock().unwrap().clone(),
+        Some(c) => c.stderr.lock().unwrap_or_else(|e| e.into_inner()).clone(),
         None => Vec::new(),
     }
 }
@@ -337,7 +378,11 @@ pub async fn call_tool(slug: &str, tool: &str, arguments: &str) -> AppResult<Str
     if res.is_error.unwrap_or(false) {
         return Ok(format!("ERROR (tool): {text}"));
     }
-    Ok(if text.is_empty() { "(no content)".into() } else { text })
+    Ok(if text.is_empty() {
+        "(no content)".into()
+    } else {
+        text
+    })
 }
 
 /// Drop every live connection (called on app shutdown — stdio children must not

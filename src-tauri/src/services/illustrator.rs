@@ -101,7 +101,8 @@ fn load_thread(project_db: &Connection, thread_id: &str) -> AppResult<Thread> {
                 id: r.get(0)?,
                 role: r.get(1)?,
                 content: r.get(2)?,
-                citations: serde_json::from_str(&r.get::<_, String>(3)?).unwrap_or(serde_json::json!([])),
+                citations: serde_json::from_str(&r.get::<_, String>(3)?)
+                    .unwrap_or(serde_json::json!([])),
                 model: r.get(4)?,
                 status: r.get(5)?,
                 created_at: r.get(6)?,
@@ -138,21 +139,36 @@ pub async fn generate(
     // Resolve the chat model synchronously, then drop the connection.
     let (resolved, page_ctx, cached) = {
         let app_db = crate::storage::open(app_db_path)?;
-        let resolved = profiles::resolve(&app_db, Role::Chat)?
-            .ok_or_else(|| AppError::new("AI_NOT_CONFIGURED", "error.ai.notConfigured", "no chat model"))?;
+        let resolved = profiles::resolve(&app_db, Role::Chat)?.ok_or_else(|| {
+            AppError::new(
+                "AI_NOT_CONFIGURED",
+                "error.ai.notConfigured",
+                "no chat model",
+            )
+        })?;
         let project_db = projects::open_db(projects_root, &input.project_id)?;
         let page_ctx = build_page_context(&project_db, &input.source_id, &input.locator)?;
 
         let cached = if input.force {
             None
         } else {
-            load_cached(&project_db, &input.source_id, &locator_key, &ui_lang, input.level, &resolved.model)?
+            load_cached(
+                &project_db,
+                &input.source_id,
+                &locator_key,
+                &ui_lang,
+                input.level,
+                &resolved.model,
+            )?
         };
         (resolved, page_ctx, cached)
     };
 
     if let Some(c) = cached {
-        return Ok(GenerateStarted { stream_id: None, cached: Some(c) });
+        return Ok(GenerateStarted {
+            stream_id: None,
+            cached: Some(c),
+        });
     }
 
     let level = input.level;
@@ -176,7 +192,13 @@ pub async fn generate(
     let sid = stream_id.clone();
 
     tauri::async_runtime::spawn(async move {
-        let client = match AiClient::new(&resolved.base_url, resolved.api_key, resolved.extra_headers, resolved.timeout_ms) {
+        let client = match AiClient::new(
+            resolved.protocol,
+            &resolved.base_url,
+            resolved.api_key,
+            resolved.extra_headers,
+            resolved.timeout_ms,
+        ) {
             Ok(c) => c,
             Err(e) => return emit_error(&app, &sid, e, &reg),
         };
@@ -191,19 +213,41 @@ pub async fn generate(
         let res = client
             .chat_stream(&model, messages, &resolved.params, &token, |kind, text| {
                 if kind == "text" {
-                    acc.lock().unwrap().push_str(text);
+                    acc.lock().unwrap_or_else(|e| e.into_inner()).push_str(text);
                 }
-                let _ = app2.emit("stream://delta", StreamDelta { stream_id: sid2.clone(), kind: kind.into(), text: text.into() });
+                let _ = app2.emit(
+                    "stream://delta",
+                    StreamDelta {
+                        stream_id: sid2.clone(),
+                        kind: kind.into(),
+                        text: text.into(),
+                    },
+                );
             })
             .await;
+        let cancelled = token.is_cancelled();
 
         finish_generate(
-            &app, &reg, &sid, res, acc.into_inner().unwrap(),
-            &projects_root, &project_id, &source_id, &locator_key, &ui_lang, level, &model,
+            &app,
+            &reg,
+            &sid,
+            res,
+            acc.into_inner().unwrap_or_else(|e| e.into_inner()),
+            cancelled,
+            &projects_root,
+            &project_id,
+            &source_id,
+            &locator_key,
+            &ui_lang,
+            level,
+            &model,
         );
     });
 
-    Ok(GenerateStarted { stream_id: Some(stream_id), cached: None })
+    Ok(GenerateStarted {
+        stream_id: Some(stream_id),
+        cached: None,
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -211,8 +255,13 @@ fn finish_generate(
     app: &AppHandle,
     reg: &StreamRegistry,
     stream_id: &str,
-    res: AppResult<(Option<TokenUsage>, bool, Vec<crate::services::ai::client::StreamedToolCall>)>,
+    res: AppResult<(
+        Option<TokenUsage>,
+        bool,
+        Vec<crate::services::ai::client::StreamedToolCall>,
+    )>,
     content: String,
+    cancelled: bool,
     projects_root: &Path,
     project_id: &str,
     source_id: &str,
@@ -223,7 +272,7 @@ fn finish_generate(
 ) {
     match res {
         Ok((usage, truncated, _tool_calls)) => {
-            if !content.trim().is_empty() {
+            if !cancelled && !truncated && !content.trim().is_empty() {
                 if let Ok(db) = projects::open_db(projects_root, project_id) {
                     let cites = serde_json::json!([]); // page explanation cites the page implicitly
                     let _ = db.execute(
@@ -238,12 +287,15 @@ fn finish_generate(
                     );
                 }
             }
-            let _ = app.emit("stream://done", StreamDone {
-                stream_id: stream_id.into(),
-                cancelled: false,
-                truncated,
-                usage,
-            });
+            let _ = app.emit(
+                "stream://done",
+                StreamDone {
+                    stream_id: stream_id.into(),
+                    cancelled,
+                    truncated,
+                    usage,
+                },
+            );
             let _ = source_id; // keep the param meaningful even if unused above
         }
         Err(e) => emit_error(app, stream_id, e, reg),
@@ -263,37 +315,57 @@ pub async fn ask(
 ) -> AppResult<String> {
     let (resolved, thread_src, thread_loc, ctx_items, project_name) = {
         let app_db = crate::storage::open(app_db_path)?;
-        let resolved = profiles::resolve(&app_db, Role::Chat)?
-            .ok_or_else(|| AppError::new("AI_NOT_CONFIGURED", "error.ai.notConfigured", "no chat model"))?;
+        let resolved = profiles::resolve(&app_db, Role::Chat)?.ok_or_else(|| {
+            AppError::new(
+                "AI_NOT_CONFIGURED",
+                "error.ai.notConfigured",
+                "no chat model",
+            )
+        })?;
         let embed_role = profiles::resolve(&app_db, Role::Embedding)?;
         let project_name: String = app_db
-            .query_row("SELECT name FROM projects WHERE id=?1", [&input.project_id], |r| r.get(0))
+            .query_row(
+                "SELECT name FROM projects WHERE id=?1",
+                [&input.project_id],
+                |r| r.get(0),
+            )
             .unwrap_or_default();
         drop(app_db);
 
         let project_db = projects::open_db(projects_root, &input.project_id)?;
         let (src, loc): (Option<String>, Option<String>) = project_db
-            .query_row("SELECT source_id, locator_key FROM threads WHERE id=?1", [&input.thread_id], |r| {
-                Ok((r.get(0)?, r.get(1)?))
-            })
+            .query_row(
+                "SELECT source_id, locator_key FROM threads WHERE id=?1",
+                [&input.thread_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
             .optional()?
-            .ok_or_else(|| AppError::new("THREAD_NOT_FOUND", "error.thread.notFound", &input.thread_id))?;
+            .ok_or_else(|| {
+                AppError::new(
+                    "THREAD_NOT_FOUND",
+                    "error.thread.notFound",
+                    &input.thread_id,
+                )
+            })?;
 
         // query vector (best-effort)
         let qvec = match (embed_role, input.scope) {
-            (Some(role), crate::domain::illustrator::Scope::Project | crate::domain::illustrator::Scope::Source) => {
-                crate::services::ai::embed_with(role, std::slice::from_ref(&input.text), true)
-                    .await
-                    .ok()
-                    .and_then(|(_, mut v)| v.pop())
-            }
+            (
+                Some(role),
+                crate::domain::illustrator::Scope::Project
+                | crate::domain::illustrator::Scope::Source,
+            ) => crate::services::ai::embed_with(role, std::slice::from_ref(&input.text), true)
+                .await
+                .ok()
+                .and_then(|(_, mut v)| v.pop()),
             _ => None,
         };
         let source_filter = match input.scope {
             crate::domain::illustrator::Scope::Project => None,
             _ => src.as_deref(),
         };
-        let hits = retrieval::hybrid_search(&project_db, &input.text, qvec.as_deref(), source_filter, 12)?;
+        let hits =
+            retrieval::hybrid_search(&project_db, &input.text, qvec.as_deref(), source_filter, 12)?;
         (resolved, src, loc, hits, project_name)
     };
 
@@ -304,7 +376,10 @@ pub async fn ask(
             "INSERT INTO messages (id, thread_id, role, content, created_at) VALUES (?1, ?2, 'user', ?3, ?4)",
             params![Uuid::now_v7().to_string(), input.thread_id, input.text, now_iso8601()],
         )?;
-        db.execute("UPDATE threads SET updated_at=?2 WHERE id=?1", params![input.thread_id, now_iso8601()])?;
+        db.execute(
+            "UPDATE threads SET updated_at=?2 WHERE id=?1",
+            params![input.thread_id, now_iso8601()],
+        )?;
     }
 
     let context_block = build_rag_block(&ctx_items, &ui_lang);
@@ -339,7 +414,13 @@ pub async fn ask(
     let _ = (thread_src, thread_loc);
 
     tauri::async_runtime::spawn(async move {
-        let client = match AiClient::new(&resolved.base_url, resolved.api_key, resolved.extra_headers, resolved.timeout_ms) {
+        let client = match AiClient::new(
+            resolved.protocol,
+            &resolved.base_url,
+            resolved.api_key,
+            resolved.extra_headers,
+            resolved.timeout_ms,
+        ) {
             Ok(c) => c,
             Err(e) => return emit_error(&app, &sid, e, &reg),
         };
@@ -348,12 +429,21 @@ pub async fn ask(
         let sid2 = sid.clone();
         let res = client
             .chat_stream(&model, messages, &resolved.params, &token, |kind, text| {
-                if kind == "text" { acc.lock().unwrap().push_str(text); }
-                let _ = app2.emit("stream://delta", StreamDelta { stream_id: sid2.clone(), kind: kind.into(), text: text.into() });
+                if kind == "text" {
+                    acc.lock().unwrap_or_else(|e| e.into_inner()).push_str(text);
+                }
+                let _ = app2.emit(
+                    "stream://delta",
+                    StreamDelta {
+                        stream_id: sid2.clone(),
+                        kind: kind.into(),
+                        text: text.into(),
+                    },
+                );
             })
             .await;
 
-        let content = acc.into_inner().unwrap();
+        let content = acc.into_inner().unwrap_or_else(|e| e.into_inner());
         let citations = resolve_citations(&content, &ctx_items);
 
         if let Ok(db) = projects::open_db(&projects_root, &project_id) {
@@ -363,20 +453,40 @@ pub async fn ask(
                     msg_id,
                     content,
                     serde_json::to_string(&citations).unwrap_or("[]".into()),
-                    if matches!(res, Ok((_, true, _))) { "complete" } else if res.is_err() { "error" } else { "complete" }
+                    if matches!(res, Ok((_, true, _))) || res.is_err() {
+                        "error"
+                    } else if token.is_cancelled() {
+                        "cancelled"
+                    } else {
+                        "complete"
+                    }
                 ],
             );
-            let _ = db.execute("UPDATE threads SET updated_at=?2 WHERE id=?1", params![thread_id, now_iso8601()]);
+            let _ = db.execute(
+                "UPDATE threads SET updated_at=?2 WHERE id=?1",
+                params![thread_id, now_iso8601()],
+            );
         }
-        let _ = app.emit("stream://citations", StreamCitations {
-            stream_id: sid.clone(),
-            message_id: msg_id.clone(),
-            citations: serde_json::to_value(&citations).unwrap_or(serde_json::json!([])),
-        });
+        let _ = app.emit(
+            "stream://citations",
+            StreamCitations {
+                stream_id: sid.clone(),
+                message_id: msg_id.clone(),
+                citations: serde_json::to_value(&citations).unwrap_or(serde_json::json!([])),
+            },
+        );
 
         match res {
             Ok((usage, truncated, _)) => {
-                let _ = app.emit("stream://done", StreamDone { stream_id: sid.clone(), cancelled: token.is_cancelled(), truncated, usage });
+                let _ = app.emit(
+                    "stream://done",
+                    StreamDone {
+                        stream_id: sid.clone(),
+                        cancelled: token.is_cancelled(),
+                        truncated,
+                        usage,
+                    },
+                );
             }
             Err(e) => emit_error(&app, &sid, e, &reg),
         }
@@ -388,22 +498,28 @@ pub async fn ask(
 
 // ───────────────────────── import to Studio ─────────────────────────
 
-pub fn import_to_studio(
-    project_db: &Connection,
-    input: &ImportToStudioInput,
-) -> AppResult<String> {
+pub fn import_to_studio(project_db: &Connection, input: &ImportToStudioInput) -> AppResult<String> {
     let src = load_thread(project_db, &input.thread_id)?;
     let now = now_iso8601();
 
     let (studio_thread_id, tab_id) = if input.mode == "append" {
-        let tab_id = input
-            .target_tab_id
-            .clone()
-            .ok_or_else(|| AppError::new("STUDIO_TAB_REQUIRED", "error.studio.tabRequired", "append needs a target tab"))?;
+        let tab_id = input.target_tab_id.clone().ok_or_else(|| {
+            AppError::new(
+                "STUDIO_TAB_REQUIRED",
+                "error.studio.tabRequired",
+                "append needs a target tab",
+            )
+        })?;
         let thread_id: String = project_db
-            .query_row("SELECT thread_id FROM studio_tabs WHERE id=?1", [&tab_id], |r| r.get(0))
+            .query_row(
+                "SELECT thread_id FROM studio_tabs WHERE id=?1",
+                [&tab_id],
+                |r| r.get(0),
+            )
             .optional()?
-            .ok_or_else(|| AppError::new("STUDIO_TAB_NOT_FOUND", "error.studio.tabNotFound", &tab_id))?;
+            .ok_or_else(|| {
+                AppError::new("STUDIO_TAB_NOT_FOUND", "error.studio.tabNotFound", &tab_id)
+            })?;
         (thread_id, tab_id)
     } else {
         let thread_id = Uuid::now_v7().to_string();
@@ -414,7 +530,11 @@ pub fn import_to_studio(
             params![thread_id, title, now],
         )?;
         let ord: i64 = project_db
-            .query_row("SELECT COALESCE(MAX(ordinal),0)+1 FROM studio_tabs", [], |r| r.get(0))
+            .query_row(
+                "SELECT COALESCE(MAX(ordinal),0)+1 FROM studio_tabs",
+                [],
+                |r| r.get(0),
+            )
             .unwrap_or(1);
         project_db.execute(
             "INSERT INTO studio_tabs (id, thread_id, title, ordinal, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -455,11 +575,19 @@ fn build_page_context(
     locator: &serde_json::Value,
 ) -> AppResult<PageContext> {
     let source_name: String = project_db
-        .query_row("SELECT original_name FROM sources WHERE id=?1", [source_id], |r| r.get(0))
+        .query_row(
+            "SELECT original_name FROM sources WHERE id=?1",
+            [source_id],
+            |r| r.get(0),
+        )
         .optional()?
         .ok_or_else(|| AppError::new("SOURCE_NOT_FOUND", "error.source.notFound", source_id))?;
     let total: i64 = project_db
-        .query_row("SELECT COUNT(*) FROM documents WHERE source_id=?1", [source_id], |r| r.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM documents WHERE source_id=?1",
+            [source_id],
+            |r| r.get(0),
+        )
         .unwrap_or(0);
 
     let ordinal = match Locator::from_value(locator) {
@@ -503,7 +631,11 @@ fn build_page_context(
         body.push(')');
     }
 
-    Ok(PageContext { source_name, position, text: body })
+    Ok(PageContext {
+        source_name,
+        position,
+        text: body,
+    })
 }
 
 pub(crate) fn build_rag_block(items: &[retrieval::HybridHit], lang: &str) -> String {
@@ -590,7 +722,8 @@ fn load_cached(
             |r| {
                 Ok(Illustration {
                     content: r.get(0)?,
-                    citations: serde_json::from_str(&r.get::<_, String>(1)?).unwrap_or(serde_json::json!([])),
+                    citations: serde_json::from_str(&r.get::<_, String>(1)?)
+                        .unwrap_or(serde_json::json!([])),
                     level,
                     model: model.to_string(),
                     created_at: r.get(2)?,
@@ -602,7 +735,13 @@ fn load_cached(
 }
 
 fn emit_error(app: &AppHandle, stream_id: &str, e: AppError, reg: &StreamRegistry) {
-    let _ = app.emit("stream://error", StreamError { stream_id: stream_id.into(), error: e });
+    let _ = app.emit(
+        "stream://error",
+        StreamError {
+            stream_id: stream_id.into(),
+            error: e,
+        },
+    );
     reg.finish(stream_id);
 }
 
@@ -615,7 +754,9 @@ fn level_str(l: DetailLevel) -> &'static str {
 }
 fn level_guidance(l: DetailLevel) -> &'static str {
     match l {
-        DetailLevel::Simple => "about 300 characters; replace every technical term with plain wording.",
+        DetailLevel::Simple => {
+            "about 300 characters; replace every technical term with plain wording."
+        }
         DetailLevel::Standard => "about 600 characters; use terms with a short definition.",
         DetailLevel::Detailed => "about 1200 characters; work through formulas and steps.",
     }
@@ -672,5 +813,25 @@ mod tests {
     fn locator_key_is_used_for_thread_identity() {
         let k = Locator::key_from_value(&serde_json::json!({ "t": "page", "page": 7 }));
         assert_eq!(k, "page:7");
+    }
+
+    #[test]
+    fn illustrator_prompt_always_applies_plain_and_socratic_teaching() {
+        for prompt in [
+            prompts::ILLUSTRATOR_EN,
+            prompts::ILLUSTRATOR_JA,
+            prompts::ILLUSTRATOR_ZH,
+        ] {
+            assert!(
+                prompt.contains("check-for-understanding")
+                    || prompt.contains("理解確認")
+                    || prompt.contains("理解检查")
+            );
+            assert!(
+                prompt.contains("everyday words")
+                    || prompt.contains("日常語")
+                    || prompt.contains("日常语言")
+            );
+        }
     }
 }

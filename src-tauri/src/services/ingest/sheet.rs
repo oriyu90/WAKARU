@@ -46,7 +46,12 @@ fn parse_delimited(path: &Path, delim: u8) -> AppResult<Vec<Unit>> {
     let mut units = Vec::new();
 
     // A summary unit first (docs/04 §6: header + stats for large sheets).
-    let mut summary = format!("Sheet: {}\nRows: {}  Columns: {}\n\n", file_stem(path), rows.len(), n_cols);
+    let mut summary = format!(
+        "Sheet: {}\nRows: {}  Columns: {}\n\n",
+        file_stem(path),
+        rows.len(),
+        n_cols
+    );
     summary.push_str("Columns: ");
     summary.push_str(&header.join(", "));
     units.push(Unit {
@@ -98,7 +103,14 @@ fn header_is_names(header: &[String]) -> bool {
 }
 
 fn md_row(cells: &[String]) -> String {
-    format!("| {} |\n", cells.iter().map(|c| c.replace('|', "\\|")).collect::<Vec<_>>().join(" | "))
+    format!(
+        "| {} |\n",
+        cells
+            .iter()
+            .map(|c| c.replace('|', "\\|"))
+            .collect::<Vec<_>>()
+            .join(" | ")
+    )
 }
 fn md_sep(n: usize) -> String {
     format!("|{}\n", " --- |".repeat(n.max(1)))

@@ -84,7 +84,11 @@ pub fn fetch_and_parse(url: &str, derived_dir: &Path, allow_private: bool) -> Ap
         });
     }
     if units.is_empty() {
-        return Err(AppError::new("SOURCE_EMPTY", "error.source.empty", "no readable content"));
+        return Err(AppError::new(
+            "SOURCE_EMPTY",
+            "error.source.empty",
+            "no readable content",
+        ));
     }
 
     Ok(WebResult { units, title })
@@ -119,9 +123,12 @@ fn is_private(ip: &IpAddr) -> bool {
                 || v4.is_loopback()
                 || v4.is_link_local()
                 || v4.octets()[0] == 0
-                || (v4.octets()[0] == 100 && (64..128).contains(&v4.octets()[1])) // CGNAT
+                || (v4.octets()[0] == 100 && (64..128).contains(&v4.octets()[1]))
+            // CGNAT
         }
-        IpAddr::V6(v6) => v6.is_loopback() || v6.is_unspecified() || v6.segments()[0] & 0xfe00 == 0xfc00,
+        IpAddr::V6(v6) => {
+            v6.is_loopback() || v6.is_unspecified() || v6.segments()[0] & 0xfe00 == 0xfc00
+        }
     }
 }
 
@@ -180,7 +187,9 @@ fn extract_readable(html: &str) -> (Option<String>, Vec<(Option<String>, String)
     };
 
     let block_sel = Selector::parse("h1, h2, h3, p, li, blockquote, pre").unwrap();
-    let skip_ancestors = ["script", "style", "nav", "header", "footer", "aside", "noscript"];
+    let skip_ancestors = [
+        "script", "style", "nav", "header", "footer", "aside", "noscript",
+    ];
 
     let mut sections: Vec<(Option<String>, String)> = vec![(None, String::new())];
     for el in body.select(&block_sel) {
@@ -191,7 +200,12 @@ fn extract_readable(html: &str) -> (Option<String>, Vec<(Option<String>, String)
         {
             continue;
         }
-        let text = el.text().collect::<String>().split_whitespace().collect::<Vec<_>>().join(" ");
+        let text = el
+            .text()
+            .collect::<String>()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
         if text.is_empty() {
             continue;
         }

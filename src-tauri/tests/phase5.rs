@@ -23,7 +23,13 @@ fn write_wav(path: &std::path::Path, sr: u32, secs: f32, amp: i16) {
     f.write_all(b"data").unwrap();
     f.write_all(&data_len.to_le_bytes()).unwrap();
     for i in 0..n {
-        let s = if amp != 0 && i % 2 == 0 { amp } else if amp != 0 { -amp } else { 0 };
+        let s = if amp != 0 && i % 2 == 0 {
+            amp
+        } else if amp != 0 {
+            -amp
+        } else {
+            0
+        };
         f.write_all(&s.to_le_bytes()).unwrap();
     }
 }

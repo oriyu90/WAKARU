@@ -64,7 +64,10 @@ pub fn image_preview(path: &str) -> AppResult<String> {
     let thumb = img.resize(320, 320, ::image::imageops::FilterType::Triangle);
     let mut buf = Vec::new();
     thumb
-        .write_to(&mut std::io::Cursor::new(&mut buf), ::image::ImageFormat::Jpeg)
+        .write_to(
+            &mut std::io::Cursor::new(&mut buf),
+            ::image::ImageFormat::Jpeg,
+        )
         .map_err(|e| AppError::internal(format!("thumb encode: {e}")))?;
     let b64 = base64::engine::general_purpose::STANDARD.encode(&buf);
     Ok(format!("data:image/jpeg;base64,{b64}"))
@@ -72,14 +75,19 @@ pub fn image_preview(path: &str) -> AppResult<String> {
 
 pub fn images_to_pdf(input: &ImagesToPdfInput) -> AppResult<WrittenFile> {
     if input.images.is_empty() {
-        return Err(AppError::new("FM_NO_IMAGES", "error.fm.noImages", "no images selected"));
+        return Err(AppError::new(
+            "FM_NO_IMAGES",
+            "error.fm.noImages",
+            "no images selected",
+        ));
     }
     let (doc, page1, layer1) = PdfDocument::new("WAKARU", Mm(210.0), Mm(297.0), "Layer 1");
     let mut first = Some((page1, layer1));
 
     for (i, path) in input.images.iter().enumerate() {
-        let dyn_img = ::image::open(path)
-            .map_err(|e| AppError::new("FM_BAD_IMAGE", "error.fm.badImage", format!("{path}: {e}")))?;
+        let dyn_img = ::image::open(path).map_err(|e| {
+            AppError::new("FM_BAD_IMAGE", "error.fm.badImage", format!("{path}: {e}"))
+        })?;
         let (iw, ih) = (dyn_img.width() as f32, dyn_img.height() as f32);
         let img_landscape = iw > ih;
 
@@ -155,7 +163,9 @@ pub fn images_to_pdf(input: &ImagesToPdfInput) -> AppResult<WrittenFile> {
     let file = std::fs::File::create(&input.dest_path)?;
     doc.save(&mut BufWriter::new(file))
         .map_err(|e| AppError::internal(format!("pdf save: {e}")))?;
-    Ok(WrittenFile { path: input.dest_path.clone() })
+    Ok(WrittenFile {
+        path: input.dest_path.clone(),
+    })
 }
 
 fn px_to_mm(px: f32) -> f32 {
@@ -189,7 +199,13 @@ pub async fn text_to_markdown(
         let app_db = crate::storage::open(app_db_path)?;
         profiles::resolve(&app_db, Role::Organizer)?
     }
-    .ok_or_else(|| AppError::new("AI_NOT_CONFIGURED", "error.ai.notConfigured", "no organizer/chat model"))?;
+    .ok_or_else(|| {
+        AppError::new(
+            "AI_NOT_CONFIGURED",
+            "error.ai.notConfigured",
+            "no organizer/chat model",
+        )
+    })?;
 
     let system = prompts::organizer(&ui_lang).replace("{{text}}", &text);
     let model = resolved.model.clone();
@@ -198,10 +214,22 @@ pub async fn text_to_markdown(
     let sid = stream_id.clone();
 
     tauri::async_runtime::spawn(async move {
-        let client = match AiClient::new(&resolved.base_url, resolved.api_key, resolved.extra_headers, resolved.timeout_ms) {
+        let client = match AiClient::new(
+            resolved.protocol,
+            &resolved.base_url,
+            resolved.api_key,
+            resolved.extra_headers,
+            resolved.timeout_ms,
+        ) {
             Ok(c) => c,
             Err(e) => {
-                let _ = app.emit("stream://error", StreamError { stream_id: sid.clone(), error: e });
+                let _ = app.emit(
+                    "stream://error",
+                    StreamError {
+                        stream_id: sid.clone(),
+                        error: e,
+                    },
+                );
                 reg.finish(&sid);
                 return;
             }
@@ -213,16 +241,43 @@ pub async fn text_to_markdown(
         let app2 = app.clone();
         let sid2 = sid.clone();
         let res = client
-            .chat_stream(&model, messages, &resolved.params, &token, move |kind, t| {
-                let _ = app2.emit("stream://delta", StreamDelta { stream_id: sid2.clone(), kind: kind.into(), text: t.into() });
-            })
+            .chat_stream(
+                &model,
+                messages,
+                &resolved.params,
+                &token,
+                move |kind, t| {
+                    let _ = app2.emit(
+                        "stream://delta",
+                        StreamDelta {
+                            stream_id: sid2.clone(),
+                            kind: kind.into(),
+                            text: t.into(),
+                        },
+                    );
+                },
+            )
             .await;
         match res {
             Ok((usage, truncated, _)) => {
-                let _ = app.emit("stream://done", StreamDone { stream_id: sid.clone(), cancelled: token.is_cancelled(), truncated, usage });
+                let _ = app.emit(
+                    "stream://done",
+                    StreamDone {
+                        stream_id: sid.clone(),
+                        cancelled: token.is_cancelled(),
+                        truncated,
+                        usage,
+                    },
+                );
             }
             Err(e) => {
-                let _ = app.emit("stream://error", StreamError { stream_id: sid.clone(), error: e });
+                let _ = app.emit(
+                    "stream://error",
+                    StreamError {
+                        stream_id: sid.clone(),
+                        error: e,
+                    },
+                );
             }
         }
         reg.finish(&sid);
@@ -239,7 +294,9 @@ mod tests {
     fn images_to_pdf_writes_a_file() {
         let tmp = tempfile::tempdir().unwrap();
         let img = tmp.path().join("a.png");
-        ::image::RgbImage::from_pixel(200, 300, ::image::Rgb([120, 130, 140])).save(&img).unwrap();
+        ::image::RgbImage::from_pixel(200, 300, ::image::Rgb([120, 130, 140]))
+            .save(&img)
+            .unwrap();
         let dest = tmp.path().join("out.pdf");
         let out = images_to_pdf(&ImagesToPdfInput {
             images: vec![img.to_string_lossy().into()],

@@ -11,7 +11,11 @@ pub fn source_list(state: State<'_, AppState>, project_id: String) -> AppResult<
 }
 
 #[tauri::command]
-pub fn source_get(state: State<'_, AppState>, project_id: String, source_id: String) -> AppResult<Source> {
+pub fn source_get(
+    state: State<'_, AppState>,
+    project_id: String,
+    source_id: String,
+) -> AppResult<Source> {
     let db = projects::open_db(&state.projects_dir, &project_id)?;
     sources::get(&db, &source_id)
 }

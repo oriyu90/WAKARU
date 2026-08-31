@@ -9,13 +9,10 @@ frontend.
 
 ## Status
 
-Re-development toward **v0.2.0** (a from-scratch Hallmark UI over a rebuilt backend —
-the v0.1.0 source was lost). Work follows `docs/08_実装フェーズ計画.md` P0 → P11.
-
-- **P0 (scaffold + design system)** — done: Tauri v2 shell, `app.db` + migrations,
-  job registry skeleton, `AppError` + `ts-rs` bindings, the locked design system
-  (`design.md` / `src/styles/tokens.css`), all 8-state base components + the
-  `__preview__/states` demo, `AppShell` with the translucent overlay sidebar.
+**v0.0.0 release candidate.** All implementation phases are complete. AI
+connections support OpenAI-compatible and Anthropic-compatible wire formats;
+Studio applies a concise editorial quality policy, and Live Illustrator applies
+plain-language, understanding-oriented teaching guidance on every request.
 
 ## Layout
 
@@ -39,7 +36,7 @@ npm run tauri dev
 
 ```bash
 npm run typecheck && npm run lint && npm test && npm run check:contrast && npm run check:i18n
-cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo test
+cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 ```
 
 Commits are prefixed `phase(N):`.

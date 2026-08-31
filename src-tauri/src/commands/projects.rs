@@ -5,7 +5,10 @@ use crate::state::AppState;
 use tauri::State;
 
 #[tauri::command]
-pub fn project_list(state: State<'_, AppState>, include_archived: Option<bool>) -> AppResult<Vec<ProjectSummary>> {
+pub fn project_list(
+    state: State<'_, AppState>,
+    include_archived: Option<bool>,
+) -> AppResult<Vec<ProjectSummary>> {
     state.with_db(|db| projects::list(db, &state.projects_dir, include_archived.unwrap_or(false)))
 }
 
@@ -25,7 +28,11 @@ pub fn project_update(state: State<'_, AppState>, input: UpdateProjectInput) -> 
 }
 
 #[tauri::command]
-pub fn project_set_archived(state: State<'_, AppState>, id: String, archived: bool) -> AppResult<()> {
+pub fn project_set_archived(
+    state: State<'_, AppState>,
+    id: String,
+    archived: bool,
+) -> AppResult<()> {
     state.with_db(|db| projects::set_archived(db, &id, archived))
 }
 
@@ -38,6 +45,10 @@ pub fn project_open(state: State<'_, AppState>, id: String) -> AppResult<Project
 }
 
 #[tauri::command]
-pub fn project_delete(state: State<'_, AppState>, id: String, confirm_name: String) -> AppResult<()> {
+pub fn project_delete(
+    state: State<'_, AppState>,
+    id: String,
+    confirm_name: String,
+) -> AppResult<()> {
     state.with_db(|db| projects::delete(db, &state.projects_dir, &id, &confirm_name))
 }

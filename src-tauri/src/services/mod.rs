@@ -1,5 +1,5 @@
-pub mod assets;
 pub mod ai;
+pub mod assets;
 pub mod chunk;
 pub mod embed;
 pub mod export;

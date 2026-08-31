@@ -34,7 +34,10 @@ pub async fn probe(client: &AiClient, model: &str) -> AppResult<TestResult> {
     result.supports_vision = probe_vision(client, model).await;
     result.supports_tools = probe_tools(client, model).await;
     result.json_schema = probe_json_schema(client, model).await;
-    result.supports_embed = client.embeddings(model, &["ping".to_string()]).await.is_ok();
+    result.supports_embed = client
+        .embeddings(model, &["ping".to_string()])
+        .await
+        .is_ok();
 
     Ok(result)
 }

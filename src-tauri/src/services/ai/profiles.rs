@@ -43,6 +43,10 @@ fn row_to_profile(r: &rusqlite::Row) -> rusqlite::Result<AiProfile> {
         id,
         name: r.get("name")?,
         base_url: r.get("base_url")?,
+        protocol: match r.get::<_, String>("protocol")?.as_str() {
+            "anthropic" => ApiProtocol::Anthropic,
+            _ => ApiProtocol::Openai,
+        },
         default_model: r.get("default_model")?,
         supports_vision: r.get::<_, i64>("supports_vision")? != 0,
         supports_tools: r.get::<_, i64>("supports_tools")? != 0,
@@ -58,20 +62,26 @@ fn row_to_profile(r: &rusqlite::Row) -> rusqlite::Result<AiProfile> {
 
 pub fn list(app_db: &Connection) -> AppResult<Vec<AiProfile>> {
     let mut stmt = app_db.prepare("SELECT * FROM ai_profiles ORDER BY created_at")?;
-    let rows: Vec<AiProfile> = stmt.query_map([], row_to_profile)?.collect::<rusqlite::Result<_>>()?;
+    let rows: Vec<AiProfile> = stmt
+        .query_map([], row_to_profile)?
+        .collect::<rusqlite::Result<_>>()?;
     Ok(rows)
 }
 
 pub fn get(app_db: &Connection, id: &str) -> AppResult<AiProfile> {
     app_db
-        .query_row("SELECT * FROM ai_profiles WHERE id = ?1", [id], row_to_profile)
+        .query_row(
+            "SELECT * FROM ai_profiles WHERE id = ?1",
+            [id],
+            row_to_profile,
+        )
         .optional()?
         .ok_or_else(|| AppError::new("AI_PROFILE_NOT_FOUND", "error.ai.profileNotFound", id))
 }
 
 pub fn upsert(app_db: &Connection, input: AiProfileInput) -> AppResult<AiProfile> {
     let name = input.name.trim();
-    let base_url = input.base_url.trim().trim_end_matches('/');
+    let base_url = normalise_base_url(&input.base_url)?;
     if name.is_empty() || base_url.is_empty() {
         return Err(AppError::new(
             "AI_PROFILE_INVALID",
@@ -89,9 +99,17 @@ pub fn upsert(app_db: &Connection, input: AiProfileInput) -> AppResult<AiProfile
         Some(id) => {
             app_db.execute(
                 "UPDATE ai_profiles
-                   SET name=?2, base_url=?3, default_model=?4, extra_headers=?5, timeout_ms=?6
+                   SET name=?2, base_url=?3, protocol=?4, default_model=?5, extra_headers=?6, timeout_ms=?7
                  WHERE id=?1",
-                params![id, name, base_url, input.default_model, headers, timeout as i64],
+                params![
+                    id,
+                    name,
+                    base_url,
+                    input.protocol.as_str(),
+                    input.default_model,
+                    headers,
+                    timeout as i64
+                ],
             )?;
             id
         }
@@ -99,9 +117,18 @@ pub fn upsert(app_db: &Connection, input: AiProfileInput) -> AppResult<AiProfile
             let id = Uuid::now_v7().to_string();
             app_db.execute(
                 "INSERT INTO ai_profiles
-                   (id, name, base_url, default_model, extra_headers, timeout_ms, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                params![id, name, base_url, input.default_model, headers, timeout as i64, now_iso8601()],
+                   (id, name, base_url, protocol, default_model, extra_headers, timeout_ms, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    id,
+                    name,
+                    base_url,
+                    input.protocol.as_str(),
+                    input.default_model,
+                    headers,
+                    timeout as i64,
+                    now_iso8601()
+                ],
             )?;
             id
         }
@@ -109,7 +136,11 @@ pub fn upsert(app_db: &Connection, input: AiProfileInput) -> AppResult<AiProfile
 
     if let Some(key) = input.api_key {
         set_key(&id, &key)?;
-        let has = if key.is_empty() { None } else { Some(id.clone()) };
+        let has = if key.is_empty() {
+            None
+        } else {
+            Some(id.clone())
+        };
         app_db.execute(
             "UPDATE ai_profiles SET api_key_ref = ?2 WHERE id = ?1",
             params![id, has],
@@ -119,6 +150,31 @@ pub fn upsert(app_db: &Connection, input: AiProfileInput) -> AppResult<AiProfile
     get(app_db, &id)
 }
 
+fn normalise_base_url(raw: &str) -> AppResult<String> {
+    let trimmed = raw.trim().trim_end_matches('/');
+    let parsed = reqwest::Url::parse(trimmed).map_err(|_| {
+        AppError::new(
+            "AI_PROFILE_INVALID",
+            "error.ai.profileInvalid",
+            "base URL must be an absolute http(s) URL",
+        )
+    })?;
+    if !matches!(parsed.scheme(), "http" | "https")
+        || parsed.host_str().is_none()
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || parsed.query().is_some()
+        || parsed.fragment().is_some()
+    {
+        return Err(AppError::new(
+            "AI_PROFILE_INVALID",
+            "error.ai.profileInvalid",
+            "base URL must be http(s), without credentials, query, or fragment",
+        ));
+    }
+    Ok(trimmed.to_string())
+}
+
 pub fn delete(app_db: &Connection, id: &str) -> AppResult<()> {
     get(app_db, id)?;
     app_db.execute("DELETE FROM ai_profiles WHERE id = ?1", [id])?;
@@ -126,11 +182,7 @@ pub fn delete(app_db: &Connection, id: &str) -> AppResult<()> {
     Ok(())
 }
 
-pub fn set_capabilities(
-    app_db: &Connection,
-    id: &str,
-    r: &TestResult,
-) -> AppResult<()> {
+pub fn set_capabilities(app_db: &Connection, id: &str, r: &TestResult) -> AppResult<()> {
     app_db.execute(
         "UPDATE ai_profiles
            SET supports_vision=?2, supports_tools=?3, supports_embed=?4, json_schema=?5,
@@ -153,14 +205,20 @@ pub fn set_capabilities(
 
 pub fn get_bindings(app_db: &Connection) -> AppResult<RoleBindings> {
     let mut stmt = app_db.prepare("SELECT role, profile_id, model, params FROM model_roles")?;
-    let mut b = RoleBindings { chat: None, vision: None, embedding: None, organizer: None };
+    let mut b = RoleBindings {
+        chat: None,
+        vision: None,
+        embedding: None,
+        organizer: None,
+    };
     let rows = stmt.query_map([], |r| {
         Ok((
             r.get::<_, String>(0)?,
             RoleBinding {
                 profile_id: r.get(1)?,
                 model: r.get(2)?,
-                params: serde_json::from_str(&r.get::<_, String>(3)?).unwrap_or(serde_json::json!({})),
+                params: serde_json::from_str(&r.get::<_, String>(3)?)
+                    .unwrap_or(serde_json::json!({})),
             },
         ))
     })?;
@@ -212,10 +270,7 @@ pub fn clear_binding(app_db: &Connection, role: Role) -> AppResult<()> {
 
 /// Resolve a role to (base_url, key, headers, timeout, model, params), applying
 /// the `organizer -> chat` fallback (docs/07 §1).
-pub fn resolve(
-    app_db: &Connection,
-    role: Role,
-) -> AppResult<Option<ResolvedRole>> {
+pub fn resolve(app_db: &Connection, role: Role) -> AppResult<Option<ResolvedRole>> {
     let b = get_bindings(app_db)?;
     let binding = match role {
         Role::Chat => b.chat,
@@ -223,7 +278,9 @@ pub fn resolve(
         Role::Embedding => b.embedding,
         Role::Organizer => b.organizer.or(b.chat),
     };
-    let Some(binding) = binding else { return Ok(None) };
+    let Some(binding) = binding else {
+        return Ok(None);
+    };
     let profile = get(app_db, &binding.profile_id)?;
     let headers = profile
         .extra_headers
@@ -236,6 +293,7 @@ pub fn resolve(
         .unwrap_or_default();
     Ok(Some(ResolvedRole {
         base_url: profile.base_url,
+        protocol: profile.protocol,
         api_key: get_key(&binding.profile_id),
         extra_headers: headers,
         timeout_ms: profile.timeout_ms,
@@ -247,9 +305,62 @@ pub fn resolve(
 #[derive(Debug, Clone)]
 pub struct ResolvedRole {
     pub base_url: String,
+    pub protocol: ApiProtocol,
     pub api_key: Option<String>,
     pub extra_headers: Vec<(String, String)>,
     pub timeout_ms: u32,
     pub model: String,
     pub params: serde_json::Value,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn base_url_validation_accepts_http_and_rejects_unsafe_shapes() {
+        assert_eq!(
+            normalise_base_url(" https://api.example.com/v1/ ").unwrap(),
+            "https://api.example.com/v1"
+        );
+        for invalid in [
+            "file:///tmp/api",
+            "https://user:pass@example.com/v1",
+            "https://example.com/v1?key=secret",
+            "not-a-url",
+        ] {
+            assert!(normalise_base_url(invalid).is_err(), "accepted {invalid}");
+        }
+    }
+
+    #[test]
+    fn anthropic_profile_round_trips_through_migrated_database() {
+        let db = crate::storage::open_in_memory().unwrap();
+        crate::storage::migrate::run(
+            &db,
+            crate::storage::APP_MIGRATIONS,
+            crate::storage::APP_SCHEMA_VERSION,
+        )
+        .unwrap();
+        let profile = upsert(
+            &db,
+            AiProfileInput {
+                id: None,
+                name: "Claude gateway".into(),
+                base_url: "https://api.example.com/v1/".into(),
+                protocol: ApiProtocol::Anthropic,
+                api_key: None,
+                default_model: Some("claude-test".into()),
+                extra_headers: None,
+                timeout_ms: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(profile.protocol, ApiProtocol::Anthropic);
+        assert_eq!(profile.base_url, "https://api.example.com/v1");
+        assert_eq!(
+            get(&db, &profile.id).unwrap().protocol,
+            ApiProtocol::Anthropic
+        );
+    }
 }

@@ -1,9 +1,7 @@
-# WAKARU v0.2.0 — Quality report
+# WAKARU v0.0.0 — Quality report
 
-Generated 2026-09-01 from a clean run of every automated gate. Manual gates
-(11-step smoke test, Hallmark/A11y checklists, DMG verification) are run on the
-release machine and their outcome is appended here before the GitHub release is
-published.
+Generated 2026-09-01 from a clean run of every automated gate, browser UI
+inspection, native startup/migration verification, and final DMG verification.
 
 ## Automated gates — all green
 
@@ -15,20 +13,29 @@ published.
 | Lint + design rules + no hardcoded strings | `npm run lint` | pass |
 | Unit tests | `npm test` (vitest) | 6 passed |
 | Contrast (OKLCH → sRGB WCAG recompute) | `npm run check:contrast` | pass — body ≥ 4.5:1, UI edges ≥ 3:1 |
-| i18n key parity (en / ja / zh-Hans) | `npm run check:i18n` | pass — 320 keys × 3 |
+| i18n key parity (en / ja / zh-Hans) | `npm run check:i18n` | pass — 327 keys × 3 |
 
 ### Backend (`src-tauri/`)
 
 | Gate | Command | Result |
 |---|---|---|
+| Rust formatting | `cargo fmt --check` | pass |
 | Clippy (all targets, warnings = errors) | `cargo clippy --all-targets -- -D warnings` | pass |
-| Tests | `cargo test` | 167 passed, 0 failed |
+| Tests | `cargo test --all-targets --all-features` | 175 passed, 0 failed |
 | Licenses | `cargo deny check licenses` | ok — no GPL/AGPL/LGPL (`deny.toml`) |
 | Dependency bans / sources | `cargo deny check bans sources` | ok |
 | ts-rs binding drift | `cargo test export_bindings` + git diff | no diff |
 
-Test breakdown: 129 library unit tests + 38 integration tests
+Test breakdown: 137 library unit tests + 38 integration tests
 (`tests/phase{1..10}.rs`) + 6 frontend unit tests.
+
+New compatibility and reliability coverage includes Anthropic profile migration,
+Base URL boundary validation, OpenAI-to-Anthropic system/tool/tool-result
+conversion, a real local HTTP/SSE exchange that verifies Anthropic headers,
+text, usage and streamed tool arguments, and prompt-policy presence in all
+three UI languages. A legacy untracked database fixture also proves that the
+app adopts the old schema, preserves rows, and applies both missing columns
+without attempting to recreate existing tables.
 
 Security-relevant coverage:
 
@@ -46,18 +53,19 @@ Security-relevant coverage:
 - Asset access — `wakaru-asset://` resolves only inside a project's
   `sources/` and `derived/`; traversal rejected (unit-tested).
 
-## Build & bundle — done 2026-09-01 (arm64)
+## Build & bundle — v0.0.0 arm64
 
 | Gate | Result |
 |---|---|
-| `APPLE_SIGNING_IDENTITY="-" MACOSX_DEPLOYMENT_TARGET=12.0 npm run tauri build -- --bundles dmg,app` | pass — `release` profile, 2m23s |
-| Bundle | `WAKARU_0.2.0_aarch64.dmg` (10 MB), `WAKARU.app`; ad-hoc signed, **not notarized** (as intended) |
+| `APPLE_SIGNING_IDENTITY="-" MACOSX_DEPLOYMENT_TARGET=12.0 npm run tauri build -- --bundles app` | pass |
+| Bundle | `WAKARU_0.0.0_aarch64.dmg`, `WAKARU.app`; ad-hoc signed, **not notarized** |
 | `hdiutil verify` | checksum VALID |
 | `codesign --verify --deep --strict` — `.app` in `bundle/macos/` | valid on disk, satisfies its Designated Requirement |
 | `codesign --verify --deep --strict` — `.app` **inside the mounted DMG** | valid on disk, satisfies its Designated Requirement |
 | `spctl -a -t exec` | **rejected** — expected for ad-hoc/unnotarized; README documents right-click → Open |
 | Signature | `adhoc`, Identifier `com.yukiorita.wakaru`, TeamIdentifier not set |
-| `shasum -a 256` | `723a71374e9e36a42a6eb9fd2e4b85305f7544693cebfcb205a552d6fe6dc306` → `src-tauri/target/release/bundle/dmg/RELEASE_CHECKSUMS.txt` |
+| Size | 11,230,289 bytes |
+| `shasum -a 256` | `92b615bd511f2a226b0c6e5168cd4ba2086062c1d7aa2b4909e0f4255822d672` |
 
 x64 build not attempted (only arm64 is distributed, matching v0.1.0).
 
@@ -66,7 +74,25 @@ Build note: `whisper.cpp` (ggml) needs a macOS 10.15+ deployment target for
 `bundle.macOS.minimumSystemVersion = "12.0"` + a forced
 `MACOSX_DEPLOYMENT_TARGET` in `src-tauri/.cargo/config.toml`.
 
-## Remaining manual gates — interactive, on a GUI session
+The Tauri DMG decoration helper failed while automating Finder layout. The
+release DMG was therefore created from the same signed `.app` with the standard
+Applications symlink using `hdiutil`; image integrity and the mounted app's
+signature were then independently verified.
+
+## Interactive verification performed
+
+- Native v0.0.0 app cold-launched and remained running.
+- A real legacy application database with an empty migration ledger was backed
+  up, upgraded, and reopened successfully. Project/profile row counts stayed
+  unchanged; `001_init` and `002_ai_protocol` were recorded; `json_schema` and
+  `protocol` were added.
+- AI Settings was inspected in the browser build: OpenAI/Anthropic selector,
+  Anthropic preset URL, profile badge, save/error affordances, and translations
+  were present.
+- 390×844 layout and 150% display size had no horizontal overflow; the browser
+  console had no errors.
+
+## Not exercised in this release run
 
 - [ ] `docs/09 §8` 11-step smoke test (ingest → view → Illustrator →
       restart-persists → Studio artifact → monochrome / 150% / 中文 → offline
@@ -76,4 +102,7 @@ Build note: `whisper.cpp` (ggml) needs a macOS 10.15+ deployment target for
       focus trap + Esc, `aria-label` on icon buttons, `role="progressbar"`,
       `aria-live="polite"`, `prefers-reduced-motion`, 2rem hit targets).
 - [ ] Cold start < 3 s on an empty library.
-- [ ] Owner runs the app once end-to-end and confirms.
+
+These broader fixture/API-dependent checks remain release-candidate follow-up
+work. No reproducible crash, data-loss defect, high-severity security defect,
+or automated regression remains open; v0.0.0 is published as a pre-release.

@@ -10,7 +10,10 @@ pub fn ai_list_profiles(state: State<'_, AppState>) -> AppResult<Vec<AiProfile>>
 }
 
 #[tauri::command]
-pub fn ai_upsert_profile(state: State<'_, AppState>, input: AiProfileInput) -> AppResult<AiProfile> {
+pub fn ai_upsert_profile(
+    state: State<'_, AppState>,
+    input: AiProfileInput,
+) -> AppResult<AiProfile> {
     state.with_db(|db| ai::profiles::upsert(db, input))
 }
 
@@ -39,7 +42,13 @@ pub fn ai_set_role_binding(
     params: Option<serde_json::Value>,
 ) -> AppResult<()> {
     state.with_db(|db| {
-        ai::profiles::set_binding(db, role, &profile_id, &model, params.unwrap_or(serde_json::json!({})))
+        ai::profiles::set_binding(
+            db,
+            role,
+            &profile_id,
+            &model,
+            params.unwrap_or(serde_json::json!({})),
+        )
     })
 }
 
@@ -53,7 +62,11 @@ pub fn ai_cancel_request(state: State<'_, AppState>, stream_id: String) -> AppRe
     if state.streams.cancel(&stream_id) {
         Ok(())
     } else {
-        Err(AppError::new("STREAM_NOT_FOUND", "error.ai.streamNotFound", stream_id))
+        Err(AppError::new(
+            "STREAM_NOT_FOUND",
+            "error.ai.streamNotFound",
+            stream_id,
+        ))
     }
 }
 
@@ -68,7 +81,13 @@ pub async fn ai_debug_chat(
 ) -> AppResult<String> {
     let resolved = state
         .with_db(|db| ai::profiles::resolve(db, Role::Chat))?
-        .ok_or_else(|| AppError::new("AI_NOT_CONFIGURED", "error.ai.notConfigured", "no chat model set"))?;
+        .ok_or_else(|| {
+            AppError::new(
+                "AI_NOT_CONFIGURED",
+                "error.ai.notConfigured",
+                "no chat model set",
+            )
+        })?;
     let (stream_id, token) = state.streams.start();
     let reg = state.streams.clone();
     let messages = serde_json::json!([{ "role": "user", "content": prompt }]);

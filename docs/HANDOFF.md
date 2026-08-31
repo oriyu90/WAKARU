@@ -1,4 +1,4 @@
-# WAKARU v0.2.0 — handoff
+# WAKARU v0.0.0 — handoff
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
@@ -15,7 +15,7 @@ a from-scratch Hallmark React frontend.
   never push source there. If you want an off-site backup, add a *private*
   remote deliberately.
 - Author `Yuki Orita` / `Yuki_Orita`, MIT. Bundle id `com.yukiorita.wakaru`.
-- Version `0.2.0`, identical in `package.json`, `src-tauri/Cargo.toml`,
+- Version `0.0.0`, identical in `package.json`, `src-tauri/Cargo.toml`,
   `src-tauri/tauri.conf.json`.
 
 ## Status
@@ -29,9 +29,9 @@ prefixes). Working tree clean.
 | Backend | `cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo test` | green — 167 tests |
 | Licenses | `cd src-tauri && cargo deny check licenses bans sources` | green — no GPL/AGPL/LGPL |
 
-**Not done: the release itself** — see `../RELEASE_DRAFT.md`. Needs a local
-DMG build, the `docs/09 §8` 11-step manual smoke test, owner sign-off, then
-`gh release create`, then (last) the public repo + studio-rizi site updates.
+The current release work follows `IMPLEMENTATION_PLAN_v0.0.0.md`: dual API
+formats, built-in Studio/Illustrator behaviour, reliability hardening, final
+DMG verification, then public docs and Studio RIZI updates.
 
 ## Layout
 

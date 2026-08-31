@@ -29,18 +29,34 @@ pub fn decode_to_mono_16k(path: &Path) -> AppResult<Vec<f32>> {
     }
 
     let probed = symphonia::default::get_probe()
-        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+        .format(
+            &hint,
+            mss,
+            &FormatOptions::default(),
+            &MetadataOptions::default(),
+        )
         .map_err(|e| AppError::new("AV_DECODE_FAILED", "error.av.decodeFailed", e.to_string()))?;
     let mut format = probed.format;
     let track = format
         .tracks()
         .iter()
         .find(|t| t.codec_params.sample_rate.is_some())
-        .ok_or_else(|| AppError::new("AV_NO_AUDIO", "error.av.noAudio", "no decodable audio track"))?
+        .ok_or_else(|| {
+            AppError::new(
+                "AV_NO_AUDIO",
+                "error.av.noAudio",
+                "no decodable audio track",
+            )
+        })?
         .clone();
     let track_id = track.id;
     let src_sr = track.codec_params.sample_rate.unwrap_or(TARGET_SR);
-    let channels = track.codec_params.channels.map(|c| c.count()).unwrap_or(1).max(1);
+    let channels = track
+        .codec_params
+        .channels
+        .map(|c| c.count())
+        .unwrap_or(1)
+        .max(1);
 
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
@@ -56,7 +72,13 @@ pub fn decode_to_mono_16k(path: &Path) -> AppResult<Vec<f32>> {
             {
                 break
             }
-            Err(e) => return Err(AppError::new("AV_DECODE_FAILED", "error.av.decodeFailed", e.to_string())),
+            Err(e) => {
+                return Err(AppError::new(
+                    "AV_DECODE_FAILED",
+                    "error.av.decodeFailed",
+                    e.to_string(),
+                ))
+            }
         };
         if packet.track_id() != track_id {
             continue;
@@ -64,7 +86,10 @@ pub fn decode_to_mono_16k(path: &Path) -> AppResult<Vec<f32>> {
         match decoder.decode(&packet) {
             Ok(decoded) => {
                 if sbuf.is_none() {
-                    sbuf = Some(SampleBuffer::new(decoded.capacity() as u64, *decoded.spec()));
+                    sbuf = Some(SampleBuffer::new(
+                        decoded.capacity() as u64,
+                        *decoded.spec(),
+                    ));
                 }
                 let sb = sbuf.as_mut().unwrap();
                 sb.copy_interleaved_ref(decoded);
@@ -74,12 +99,22 @@ pub fn decode_to_mono_16k(path: &Path) -> AppResult<Vec<f32>> {
                 }
             }
             Err(symphonia::core::errors::Error::DecodeError(_)) => continue,
-            Err(e) => return Err(AppError::new("AV_DECODE_FAILED", "error.av.decodeFailed", e.to_string())),
+            Err(e) => {
+                return Err(AppError::new(
+                    "AV_DECODE_FAILED",
+                    "error.av.decodeFailed",
+                    e.to_string(),
+                ))
+            }
         }
     }
 
     if mono.is_empty() {
-        return Err(AppError::new("AV_NO_AUDIO", "error.av.noAudio", "audio track decoded to nothing"));
+        return Err(AppError::new(
+            "AV_NO_AUDIO",
+            "error.av.noAudio",
+            "audio track decoded to nothing",
+        ));
     }
     Ok(resample_to_16k(&mono, src_sr))
 }
@@ -227,7 +262,11 @@ pub fn merge_segments(segs: Vec<TranscriptSegment>) -> Vec<TranscriptSegment> {
                 prev.text.push_str(&text);
                 prev.end = s.end;
             }
-            _ => out.push(TranscriptSegment { start: s.start, end: s.end, text }),
+            _ => out.push(TranscriptSegment {
+                start: s.start,
+                end: s.end,
+                text,
+            }),
         }
     }
     out
@@ -287,7 +326,11 @@ mod tests {
 
     #[test]
     fn merge_joins_fragments_until_a_sentence_ends() {
-        let seg = |a: f64, b: f64, t: &str| TranscriptSegment { start: a, end: b, text: t.into() };
+        let seg = |a: f64, b: f64, t: &str| TranscriptSegment {
+            start: a,
+            end: b,
+            text: t.into(),
+        };
         let merged = merge_segments(vec![
             seg(0.0, 1.0, "hello there"),
             seg(1.1, 2.0, "friend."),

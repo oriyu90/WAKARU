@@ -36,12 +36,18 @@ fn ac_7_4_tool_policy_is_recorded_and_revocable() {
     // "Always allow" is persisted, keyed by <slug>__<tool>.
     mcp::set_policy(&db, "srv1", "read_file", "always_allow").unwrap();
     let map = mcp::policy_map(&db).unwrap();
-    assert_eq!(map.get("files_fs__read_file").map(String::as_str), Some("always_allow"));
+    assert_eq!(
+        map.get("files_fs__read_file").map(String::as_str),
+        Some("always_allow")
+    );
 
     // Revoked from settings -> back to ask.
     mcp::set_policy(&db, "srv1", "read_file", "ask").unwrap();
     assert_eq!(
-        mcp::policy_map(&db).unwrap().get("files_fs__read_file").map(String::as_str),
+        mcp::policy_map(&db)
+            .unwrap()
+            .get("files_fs__read_file")
+            .map(String::as_str),
         Some("ask")
     );
 
@@ -58,7 +64,8 @@ fn deleting_a_server_cascades_its_policies() {
     )
     .unwrap();
     mcp::set_policy(&db, "s", "t", "deny").unwrap();
-    db.execute("DELETE FROM mcp_servers WHERE id = 's'", []).unwrap();
+    db.execute("DELETE FROM mcp_servers WHERE id = 's'", [])
+        .unwrap();
     assert!(mcp::policy_map(&db).unwrap().is_empty());
     assert!(mcp::list_servers(&db).unwrap().is_empty());
 }
@@ -75,6 +82,8 @@ async fn http_transport_is_refused_this_release() {
         url: Some("https://example.com/mcp".into()),
         env: serde_json::Map::new(),
     };
-    let err = mcp::connect(row, &std::collections::HashMap::new()).await.unwrap_err();
+    let err = mcp::connect(row, &std::collections::HashMap::new())
+        .await
+        .unwrap_err();
     assert_eq!(err.code, "MCP_TRANSPORT_UNSUPPORTED");
 }

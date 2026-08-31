@@ -178,3 +178,11 @@
 - **whisper モデル SHA**: ggml ファイルに公式 SHA マニフェストが無いため、カタログは概算サイズ（ディスク事前チェック用）＋ URL のみ。初回 DL 時にファイルの SHA-256 を計算して `whisper_models` に記録、再 DL でハッシュ／サイズが変われば拒否。DL は HTTP Range で中断・再開（`.part`）。
 - **整形（organizer）**: 文字起こしの organizer 整形は見送り、生セグメントを `documents` に保存（AC-5-6 は自明に成立、`ready_partial` にしない）。
 - **差し戻し条件**: ONNX のビルドが安定したら Silero へ。動画キーフレームは `ffmpeg` サイドカー同梱か実用的な純 Rust デコーダが出たら追加。
+
+## D-16 · API形式と教育・文章品質の振る舞いをアプリ本体で抽象化
+
+- **日付**: 2026-09-01
+- **論点**: OpenAI互換に加えてAnthropic互換エンドポイントを使い、Studioではunslop相当、Live IllustratorではSocratic tutor + ELI5相当の効果を常時得たい。ただし外部Skill実装そのものを同梱する必要はない。
+- **採用**: 接続プロファイルに `openai` / `anthropic` を保存し、共通内部メッセージから各wire形式へ変換する。文章・教育品質は3言語の機能別system promptへ組み込み、Skill名や内部手法名を回答へ出さない。
+- **理由**: ベンダSDKや外部Skill配布物へ依存せず、ローカル互換サーバを含む複数プロバイダで同じWAKARU体験と安全規約を維持できる。
+- **安全性**: 既存プロファイルはDB migrationでOpenAI互換を既定値にする。Base URLはhttp(s)絶対URLだけを許可し、認証情報・query・fragmentを拒否する。Anthropicのsystem/tool/tool_result/SSEは専用アダプタで変換し、未知イベントは安全に無視する。

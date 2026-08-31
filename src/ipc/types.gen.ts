@@ -4,17 +4,23 @@ export type AddFilesInput = { projectId: string, paths: Array<string>, };
 
 export type AiBudget = { contextTokens: number, maxOutputTokens: number, maxImagesPerRequest: number, rerank: boolean, concurrency: number, warnAboveTokens: number | null, };
 
-export type AiProfile = { id: string, name: string, baseUrl: string, 
+export type AiProfile = { id: string, name: string, baseUrl: string, protocol: ApiProtocol,
 /**
  * The API key is never returned — only whether one is stored.
  */
 hasKey: boolean, defaultModel: string | null, supportsVision: boolean, supportsTools: boolean, supportsEmbed: boolean, jsonSchema: boolean, extraHeaders: Record<string, string>, timeoutMs: number, createdAt: string, lastOkAt: string | null, };
 
-export type AiProfileInput = { id: string | null, name: string, baseUrl: string, 
+export type AiProfileInput = { id: string | null, name: string, baseUrl: string, protocol: ApiProtocol,
 /**
  * Present only when the user typed or changed it. `""` clears the key.
  */
 apiKey: string | null, defaultModel: string | null, extraHeaders: Record<string, string> | null, timeoutMs: number | null, };
+
+/**
+ * Wire protocol used by an AI connection. Both variants are implemented
+ * directly on reqwest; no vendor SDK is linked into the app.
+ */
+export type ApiProtocol = "openai" | "anthropic";
 
 export type AppError = { code: string, message: string, i18nKey: string, details: unknown | null, retriable: boolean, };
 

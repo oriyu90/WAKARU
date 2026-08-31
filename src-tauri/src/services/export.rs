@@ -27,7 +27,10 @@ pub fn estimate(projects_root: &Path, project_ids: &[String]) -> AppResult<Vec<E
                 continue;
             }
             let rel = entry.path().strip_prefix(&dir).unwrap_or(entry.path());
-            if rel.components().any(|c| SKIP_DIRS.contains(&c.as_os_str().to_string_lossy().as_ref())) {
+            if rel
+                .components()
+                .any(|c| SKIP_DIRS.contains(&c.as_os_str().to_string_lossy().as_ref()))
+            {
                 continue;
             }
             let len = entry.metadata().map(|m| m.len()).unwrap_or(0);
@@ -64,11 +67,15 @@ pub fn export(
 
         let manifest = build_manifest(app_db, projects_root, &project)?;
         let safe_name = sanitize(&project.name);
-        let out_path = format!("{}/{safe_name}.wakaru.zip", input.dest_dir.trim_end_matches('/'));
+        let out_path = format!(
+            "{}/{safe_name}.wakaru.zip",
+            input.dest_dir.trim_end_matches('/')
+        );
 
         let file = File::create(&out_path)?;
         let mut zip = zip::ZipWriter::new(file);
-        let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        let opts =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
         zip.start_file("manifest.json", opts)?;
         zip.write_all(serde_json::to_string_pretty(&manifest)?.as_bytes())?;
@@ -83,7 +90,9 @@ pub fn export(
             let rel = entry.path().strip_prefix(&dir).unwrap_or(entry.path());
             let rel_str = rel.to_string_lossy().replace('\\', "/");
             if rel_str == "manifest.json"
-                || SKIP_DIRS.iter().any(|d| rel_str.starts_with(&format!("{d}/")))
+                || SKIP_DIRS
+                    .iter()
+                    .any(|d| rel_str.starts_with(&format!("{d}/")))
             {
                 continue;
             }
@@ -119,7 +128,13 @@ pub fn import(
         let mut s = String::new();
         archive
             .by_name("manifest.json")
-            .map_err(|_| AppError::new("IMPORT_NO_MANIFEST", "error.import.noManifest", "no manifest.json"))?
+            .map_err(|_| {
+                AppError::new(
+                    "IMPORT_NO_MANIFEST",
+                    "error.import.noManifest",
+                    "no manifest.json",
+                )
+            })?
             .read_to_string(&mut s)?;
         serde_json::from_str(&s)?
     };
@@ -138,7 +153,10 @@ pub fn import(
             .with_details(serde_json::json!({ "schemaVersion": stored_ver })));
         }
         VersionVerdict::WarnOpen => {
-            tracing::warn!(schema = stored_ver, "importing a newer-minor project; unknown columns preserved");
+            tracing::warn!(
+                schema = stored_ver,
+                "importing a newer-minor project; unknown columns preserved"
+            );
         }
         _ => {}
     }
@@ -152,7 +170,13 @@ pub fn import(
     }
 
     for i in 0..archive.len() {
-        let mut entry = archive.by_index(i).unwrap();
+        let mut entry = archive.by_index(i).map_err(|e| {
+            AppError::new(
+                "IMPORT_BAD_ARCHIVE",
+                "error.import.badArchive",
+                format!("cannot read zip entry {i}: {e}"),
+            )
+        })?;
         let name = entry.name().to_string();
         if name == "manifest.json" || name == "README.txt" || name.ends_with('/') {
             continue;
@@ -171,12 +195,15 @@ pub fn import(
 
     // Run project migrations over the imported db (handles Migrate verdict).
     let conn = storage::open_project_db(&projects::project_db_path(projects_root, &new_id))?;
-    let source_count: i64 = conn.query_row("SELECT count(*) FROM sources", [], |r| r.get(0)).unwrap_or(0);
+    let source_count: i64 = conn
+        .query_row("SELECT count(*) FROM sources", [], |r| r.get(0))
+        .unwrap_or(0);
 
     // If embeddings weren't bundled, drop any stale vector table — it will be
     // rebuilt on next ingest / search (§6.2).
     if !dir.join("embeddings.bin").exists() {
-        let _ = conn.execute_batch("DROP TABLE IF EXISTS chunk_vectors; DELETE FROM embedding_meta;");
+        let _ =
+            conn.execute_batch("DROP TABLE IF EXISTS chunk_vectors; DELETE FROM embedding_meta;");
     }
 
     let name = manifest
@@ -186,7 +213,11 @@ pub fn import(
         .to_string();
     let now = now_iso8601();
     let sort_order: i32 = app_db
-        .query_row("SELECT COALESCE(MAX(sort_order),0)+1 FROM projects", [], |r| r.get(0))
+        .query_row(
+            "SELECT COALESCE(MAX(sort_order),0)+1 FROM projects",
+            [],
+            |r| r.get(0),
+        )
         .unwrap_or(1);
     app_db.execute(
         "INSERT INTO projects (id, name, description, color, dir_name, schema_version, created_at, updated_at, sort_order)
@@ -213,13 +244,18 @@ fn rebuild_global_index(
     project_db: &rusqlite::Connection,
     project_id: &str,
 ) -> AppResult<()> {
-    app_db.execute("DELETE FROM global_index WHERE project_id = ?1", [project_id])?;
+    app_db.execute(
+        "DELETE FROM global_index WHERE project_id = ?1",
+        [project_id],
+    )?;
     let mut stmt = project_db.prepare(
         "SELECT s.id, s.original_name, d.ordinal, d.title, d.text
          FROM documents d JOIN sources s ON s.id = d.source_id",
     )?;
     let rows: Vec<(String, String, i64, Option<String>, String)> = stmt
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)))?
+        .query_map([], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+        })?
         .collect::<rusqlite::Result<_>>()?;
     drop(stmt);
     for (sid, sname, ordinal, title, text) in rows {
@@ -246,11 +282,21 @@ fn build_manifest(
     project: &crate::domain::project::Project,
 ) -> AppResult<serde_json::Value> {
     let conn = storage::open(&projects::project_db_path(projects_root, &project.id))?;
-    let sources: i64 = conn.query_row("SELECT count(*) FROM sources", [], |r| r.get(0)).unwrap_or(0);
-    let documents: i64 = conn.query_row("SELECT count(*) FROM documents", [], |r| r.get(0)).unwrap_or(0);
-    let chunks: i64 = conn.query_row("SELECT count(*) FROM chunks", [], |r| r.get(0)).unwrap_or(0);
+    let sources: i64 = conn
+        .query_row("SELECT count(*) FROM sources", [], |r| r.get(0))
+        .unwrap_or(0);
+    let documents: i64 = conn
+        .query_row("SELECT count(*) FROM documents", [], |r| r.get(0))
+        .unwrap_or(0);
+    let chunks: i64 = conn
+        .query_row("SELECT count(*) FROM chunks", [], |r| r.get(0))
+        .unwrap_or(0);
     let embed: Option<(String, i64)> = conn
-        .query_row("SELECT model, dim FROM embedding_meta WHERE id = 1", [], |r| Ok((r.get(0)?, r.get(1)?)))
+        .query_row(
+            "SELECT model, dim FROM embedding_meta WHERE id = 1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
         .ok();
     let _ = app_db;
     Ok(serde_json::json!({
@@ -278,7 +324,13 @@ fn readme_txt(name: &str) -> String {
 fn sanitize(name: &str) -> String {
     let s: String = name
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     if s.trim_matches('_').is_empty() {
         "project".into()

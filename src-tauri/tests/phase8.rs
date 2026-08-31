@@ -6,9 +6,11 @@ use wakaru_lib::services::file_modifier as fm;
 
 fn png(dir: &std::path::Path, name: &str, w: u32, h: u32) -> std::path::PathBuf {
     let p = dir.join(name);
-    image::RgbImage::from_fn(w, h, |x, y| image::Rgb([(x % 255) as u8, (y % 255) as u8, 90]))
-        .save(&p)
-        .unwrap();
+    image::RgbImage::from_fn(w, h, |x, y| {
+        image::Rgb([(x % 255) as u8, (y % 255) as u8, 90])
+    })
+    .save(&p)
+    .unwrap();
     p
 }
 

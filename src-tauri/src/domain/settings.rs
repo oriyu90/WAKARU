@@ -93,8 +93,14 @@ pub struct AiBudget {
 impl Default for Settings {
     fn default() -> Self {
         Settings {
-            general: General { startup_view: "home".into(), check_updates_on_start: true },
-            language: Language { ui: "ja".into(), ai_response: "follow_ui".into() },
+            general: General {
+                startup_view: "home".into(),
+                check_updates_on_start: true,
+            },
+            language: Language {
+                ui: "ja".into(),
+                ai_response: "follow_ui".into(),
+            },
             illustrator: IllustratorSettings {
                 enabled: false,
                 default_level: "standard".into(),
@@ -107,7 +113,10 @@ impl Default for Settings {
                 fetch_web_images: false,
                 allow_private_network: false,
             },
-            sandbox: SandboxSettings { command_timeout_sec: 60, auto_allow_new_file_writes: false },
+            sandbox: SandboxSettings {
+                command_timeout_sec: 60,
+                auto_allow_new_file_writes: false,
+            },
             transcription: Transcription {
                 whisper_model: "small".into(),
                 language: "auto".into(),
@@ -126,5 +135,7 @@ impl Default for Settings {
 }
 
 fn num_cpus() -> u32 {
-    std::thread::available_parallelism().map(|n| n.get() as u32).unwrap_or(4)
+    std::thread::available_parallelism()
+        .map(|n| n.get() as u32)
+        .unwrap_or(4)
 }

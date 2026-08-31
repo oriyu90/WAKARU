@@ -30,9 +30,8 @@ pub fn detect_kind(path: &Path) -> Option<SourceKind> {
         "pdf" => Some(SourceKind::Pdf),
         "pptx" | "ppt" => Some(SourceKind::Slides),
         "docx" | "doc" => Some(SourceKind::Doc),
-        "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "tif" | "tiff" | "heic" | "heif" | "avif" => {
-            Some(SourceKind::Image)
-        }
+        "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "tif" | "tiff" | "heic" | "heif"
+        | "avif" => Some(SourceKind::Image),
         "mp3" | "wav" | "m4a" | "aac" | "flac" | "ogg" | "opus" => Some(SourceKind::Audio),
         "mp4" | "mov" | "m4v" | "mkv" | "webm" => Some(SourceKind::Video),
         "xlsx" | "xls" | "csv" | "tsv" => Some(SourceKind::Sheet),
@@ -104,9 +103,7 @@ pub fn row_to_source(r: &rusqlite::Row) -> rusqlite::Result<Source> {
 }
 
 pub fn list(project_db: &Connection) -> AppResult<Vec<Source>> {
-    let mut stmt = project_db.prepare(
-        "SELECT * FROM sources ORDER BY added_at DESC",
-    )?;
+    let mut stmt = project_db.prepare("SELECT * FROM sources ORDER BY added_at DESC")?;
     let rows = stmt
         .query_map([], row_to_source)?
         .collect::<Result<Vec<_>, _>>()?;
@@ -115,7 +112,11 @@ pub fn list(project_db: &Connection) -> AppResult<Vec<Source>> {
 
 pub fn get(project_db: &Connection, source_id: &str) -> AppResult<Source> {
     project_db
-        .query_row("SELECT * FROM sources WHERE id = ?1", [source_id], row_to_source)
+        .query_row(
+            "SELECT * FROM sources WHERE id = ?1",
+            [source_id],
+            row_to_source,
+        )
         .optional()?
         .ok_or_else(|| AppError::new("SOURCE_NOT_FOUND", "error.source.notFound", source_id))
 }
@@ -290,10 +291,17 @@ pub fn reanalyze(
 ) -> AppResult<()> {
     let project_db = projects::open_db(projects_root, project_id)?;
     let source = get(&project_db, source_id)?;
-    let kind = detect_kind(&projects::project_dir(projects_root, project_id).join(rel_path_of(&project_db, source_id)?))
-        .or(Some(source.kind));
+    let kind = detect_kind(
+        &projects::project_dir(projects_root, project_id)
+            .join(rel_path_of(&project_db, source_id)?),
+    )
+    .or(Some(source.kind));
     let Some(kind) = kind else {
-        return Err(AppError::new("SOURCE_UNSUPPORTED_FORMAT", "error.source.unsupported", "unknown kind"));
+        return Err(AppError::new(
+            "SOURCE_UNSUPPORTED_FORMAT",
+            "error.source.unsupported",
+            "unknown kind",
+        ));
     };
     project_db.execute(
         "UPDATE sources SET status='queued', error_code=NULL, error_message=NULL WHERE id=?1",
@@ -303,7 +311,8 @@ pub fn reanalyze(
         IngestInput::Url(source.url.clone().unwrap_or_default())
     } else {
         IngestInput::File(
-            projects::project_dir(projects_root, project_id).join(rel_path_of(&project_db, source_id)?),
+            projects::project_dir(projects_root, project_id)
+                .join(rel_path_of(&project_db, source_id)?),
         )
     };
     spawn_ingest(
@@ -329,8 +338,8 @@ pub fn delete(
 ) -> AppResult<()> {
     let project_db = projects::open_db(projects_root, project_id)?;
     get(&project_db, source_id)?; // 404 if missing
-    // documents / chunks / chunks_fts / threads / illustrations / viewer_tabs
-    // all cascade from `sources` via ON DELETE CASCADE + the fts trigger.
+                                  // documents / chunks / chunks_fts / threads / illustrations / viewer_tabs
+                                  // all cascade from `sources` via ON DELETE CASCADE + the fts trigger.
     project_db.execute("DELETE FROM sources WHERE id = ?1", [source_id])?;
     app_db.execute(
         "DELETE FROM global_index WHERE project_id = ?1 AND source_id = ?2",
@@ -367,16 +376,36 @@ fn spawn_ingest(
     input: IngestInput,
 ) {
     use crate::domain::JobKind;
-    let (job_id, token) = jobs.create(JobKind::Ingest, Some(project_id.clone()), Some(source_id.clone()));
+    let (job_id, token) = jobs.create(
+        JobKind::Ingest,
+        Some(project_id.clone()),
+        Some(source_id.clone()),
+    );
     tauri::async_runtime::spawn_blocking(move || {
         jobs.mark_running(&job_id);
         let result = (|| -> AppResult<()> {
             let project_db = projects::open_db(&projects_root, &project_id)?;
             let app_db = storage::open(&app_db_path)?;
-            set_status(&app, &project_db, &project_id, &source_id, "analyzing", None, None);
+            set_status(
+                &app,
+                &project_db,
+                &project_id,
+                &source_id,
+                "analyzing",
+                None,
+                None,
+            );
 
             if token.is_cancelled() {
-                set_status(&app, &project_db, &project_id, &source_id, "queued", None, None);
+                set_status(
+                    &app,
+                    &project_db,
+                    &project_id,
+                    &source_id,
+                    "queued",
+                    None,
+                    None,
+                );
                 return Ok(());
             }
 
@@ -402,15 +431,31 @@ fn spawn_ingest(
                  WHERE id=?1",
                 params![
                     source_id,
-                    if outcome.partial { "ready_partial" } else { "ready" },
+                    if outcome.partial {
+                        "ready_partial"
+                    } else {
+                        "ready"
+                    },
                     outcome.lang,
                     outcome.page_count.map(|v| v as i64),
                     now_iso8601(),
                     outcome.title_override,
                 ],
             )?;
-            let final_status = if outcome.partial { "ready_partial" } else { "ready" };
-            set_status(&app, &project_db, &project_id, &source_id, final_status, None, None);
+            let final_status = if outcome.partial {
+                "ready_partial"
+            } else {
+                "ready"
+            };
+            set_status(
+                &app,
+                &project_db,
+                &project_id,
+                &source_id,
+                final_status,
+                None,
+                None,
+            );
             tracing::info!(source = %source_id, docs = outcome.documents, chunks = outcome.chunks, "ingest done");
 
             // Vector index (docs/05 §2). No-op when no embedding endpoint is set —
@@ -421,9 +466,13 @@ fn spawn_ingest(
                 &source_id,
                 |_, _| {},
             )) {
-                Ok(n) if n > 0 => tracing::info!(source = %source_id, embedded = n, "vector index updated"),
+                Ok(n) if n > 0 => {
+                    tracing::info!(source = %source_id, embedded = n, "vector index updated")
+                }
                 Ok(_) => {}
-                Err(e) => tracing::warn!(source = %source_id, error = %e, "embedding failed (search stays FTS-only)"),
+                Err(e) => {
+                    tracing::warn!(source = %source_id, error = %e, "embedding failed (search stays FTS-only)")
+                }
             }
             Ok(())
         })();
@@ -434,7 +483,15 @@ fn spawn_ingest(
                     "UPDATE sources SET status='failed', error_code=?2, error_message=?3 WHERE id=?1",
                     params![source_id, e.code, e.message],
                 );
-                set_status(&app, &project_db, &project_id, &source_id, "failed", Some(e.code.clone()), None);
+                set_status(
+                    &app,
+                    &project_db,
+                    &project_id,
+                    &source_id,
+                    "failed",
+                    Some(e.code.clone()),
+                    None,
+                );
             }
             jobs.finish(&job_id, crate::domain::JobStatus::Failed, Some(e.message));
         } else {
@@ -535,7 +592,10 @@ mod tests {
 
     #[test]
     fn detect_kind_by_extension() {
-        assert_eq!(detect_kind(Path::new("a/b/notes.md")), Some(SourceKind::Markdown));
+        assert_eq!(
+            detect_kind(Path::new("a/b/notes.md")),
+            Some(SourceKind::Markdown)
+        );
         assert_eq!(detect_kind(Path::new("data.csv")), Some(SourceKind::Sheet));
         assert_eq!(detect_kind(Path::new("main.rs")), Some(SourceKind::Code));
         assert_eq!(detect_kind(Path::new("mystery.xyz")), None);

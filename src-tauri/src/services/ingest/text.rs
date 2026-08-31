@@ -34,26 +34,27 @@ fn parse_markdown(text: &str) -> Vec<Unit> {
     let mut cur_title: Option<String> = None;
     let mut buf = String::new();
 
-    let flush = |units: &mut Vec<Unit>, ordinal: &mut u32, title: &Option<String>, buf: &mut String| {
-        let body = buf.trim();
-        if body.is_empty() && title.is_none() {
+    let flush =
+        |units: &mut Vec<Unit>, ordinal: &mut u32, title: &Option<String>, buf: &mut String| {
+            let body = buf.trim();
+            if body.is_empty() && title.is_none() {
+                buf.clear();
+                return;
+            }
+            units.push(Unit {
+                ordinal: *ordinal,
+                kind: "section",
+                title: title.clone(),
+                text: if title.is_some() && !body.is_empty() {
+                    format!("# {}\n\n{}", title.as_deref().unwrap_or(""), body)
+                } else {
+                    body.to_string()
+                },
+                locator: serde_json::json!({ "t": "line" }),
+            });
+            *ordinal += 1;
             buf.clear();
-            return;
-        }
-        units.push(Unit {
-            ordinal: *ordinal,
-            kind: "section",
-            title: title.clone(),
-            text: if title.is_some() && !body.is_empty() {
-                format!("# {}\n\n{}", title.as_deref().unwrap_or(""), body)
-            } else {
-                body.to_string()
-            },
-            locator: serde_json::json!({ "t": "line" }),
-        });
-        *ordinal += 1;
-        buf.clear();
-    };
+        };
 
     for line in text.lines() {
         let heading = line
@@ -121,7 +122,11 @@ fn parse_blocks(text: &str, kind: &'static str) -> Vec<Unit> {
 pub fn parse_json(path: &Path) -> AppResult<Vec<Unit>> {
     let text = read_to_string(path)?;
     let value: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
-        AppError::new("SOURCE_PARSE", "error.source.parse", format!("invalid JSON: {e}"))
+        AppError::new(
+            "SOURCE_PARSE",
+            "error.source.parse",
+            format!("invalid JSON: {e}"),
+        )
     })?;
     let mut units = Vec::new();
     match value {

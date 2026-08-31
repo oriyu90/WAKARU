@@ -153,8 +153,12 @@ pub fn hybrid_search(
         let mut stmt = project_db.prepare(&sql)?;
         let map = |r: &rusqlite::Row| r.get::<_, String>(0);
         fts_ids = match source_id {
-            Some(sid) => stmt.query_map(rusqlite::params![match_expr, sid], map)?.collect::<Result<_, _>>()?,
-            None => stmt.query_map(rusqlite::params![match_expr], map)?.collect::<Result<_, _>>()?,
+            Some(sid) => stmt
+                .query_map(rusqlite::params![match_expr, sid], map)?
+                .collect::<Result<_, _>>()?,
+            None => stmt
+                .query_map(rusqlite::params![match_expr], map)?
+                .collect::<Result<_, _>>()?,
         };
     }
 
@@ -162,7 +166,11 @@ pub fn hybrid_search(
     let mut vec_ids: Vec<String> = Vec::new();
     if let Some(qv) = query_vec {
         let has = project_db
-            .query_row("SELECT 1 FROM sqlite_master WHERE name='chunk_vectors'", [], |_| Ok(()))
+            .query_row(
+                "SELECT 1 FROM sqlite_master WHERE name='chunk_vectors'",
+                [],
+                |_| Ok(()),
+            )
             .is_ok();
         if has {
             let bytes: Vec<u8> = crate::services::embed::l2_normalize(qv)
@@ -179,14 +187,22 @@ pub fn hybrid_search(
             let mut stmt = project_db.prepare(&sql)?;
             let map = |r: &rusqlite::Row| r.get::<_, String>(0);
             vec_ids = match source_id {
-                Some(sid) => stmt.query_map(rusqlite::params![bytes, sid], map)?.collect::<Result<_, _>>()?,
-                None => stmt.query_map(rusqlite::params![bytes], map)?.collect::<Result<_, _>>()?,
+                Some(sid) => stmt
+                    .query_map(rusqlite::params![bytes, sid], map)?
+                    .collect::<Result<_, _>>()?,
+                None => stmt
+                    .query_map(rusqlite::params![bytes], map)?
+                    .collect::<Result<_, _>>()?,
             };
         }
     }
 
     let fused = if vec_ids.is_empty() {
-        fts_ids.iter().cloned().map(|id| (id, 0.0)).collect::<Vec<_>>()
+        fts_ids
+            .iter()
+            .cloned()
+            .map(|id| (id, 0.0))
+            .collect::<Vec<_>>()
     } else {
         rrf(&[fts_ids, vec_ids])
     };
@@ -205,11 +221,12 @@ fn load_hit(
     chunk_id: &str,
     score: f64,
 ) -> crate::error::AppResult<HybridHit> {
-    let (source_id, document_id, text, locator): (String, String, String, String) = project_db.query_row(
-        "SELECT source_id, document_id, text, locator FROM chunks WHERE id = ?1",
-        [chunk_id],
-        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
-    )?;
+    let (source_id, document_id, text, locator): (String, String, String, String) = project_db
+        .query_row(
+            "SELECT source_id, document_id, text, locator FROM chunks WHERE id = ?1",
+            [chunk_id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+        )?;
     let (source_name, ordinal): (String, i64) = project_db.query_row(
         "SELECT s.original_name, d.ordinal FROM documents d
          JOIN sources s ON s.id = d.source_id WHERE d.id = ?1",
