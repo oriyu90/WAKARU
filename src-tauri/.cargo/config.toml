@@ -1,3 +1,9 @@
 # Where ts-rs writes generated TS bindings (relative to src-tauri/).
 [env]
 TS_RS_EXPORT_DIR = { value = "../src/ipc", relative = true }
+
+# whisper.cpp's ggml uses <filesystem> (directory_iterator), which needs a
+# macOS 10.15+ deployment target. `tauri build` otherwise exports 10.13 and the
+# C++ build fails. `force` so it wins over tauri-cli's value. Matches
+# tauri.conf.json `bundle.macOS.minimumSystemVersion`.
+MACOSX_DEPLOYMENT_TARGET = { value = "12.0", force = true }

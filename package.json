@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "check:contrast": "node scripts/check-contrast.mjs",
     "check:i18n": "node scripts/check-i18n.mjs",
-    "bindings": "cd src-tauri && cargo test export_bindings --quiet"
+    "bindings": "cd src-tauri && cargo test export_bindings --quiet",
+    "licenses:generate": "node scripts/gen-licenses.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.1.0",

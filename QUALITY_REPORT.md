@@ -46,7 +46,27 @@ Security-relevant coverage:
 - Asset access — `wakaru-asset://` resolves only inside a project's
   `sources/` and `derived/`; traversal rejected (unit-tested).
 
-## Manual gates — to complete on the release machine
+## Build & bundle — done 2026-09-01 (arm64)
+
+| Gate | Result |
+|---|---|
+| `APPLE_SIGNING_IDENTITY="-" MACOSX_DEPLOYMENT_TARGET=12.0 npm run tauri build -- --bundles dmg,app` | pass — `release` profile, 2m23s |
+| Bundle | `WAKARU_0.2.0_aarch64.dmg` (10 MB), `WAKARU.app`; ad-hoc signed, **not notarized** (as intended) |
+| `hdiutil verify` | checksum VALID |
+| `codesign --verify --deep --strict` — `.app` in `bundle/macos/` | valid on disk, satisfies its Designated Requirement |
+| `codesign --verify --deep --strict` — `.app` **inside the mounted DMG** | valid on disk, satisfies its Designated Requirement |
+| `spctl -a -t exec` | **rejected** — expected for ad-hoc/unnotarized; README documents right-click → Open |
+| Signature | `adhoc`, Identifier `com.yukiorita.wakaru`, TeamIdentifier not set |
+| `shasum -a 256` | `723a71374e9e36a42a6eb9fd2e4b85305f7544693cebfcb205a552d6fe6dc306` → `src-tauri/target/release/bundle/dmg/RELEASE_CHECKSUMS.txt` |
+
+x64 build not attempted (only arm64 is distributed, matching v0.1.0).
+
+Build note: `whisper.cpp` (ggml) needs a macOS 10.15+ deployment target for
+`<filesystem>`; `tauri build` otherwise passes 10.13. Fixed permanently via
+`bundle.macOS.minimumSystemVersion = "12.0"` + a forced
+`MACOSX_DEPLOYMENT_TARGET` in `src-tauri/.cargo/config.toml`.
+
+## Remaining manual gates — interactive, on a GUI session
 
 - [ ] `docs/09 §8` 11-step smoke test (ingest → view → Illustrator →
       restart-persists → Studio artifact → monochrome / 150% / 中文 → offline
@@ -56,9 +76,4 @@ Security-relevant coverage:
       focus trap + Esc, `aria-label` on icon buttons, `role="progressbar"`,
       `aria-live="polite"`, `prefers-reduced-motion`, 2rem hit targets).
 - [ ] Cold start < 3 s on an empty library.
-- [ ] `APPLE_SIGNING_IDENTITY="-" npm run tauri build -- --bundles dmg,app`
-      succeeds (arm64; x64 if the toolchain allows).
-- [ ] `hdiutil verify` the DMG; mount it and
-      `codesign --verify --deep --strict` the inner `.app`.
-- [ ] `shasum -a 256` → `RELEASE_CHECKSUMS.txt`.
-- [ ] Owner runs the app once and confirms.
+- [ ] Owner runs the app once end-to-end and confirms.

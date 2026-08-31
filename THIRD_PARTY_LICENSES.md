@@ -3,7 +3,7 @@
 WAKARU itself is MIT-licensed (see LICENSE). The desktop binary statically links
 the Rust crates listed below. License identifiers are taken from each crate's
 Cargo manifest; full license texts ship inside each crate's source under
-`~/.cargo/registry/`. This file is regenerated from `cargo metadata` at release time.
+`~/.cargo/registry/`. Regenerate with `npm run licenses:generate`.
 
 No crate here requires GPL/AGPL/LGPL terms. Where a crate offers a copyleft licence as one
 option in an `OR` expression (e.g. `r-efi`), WAKARU takes the permissive option. This is
@@ -61,16 +61,16 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | cairo-sys-rs | 0.18.2 | MIT |
 | calamine | 0.26.1 | MIT |
 | camino | 1.2.5 | MIT OR Apache-2.0 |
-| cargo-platform | 0.1.9 | MIT OR Apache-2.0 |
 | cargo_metadata | 0.19.2 | MIT |
 | cargo_toml | 0.22.3 | Apache-2.0 OR MIT |
+| cargo-platform | 0.1.9 | MIT OR Apache-2.0 |
 | cc | 1.4.4 | MIT OR Apache-2.0 |
 | cesu8 | 1.1.0 | Apache-2.0/MIT |
 | cexpr | 0.6.0 | Apache-2.0/MIT |
 | cfb | 0.7.3 | MIT |
+| cfg_aliases | 0.2.2 | MIT |
 | cfg-expr | 0.15.8 | MIT OR Apache-2.0 |
 | cfg-if | 1.0.4 | MIT OR Apache-2.0 |
-| cfg_aliases | 0.2.2 | MIT |
 | chacha20 | 0.10.2 | MIT OR Apache-2.0 |
 | chardetng | 0.1.17 | Apache-2.0 OR MIT |
 | chrono | 0.4.45 | MIT OR Apache-2.0 |
@@ -131,8 +131,8 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | dyn-clone | 1.0.20 | MIT OR Apache-2.0 |
 | ego-tree | 0.6.3 | ISC |
 | either | 1.18.0 | MIT OR Apache-2.0 |
-| embed-resource | 3.0.11 | MIT |
 | embed_plist | 1.2.2 | MIT OR Apache-2.0 |
+| embed-resource | 3.0.11 | MIT |
 | encoding_rs | 0.8.35 | (Apache-2.0 OR MIT) AND BSD-3-Clause |
 | endi | 1.1.1 | MIT |
 | enumflags2 | 0.7.12 | MIT OR Apache-2.0 |
@@ -295,10 +295,10 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | nix | 0.31.3 | MIT |
 | nom | 7.1.3 | MIT |
 | nu-ansi-term | 0.50.3 | MIT |
-| num-conv | 0.2.2 | MIT OR Apache-2.0 |
-| num-traits | 0.2.19 | MIT OR Apache-2.0 |
 | num_enum | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
 | num_enum_derive | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
+| num-conv | 0.2.2 | MIT OR Apache-2.0 |
+| num-traits | 0.2.19 | MIT OR Apache-2.0 |
 | objc2 | 0.6.4 | MIT |
 | objc2-app-kit | 0.3.2 | Zlib OR Apache-2.0 OR MIT |
 | objc2-cloud-kit | 0.3.2 | Zlib OR Apache-2.0 OR MIT |
@@ -401,9 +401,9 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | rmcp | 2.2.0 | Apache-2.0 |
 | rmcp-macros | 2.2.0 | Apache-2.0 |
 | rusqlite | 0.32.1 | MIT |
+| rustc_version | 0.4.1 | MIT OR Apache-2.0 |
 | rustc-hash | 1.1.0 | Apache-2.0/MIT |
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT |
-| rustc_version | 0.4.1 | MIT OR Apache-2.0 |
 | rustix | 1.1.4 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | rustls | 0.23.43 | Apache-2.0 OR ISC OR MIT |
 | rustls-pki-types | 1.15.1 | MIT OR Apache-2.0 |
@@ -425,7 +425,6 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | selectors | 0.36.1 | MPL-2.0 |
 | semver | 1.0.28 | MIT OR Apache-2.0 |
 | serde | 1.0.229 | MIT OR Apache-2.0 |
-| serde-untagged | 0.1.9 | MIT OR Apache-2.0 |
 | serde_core | 1.0.229 | MIT OR Apache-2.0 |
 | serde_derive | 1.0.229 | MIT OR Apache-2.0 |
 | serde_derive_internals | 0.29.1 | MIT OR Apache-2.0 |
@@ -437,6 +436,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | serde_urlencoded | 0.7.1 | MIT/Apache-2.0 |
 | serde_with | 3.22.0 | MIT OR Apache-2.0 |
 | serde_with_macros | 3.22.0 | MIT OR Apache-2.0 |
+| serde-untagged | 0.1.9 | MIT OR Apache-2.0 |
 | serialize-to-javascript | 0.1.2 | MIT OR Apache-2.0 |
 | serialize-to-javascript-impl | 0.1.2 | MIT OR Apache-2.0 |
 | servo_arc | 0.3.0 | MIT/Apache-2.0 |
@@ -569,8 +569,8 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | uuid | 1.26.0 | Apache-2.0 OR MIT |
 | valuable | 0.1.1 | MIT |
 | vcpkg | 0.2.15 | MIT/Apache-2.0 |
-| version-compare | 0.2.1 | MIT |
 | version_check | 0.9.5 | MIT/Apache-2.0 |
+| version-compare | 0.2.1 | MIT |
 | vswhom | 0.1.0 | MIT |
 | vswhom-sys | 0.1.3 | MIT |
 | walkdir | 2.5.0 | Unlicense/MIT |
@@ -584,9 +584,9 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | wasm-bindgen-shared | 0.2.127 | MIT OR Apache-2.0 |
 | wasm-streams | 0.4.2 | MIT OR Apache-2.0 |
 | wasm-streams | 0.5.0 | MIT OR Apache-2.0 |
+| web_atoms | 0.2.6 | MIT OR Apache-2.0 |
 | web-sys | 0.3.104 | MIT OR Apache-2.0 |
 | web-time | 1.1.0 | MIT OR Apache-2.0 |
-| web_atoms | 0.2.6 | MIT OR Apache-2.0 |
 | webkit2gtk | 2.0.2 | MIT |
 | webkit2gtk-sys | 2.0.2 | MIT |
 | webpki-roots | 1.0.9 | CDLA-Permissive-2.0 |
@@ -603,6 +603,29 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | window-vibrancy | 0.6.0 | Apache-2.0 OR MIT |
 | windows | 0.61.3 | MIT OR Apache-2.0 |
 | windows | 0.62.2 | MIT OR Apache-2.0 |
+| windows_aarch64_gnullvm | 0.42.2 | MIT OR Apache-2.0 |
+| windows_aarch64_gnullvm | 0.52.6 | MIT OR Apache-2.0 |
+| windows_aarch64_gnullvm | 0.53.1 | MIT OR Apache-2.0 |
+| windows_aarch64_msvc | 0.42.2 | MIT OR Apache-2.0 |
+| windows_aarch64_msvc | 0.52.6 | MIT OR Apache-2.0 |
+| windows_aarch64_msvc | 0.53.1 | MIT OR Apache-2.0 |
+| windows_i686_gnu | 0.42.2 | MIT OR Apache-2.0 |
+| windows_i686_gnu | 0.52.6 | MIT OR Apache-2.0 |
+| windows_i686_gnu | 0.53.1 | MIT OR Apache-2.0 |
+| windows_i686_gnullvm | 0.52.6 | MIT OR Apache-2.0 |
+| windows_i686_gnullvm | 0.53.1 | MIT OR Apache-2.0 |
+| windows_i686_msvc | 0.42.2 | MIT OR Apache-2.0 |
+| windows_i686_msvc | 0.52.6 | MIT OR Apache-2.0 |
+| windows_i686_msvc | 0.53.1 | MIT OR Apache-2.0 |
+| windows_x86_64_gnu | 0.42.2 | MIT OR Apache-2.0 |
+| windows_x86_64_gnu | 0.52.6 | MIT OR Apache-2.0 |
+| windows_x86_64_gnu | 0.53.1 | MIT OR Apache-2.0 |
+| windows_x86_64_gnullvm | 0.42.2 | MIT OR Apache-2.0 |
+| windows_x86_64_gnullvm | 0.52.6 | MIT OR Apache-2.0 |
+| windows_x86_64_gnullvm | 0.53.1 | MIT OR Apache-2.0 |
+| windows_x86_64_msvc | 0.42.2 | MIT OR Apache-2.0 |
+| windows_x86_64_msvc | 0.52.6 | MIT OR Apache-2.0 |
+| windows_x86_64_msvc | 0.53.1 | MIT OR Apache-2.0 |
 | windows-collections | 0.2.0 | MIT OR Apache-2.0 |
 | windows-collections | 0.3.2 | MIT OR Apache-2.0 |
 | windows-core | 0.61.2 | MIT OR Apache-2.0 |
@@ -630,29 +653,6 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | windows-threading | 0.1.0 | MIT OR Apache-2.0 |
 | windows-threading | 0.2.1 | MIT OR Apache-2.0 |
 | windows-version | 0.1.7 | MIT OR Apache-2.0 |
-| windows_aarch64_gnullvm | 0.42.2 | MIT OR Apache-2.0 |
-| windows_aarch64_gnullvm | 0.52.6 | MIT OR Apache-2.0 |
-| windows_aarch64_gnullvm | 0.53.1 | MIT OR Apache-2.0 |
-| windows_aarch64_msvc | 0.42.2 | MIT OR Apache-2.0 |
-| windows_aarch64_msvc | 0.52.6 | MIT OR Apache-2.0 |
-| windows_aarch64_msvc | 0.53.1 | MIT OR Apache-2.0 |
-| windows_i686_gnu | 0.42.2 | MIT OR Apache-2.0 |
-| windows_i686_gnu | 0.52.6 | MIT OR Apache-2.0 |
-| windows_i686_gnu | 0.53.1 | MIT OR Apache-2.0 |
-| windows_i686_gnullvm | 0.52.6 | MIT OR Apache-2.0 |
-| windows_i686_gnullvm | 0.53.1 | MIT OR Apache-2.0 |
-| windows_i686_msvc | 0.42.2 | MIT OR Apache-2.0 |
-| windows_i686_msvc | 0.52.6 | MIT OR Apache-2.0 |
-| windows_i686_msvc | 0.53.1 | MIT OR Apache-2.0 |
-| windows_x86_64_gnu | 0.42.2 | MIT OR Apache-2.0 |
-| windows_x86_64_gnu | 0.52.6 | MIT OR Apache-2.0 |
-| windows_x86_64_gnu | 0.53.1 | MIT OR Apache-2.0 |
-| windows_x86_64_gnullvm | 0.42.2 | MIT OR Apache-2.0 |
-| windows_x86_64_gnullvm | 0.52.6 | MIT OR Apache-2.0 |
-| windows_x86_64_gnullvm | 0.53.1 | MIT OR Apache-2.0 |
-| windows_x86_64_msvc | 0.42.2 | MIT OR Apache-2.0 |
-| windows_x86_64_msvc | 0.52.6 | MIT OR Apache-2.0 |
-| windows_x86_64_msvc | 0.53.1 | MIT OR Apache-2.0 |
 | winnow | 0.5.40 | MIT |
 | winnow | 0.7.15 | MIT |
 | winnow | 1.0.4 | MIT |
