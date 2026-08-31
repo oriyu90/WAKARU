@@ -188,5 +188,25 @@
       "embedding": "Search",
       "organizer": "Text organizing"
     }
+  },
+  "illustrator": {
+    "openADocument": "Open a document to see its explanation.",
+    "detail": "Detail",
+    "simple": "Simple",
+    "standard": "Standard",
+    "detailed": "Detailed",
+    "regenerate": "Regenerate",
+    "visionOff": "No vision: explaining from text only",
+    "cached": "Saved explanation",
+    "willExplain": "Opening a page explains it automatically.",
+    "past": "Past conversation ({{count}})",
+    "scope": "Scope",
+    "scopePage": "This page",
+    "scopeSource": "This source",
+    "scopeProject": "Whole project",
+    "stop": "Stop",
+    "ask": "Ask a question…",
+    "send": "Send",
+    "toStudio": "Send to Studio"
   }
 }

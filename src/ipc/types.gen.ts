@@ -18,7 +18,15 @@ export type AppError = { code: string, message: string, i18nKey: string, details
 
 export type AppInfo = { version: string, buildDate: string, dataDir: string, license: string, };
 
+export type AskInput = { projectId: string, threadId: string, text: string, scope: Scope, };
+
+export type ChatMessage = { id: string, role: string, content: string, citations: Citation[], model: string | null, status: string, createdAt: string, };
+
+export type Citation = { sourceId: string, sourceName: string, documentId: string | null, chunkId: string | null, locator: unknown, quote: string | null, };
+
 export type CreateProjectInput = { name: string, description: string | null, color: ProjectColor | null, };
+
+export type DetailLevel = "simple" | "standard" | "detailed";
 
 /**
  * One page/slide/segment/sheet/section returned by `source_get_document`.
@@ -35,6 +43,33 @@ imageUrl: string | null, locator: unknown, };
  */
 export type DocumentUnit = { id: string, sourceId: string, ordinal: number, kind: string, title: string | null, text: string, imageRel: string | null, locator: unknown, };
 
+export type GenerateInput = { projectId: string, sourceId: string, locator: unknown, level: DetailLevel, force: boolean, };
+
+export type GenerateStarted = { 
+/**
+ * Set when generation started streaming; deltas arrive on `stream://*`.
+ */
+streamId: string | null, 
+/**
+ * Set when the answer came straight from the cache (no AI call).
+ */
+cached: Illustration | null, };
+
+/**
+ * The saved page explanation (docs/03 §4 `illustrations`).
+ */
+export type Illustration = { content: string, citations: Citation[], level: DetailLevel, model: string, createdAt: string, 
+/**
+ * true when this came from the cache (docs/06 §5.2 — "保存された解説").
+ */
+cached: boolean, };
+
+export type ImportToStudioInput = { projectId: string, threadId: string, 
+/**
+ * "new_tab" | "append"
+ */
+mode: string, targetTabId: string | null, };
+
 export type Job = { id: string, kind: JobKind, status: JobStatus, projectId: string | null, sourceId: string | null, phase: string | null, done: number, total: number, message: string | null, startedAt: string | null, endedAt: string | null, };
 
 export type JobKind = "ingest" | "transcribe" | "embed" | "export" | "import";
@@ -45,6 +80,8 @@ export type JobKind = "ingest" | "transcribe" | "embed" | "export" | "import";
 export type JobProgress = { jobId: string, projectId: string | null, sourceId: string | null, kind: JobKind, phase: string, done: number, total: number, message: string | null, };
 
 export type JobStatus = "queued" | "running" | "done" | "failed" | "cancelled";
+
+export type Locator = { "t": "page", page: number, bbox: [number, number, number, number] | null, } | { "t": "time", tStart: number, tEnd: number, speaker: string | null, } | { "t": "region", bbox: [number, number, number, number], } | { "t": "cell", sheet: string, range: string, } | { "t": "line", start: number, end: number, } | { "t": "path", pointer: string, } | { "t": "anchor", selector: string, char_start: number | null, char_end: number | null, } | { "t": "whole" };
 
 export type OpenTabInput = { projectId: string, sourceId: string, locator: unknown | null, };
 
@@ -70,6 +107,8 @@ export type Role = "chat" | "vision" | "embedding" | "organizer";
 export type RoleBinding = { profileId: string, model: string, params: Record<string, unknown>, };
 
 export type RoleBindings = { chat: RoleBinding | null, vision: RoleBinding | null, embedding: RoleBinding | null, organizer: RoleBinding | null, };
+
+export type Scope = "page" | "source" | "project";
 
 export type SearchHit = { projectId: string, projectName: string, sourceId: string, sourceName: string, documentId: string | null, ordinal: number | null, snippet: string, locator: unknown, };
 
@@ -110,6 +149,11 @@ export type SourceStatus = "queued" | "analyzing" | "ready" | "ready_partial" | 
 export type SourceStatusEvent = { projectId: string, sourceId: string, status: SourceStatus, errorCode: string | null, };
 
 /**
+ * `stream://citations` payload.
+ */
+export type StreamCitations = { streamId: string, messageId: string, citations: Citation[], };
+
+/**
  * `stream://delta` payload (docs/02 §5).
  */
 export type StreamDelta = { streamId: string, 
@@ -129,6 +173,8 @@ export type StreamDone = { streamId: string, cancelled: boolean, truncated: bool
 export type StreamError = { streamId: string, error: AppError, };
 
 export type TestResult = { ok: boolean, models: Array<string>, latencyMs: number, supportsVision: boolean, supportsTools: boolean, supportsEmbed: boolean, jsonSchema: boolean, note: string | null, };
+
+export type Thread = { id: string, scope: string, sourceId: string | null, locatorKey: string | null, title: string, messages: Array<ChatMessage>, };
 
 export type TokenUsage = { promptTokens: number, completionTokens: number, };
 

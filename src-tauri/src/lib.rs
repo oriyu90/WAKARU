@@ -99,6 +99,11 @@ pub fn run() {
             commands::ai_cancel_request,
             commands::ai_debug_chat,
             commands::search_query,
+            commands::illustrator_get_or_create_thread,
+            commands::illustrator_generate,
+            commands::illustrator_ask,
+            commands::illustrator_cancel,
+            commands::illustrator_import_to_studio,
         ])
         .run(tauri::generate_context!())
         .expect("error while running WAKARU");

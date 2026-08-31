@@ -4,6 +4,7 @@
 
 mod ai;
 mod app;
+mod illustrator;
 mod projects;
 mod search;
 mod sources;
@@ -11,6 +12,7 @@ mod viewer;
 
 pub use ai::*;
 pub use app::*;
+pub use illustrator::*;
 pub use projects::*;
 pub use search::*;
 pub use sources::*;

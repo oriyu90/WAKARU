@@ -5,7 +5,9 @@
 use serde::{Deserialize, Serialize};
 
 pub mod ai;
+pub mod illustrator;
 pub mod job;
+pub mod locator;
 pub mod project;
 pub mod search;
 pub mod source;

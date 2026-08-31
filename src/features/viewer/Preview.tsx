@@ -171,10 +171,12 @@ function PagedPreview({
   projectId,
   tab,
   total,
+  onContext,
 }: {
   projectId: string;
   tab: ViewerTab;
   total: number;
+  onContext?: (c: { sourceId: string; locator: unknown; position?: string }) => void;
 }) {
   const { t } = useTranslation();
   const [page, setPage] = useState(
@@ -204,7 +206,13 @@ function PagedPreview({
       tabId: tab.id,
       locator: { t: "page", page: clamped },
     }).catch(() => {});
-  }, [clamped, projectId, tab.id]);
+    onContext?.({
+      sourceId: tab.sourceId,
+      locator: { t: "page", page: clamped },
+      position: `${clamped} / ${total}`,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clamped, projectId, tab.id, total]);
 
   return (
     <div className={styles.wrap}>
@@ -374,11 +382,27 @@ function ReadingPreview({
 
 const TEXTY: SourceKind[] = ["text", "code", "json", "jsonl"];
 
-export function Preview({ projectId, tab }: { projectId: string; tab: ViewerTab }) {
+export function Preview({
+  projectId,
+  tab,
+  onContext,
+}: {
+  projectId: string;
+  tab: ViewerTab;
+  onContext?: (c: { sourceId: string; locator: unknown; position?: string }) => void;
+}) {
   const detail = useQuery({
     queryKey: ["source-detail", projectId, tab.sourceId],
     queryFn: () => documentApi.detail(projectId, tab.sourceId),
   });
+
+  const paged = detail.data?.kind === "pdf" || detail.data?.kind === "slides";
+  useEffect(() => {
+    if (detail.data && !paged) {
+      onContext?.({ sourceId: tab.sourceId, locator: { t: "whole" } });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail.data?.id, paged]);
 
   if (detail.isLoading) return <LoadingRows />;
   if (detail.isError)
@@ -396,7 +420,7 @@ export function Preview({ projectId, tab }: { projectId: string; tab: ViewerTab 
     return <ReadingPreview projectId={projectId} detail={d} originalUrl={d.url} />;
   }
   if (d.kind === "pdf" || d.kind === "slides") {
-    return <PagedPreview projectId={projectId} tab={tab} total={d.pageCount ?? 1} />;
+    return <PagedPreview projectId={projectId} tab={tab} total={d.pageCount ?? 1} onContext={onContext} />;
   }
   if (d.kind === "markdown") {
     return <TextPreview projectId={projectId} tab={tab} markdown />;

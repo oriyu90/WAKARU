@@ -5,11 +5,19 @@ import { HomeIcon, CloseIcon, FileIcon } from "../../app/Icons";
 import { Drawer } from "../../components/Drawer";
 import { useUiStore } from "../../stores/ui";
 import { viewerApi } from "../../ipc/viewer";
+import { aiApi } from "../../ipc/ai";
 import { inTauri } from "../../ipc/client";
 import type { ViewerTab } from "../../ipc/types.gen";
 import { SourceListPanel } from "../project/SourceListPanel";
 import { Preview } from "./Preview";
+import { IllustratorDrawer } from "./IllustratorDrawer";
 import styles from "./Viewer.module.css";
+
+export type PreviewContext = {
+  sourceId: string;
+  locator: unknown;
+  position?: string;
+};
 
 const HOME = "__home__";
 
@@ -19,7 +27,22 @@ export function Viewer({ projectId }: { projectId: string }) {
   const [active, setActive] = useState<string>(HOME);
   const illustratorEnabled = useUiStore((s) => s.illustratorEnabled);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [ctx, setCtx] = useState<PreviewContext | null>(null);
   const stripRef = useRef<HTMLDivElement>(null);
+
+  const visionRole = useQuery({
+    queryKey: ["ai-bindings"],
+    queryFn: aiApi.getRoleBindings,
+    enabled: inTauri && illustratorEnabled,
+  });
+  const profiles = useQuery({
+    queryKey: ["ai-profiles"],
+    queryFn: aiApi.listProfiles,
+    enabled: inTauri && illustratorEnabled,
+  });
+  const chatProfileId = visionRole.data?.chat?.profileId;
+  const visionSupported =
+    profiles.data?.find((p) => p.id === chatProfileId)?.supportsVision ?? false;
 
   const tabs = useQuery({
     queryKey: ["viewer-tabs", projectId],
@@ -114,7 +137,7 @@ export function Viewer({ projectId }: { projectId: string }) {
           {active === HOME || !activeTab ? (
             <SourceListPanel projectId={projectId} onOpen={openTab} />
           ) : (
-            <Preview projectId={projectId} tab={activeTab} />
+            <Preview projectId={projectId} tab={activeTab} onContext={setCtx} />
           )}
         </div>
 
@@ -132,9 +155,13 @@ export function Viewer({ projectId }: { projectId: string }) {
               onClose={() => setDrawerOpen(false)}
               label={t("viewer.illustrator")}
             >
-              <div className={styles.drawerBody}>
-                <p>{t("viewer.illustratorSoon")}</p>
-              </div>
+              <IllustratorDrawer
+                projectId={projectId}
+                sourceId={ctx?.sourceId ?? activeTab?.sourceId ?? null}
+                locator={ctx?.locator ?? activeTab?.locator ?? { t: "whole" }}
+                position={ctx?.position}
+                visionSupported={visionSupported}
+              />
             </Drawer>
           </>
         ) : null}

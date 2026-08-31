@@ -186,5 +186,25 @@
       "embedding": "検索",
       "organizer": "テキスト整形"
     }
+  },
+  "illustrator": {
+    "openADocument": "資料を開くと解説が表示されます。",
+    "detail": "詳細度",
+    "simple": "かんたん",
+    "standard": "標準",
+    "detailed": "くわしい",
+    "regenerate": "再生成",
+    "visionOff": "Vision非対応：テキストのみで解説しています",
+    "cached": "保存された解説",
+    "willExplain": "ページを開くと自動で解説します。",
+    "past": "過去の会話（{{count}}件）",
+    "scope": "参照範囲",
+    "scopePage": "このページ",
+    "scopeSource": "このソース",
+    "scopeProject": "プロジェクト全体",
+    "stop": "停止",
+    "ask": "質問する…",
+    "send": "送信",
+    "toStudio": "Studioへ送る"
   }
 }
