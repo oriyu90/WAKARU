@@ -29,3 +29,6 @@ dist-ssr
 *.log
 .DS_Store
 /coverage
+
+# tsc
+*.tsbuildinfo
