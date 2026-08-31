@@ -2,6 +2,7 @@ pub mod assets;
 pub mod ai;
 pub mod chunk;
 pub mod embed;
+pub mod export;
 pub mod file_modifier;
 pub mod illustrator;
 pub mod ingest;

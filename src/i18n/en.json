@@ -294,5 +294,21 @@
     "body": "A local-first tool for ingesting your own documents, explaining the page you're on, and working from them with citations. Pick a language and theme. You can set up an AI connection any time.",
     "setUpAi": "Set up AI",
     "start": "Get started"
+  },
+  "pm": {
+    "import": "Import (ZIP)",
+    "selectAll": "Select all",
+    "selectedN": "{{count}} selected",
+    "exportZip": "Download as ZIP",
+    "archive": "Archive",
+    "unarchive": "Restore",
+    "delete": "Delete",
+    "exported": "Exported {{count}}",
+    "imported": "Imported",
+    "importFailed": "Import failed — check the ZIP",
+    "deleteTitle": "Delete projects",
+    "deleteOne": "Permanently delete \"{{name}}\". This can't be undone. Type the project name to confirm.",
+    "deleteManyLabel": "Permanently delete {{count}} projects. Type the count.",
+    "embeddingsNote": "Exports don't include embedding vectors — they're recomputed after import."
   }
 }

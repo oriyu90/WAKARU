@@ -45,6 +45,12 @@ imageUrl: string | null, locator: unknown, };
  */
 export type DocumentUnit = { id: string, sourceId: string, ordinal: number, kind: string, title: string | null, text: string, imageRel: string | null, locator: unknown, };
 
+export type ExportEstimate = { projectId: string, bytesWithoutEmbeddings: bigint, bytesWithEmbeddings: bigint, };
+
+export type ExportInput = { ids: Array<string>, destDir: string, includeEmbeddings: boolean, };
+
+export type ExportResult = { files: Array<string>, };
+
 export type General = { 
 /**
  * "home" | "last_project"
@@ -249,6 +255,8 @@ whisperModel: string,
 language: string, hardwareAccel: boolean, };
 
 export type UpdateProjectInput = { id: string, name: string | null, description: string | null, color: ProjectColor | null, };
+
+export type VersionVerdict = "accept" | "migrate" | "warnOpen" | "reject";
 
 export type ViewerTab = { id: string, sourceId: string, kind: SourceKind, name: string, locator: unknown, pinned: boolean, ordinal: number, };
 

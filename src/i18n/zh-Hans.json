@@ -292,5 +292,21 @@
     "body": "一款本地优先的工具：导入你的资料，讲解你正在看的页面，并带引用地进行对话与创作。请选择语言和主题，AI 连接可稍后设置。",
     "setUpAi": "设置 AI",
     "start": "开始"
+  },
+  "pm": {
+    "import": "导入（ZIP）",
+    "selectAll": "全选",
+    "selectedN": "已选 {{count}} 项",
+    "exportZip": "下载为 ZIP",
+    "archive": "归档",
+    "unarchive": "恢复",
+    "delete": "删除",
+    "exported": "已导出 {{count}} 项",
+    "imported": "已导入",
+    "importFailed": "导入失败——请检查 ZIP",
+    "deleteTitle": "删除项目",
+    "deleteOne": "将永久删除「{{name}}」，无法撤销。请输入项目名称确认。",
+    "deleteManyLabel": "将永久删除 {{count}} 个项目，请输入数量。",
+    "embeddingsNote": "导出不含嵌入向量，导入后会自动重新计算。"
   }
 }

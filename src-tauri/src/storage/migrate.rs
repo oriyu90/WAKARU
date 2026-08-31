@@ -61,6 +61,29 @@ pub fn run(conn: &Connection, migrations: &[(&str, &str)], target_version: &str)
     Ok(())
 }
 
+/// Compare a `schemaVersion` (semver "M.m.p") against the current one — the
+/// four-case policy from docs/03 §6.3. Import decides what to do from this.
+pub fn version_verdict(stored: &str, current: &str) -> crate::domain::export::VersionVerdict {
+    use crate::domain::export::VersionVerdict::*;
+    let parse = |v: &str| -> (u32, u32, u32) {
+        let mut it = v.split('.').map(|p| p.parse::<u32>().unwrap_or(0));
+        (it.next().unwrap_or(0), it.next().unwrap_or(0), it.next().unwrap_or(0))
+    };
+    let (sm, sn, _sp) = parse(stored);
+    let (cm, cn, _cp) = parse(current);
+    if sm > cm {
+        Reject
+    } else if sm < cm {
+        Migrate
+    } else if sn > cn {
+        WarnOpen
+    } else if sn < cn {
+        Migrate
+    } else {
+        Accept
+    }
+}
+
 pub fn now_iso8601() -> String {
     use time::format_description::well_known::Rfc3339;
     time::OffsetDateTime::now_utc()
@@ -100,6 +123,16 @@ mod tests {
             )
             .unwrap();
         assert_eq!(v, "1.0.0");
+    }
+
+    #[test]
+    fn version_verdict_covers_the_four_cases() {
+        use crate::domain::export::VersionVerdict::*;
+        assert_eq!(version_verdict("1.0.0", "1.0.0"), Accept);
+        assert_eq!(version_verdict("2.0.0", "1.0.0"), Reject); // newer major
+        assert_eq!(version_verdict("1.4.0", "1.2.0"), WarnOpen); // newer minor
+        assert_eq!(version_verdict("1.1.0", "1.2.0"), Migrate); // older minor
+        assert_eq!(version_verdict("0.9.0", "1.0.0"), Migrate); // older major
     }
 
     #[test]

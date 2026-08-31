@@ -11,6 +11,7 @@ import i18n from "../../i18n";
 import { AiSettings } from "./AiSettings";
 import { About } from "./About";
 import { Shortcuts } from "./Shortcuts";
+import { ProjectManagement } from "./ProjectManagement";
 import { useAppSettings } from "./useAppSettings";
 import styles from "./SettingsPage.module.css";
 
@@ -127,7 +128,7 @@ export function SettingsPage() {
           <p className={styles.placeholder}>{t("settings.comingIn", { phase: 5 })}</p>
         )}
         {section === "mcp" && <p className={styles.placeholder}>{t("settings.comingIn", { phase: 7 })}</p>}
-        {section === "projects" && <p className={styles.placeholder}>{t("settings.comingIn", { phase: 10 })}</p>}
+        {section === "projects" && <ProjectManagement />}
 
         {section === "language" && (
           <div className={styles.group}>
