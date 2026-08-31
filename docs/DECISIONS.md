@@ -144,3 +144,14 @@
 - **理由**: FOUC 回避。表示系はマシンローカルの見た目設定でありエクスポート対象でもない。`docs/07 §1` の分割は実装都合として許容範囲。
 - **影響**: `stores/ui.ts`（表示系 + `illustratorEnabled` のミラー）、`domain/settings.rs` / `services/settings.rs`（表示系フィールドを持たない）、`main.tsx` が localStorage から初回ブートストラップ。
 - **差し戻し条件**: 表示系もエクスポート/同期したい要件が出たら、初回ブート用の同期キャッシュを別途持ちつつバックエンドを正とする方式へ。
+
+## D-13 · Studio のチャットはトークンストリーミングせず、リクエスト/レスポンスの反復ループにする
+
+- **日付**: 2026-09-01
+- **論点**: Live Illustrator は `stream://delta` でトークンを流している。Studio でも同じ体験にするか、`studio_send` が10反復のツールループを回し切って結果を返す同期方式にするか。
+- **選択肢**: A) `stream://tool_call` / `stream://tool_result` を含むフルストリーミング + `useStream` 相当を Studio 用に実装 ／ B) `studio_send` がループを回し切って `StudioSendResult` を返す。承認待ち（`write_file`）と10反復キャップは、末尾 assistant メッセージの `status`（`pending_approval` / `needs_continue`）と `studio_resolve_tool` で表現。フロントは成功時にタブ+アーティファクトを再取得。
+- **採用**: B
+- **理由**: P6 の受け入れ基準（AC-6-1..11）にトークンストリーミング要件はない。10反復キャップ・ツール承認の割り込み・コンテキスト予算での要約（AC-6-9）はいずれも同期の方が実装が単純で、DB 駆動なので IPC 境界をまたいだ再開（承認後の続行）が自然に書ける。`studio_cancel` は `StreamRegistry::start_keyed("studio:<tabId>")` のトークンで対応。
+- **影響**: `services/studio.rs`（`run_loop` は毎パス `messages` を読み書きし、モデル await をまたいで `Connection` を保持しない）、`commands/studio.rs`、`domain/studio.rs`、`features/studio/Studio.tsx`（`useMutation` ベース、承認カードは返ってきた `pending_approval` メッセージから描画）。`stream://tool_call` / `stream://tool_result` イベントは P6 では発火しない（契約には残す）。
+- **付随**: コンテキスト予算（AC-6-9）の「要約」は別 LLM 呼び出しではなく抽出的圧縮（古い順に落として `role: 内容` を1600字まで連結し `system` メッセージ化）。直近の user ターン以降は必ず保持。`fit_budget` にユニットテストあり。
+- **差し戻し条件**: 長い回答での体感待ち時間が問題になったら、`run_loop` 内の `chat_stream` コールバックから `stream://delta` を流し、`Studio.tsx` に購読を足す（ループ構造は変えずに済む）。

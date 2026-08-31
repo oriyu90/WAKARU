@@ -21,7 +21,22 @@ export type PreviewContext = {
 
 const HOME = "__home__";
 
-export function Viewer({ projectId }: { projectId: string }) {
+/** A request from elsewhere (e.g. a Studio citation) to open a source at a
+ * locator. `nonce` changes each time so repeat clicks on the same source
+ * re-fire the effect. */
+export type ViewerFocusRequest = {
+  sourceId: string;
+  locator?: unknown;
+  nonce: number;
+};
+
+export function Viewer({
+  projectId,
+  focusRequest,
+}: {
+  projectId: string;
+  focusRequest?: ViewerFocusRequest | null;
+}) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [active, setActive] = useState<string>(HOME);
@@ -61,6 +76,26 @@ export function Viewer({ projectId }: { projectId: string }) {
     await qc.invalidateQueries({ queryKey: ["viewer-tabs", projectId] });
     setActive((cur) => (cur === tabId ? HOME : cur));
   };
+
+  // Open + focus a source when asked from outside (Studio citation jump).
+  useEffect(() => {
+    if (!focusRequest || !inTauri) return;
+    let cancelled = false;
+    void (async () => {
+      const tab = await viewerApi.openTab(
+        projectId,
+        focusRequest.sourceId,
+        focusRequest.locator ?? undefined,
+      );
+      if (cancelled) return;
+      await qc.invalidateQueries({ queryKey: ["viewer-tabs", projectId] });
+      setActive(tab.id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRequest?.nonce]);
 
   // Keep the active tab scrolled into view.
   useEffect(() => {

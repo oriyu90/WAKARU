@@ -218,7 +218,7 @@ pub async fn text_to_markdown(
             })
             .await;
         match res {
-            Ok((usage, truncated)) => {
+            Ok((usage, truncated, _)) => {
                 let _ = app.emit("stream://done", StreamDone { stream_id: sid.clone(), cancelled: token.is_cancelled(), truncated, usage });
             }
             Err(e) => {

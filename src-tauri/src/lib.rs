@@ -114,6 +114,17 @@ pub fn run() {
             commands::illustrator_ask,
             commands::illustrator_cancel,
             commands::illustrator_import_to_studio,
+            commands::studio_list_tabs,
+            commands::studio_create_tab,
+            commands::studio_rename_tab,
+            commands::studio_close_tab,
+            commands::studio_reorder_tabs,
+            commands::studio_send,
+            commands::studio_cancel,
+            commands::studio_resolve_tool,
+            commands::studio_list_artifacts,
+            commands::studio_import_artifact_as_source,
+            commands::studio_download_artifact,
         ])
         .run(tauri::generate_context!())
         .expect("error while running WAKARU");

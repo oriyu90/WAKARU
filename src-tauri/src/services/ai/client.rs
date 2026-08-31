@@ -17,6 +17,15 @@ pub struct AiClient {
     extra_headers: Vec<(String, String)>,
 }
 
+/// A function/tool call the model asked for during a stream (fragments are
+/// reassembled by `index`).
+#[derive(Debug, Clone, Default)]
+pub struct StreamedToolCall {
+    pub id: String,
+    pub name: String,
+    pub arguments: String,
+}
+
 impl AiClient {
     pub fn new(base_url: &str, key: Option<String>, extra_headers: Vec<(String, String)>, timeout_ms: u32) -> AppResult<Self> {
         let http = reqwest::Client::builder()
@@ -94,8 +103,11 @@ impl AiClient {
     }
 
     /// Stream a chat completion. `on_delta(kind, text)` is called per token
-    /// chunk. Returns `(usage, truncated)`. A dropped connection before
-    /// `[DONE]` is `truncated = true`, not an error (docs/05 §1.4).
+    /// chunk. Returns `(usage, truncated, tool_calls)`. A dropped connection
+    /// before `[DONE]` is `truncated = true`, not an error (docs/05 §1.4).
+    /// `tool_calls` is populated when the model chooses to call a tool — the
+    /// streamed fragments are reassembled by their `index` (docs/05 §4.3,
+    /// Studio 10-iteration loop).
     pub async fn chat_stream(
         &self,
         model: &str,
@@ -103,7 +115,7 @@ impl AiClient {
         params: &Value,
         cancel: &CancellationToken,
         mut on_delta: impl FnMut(&str, &str),
-    ) -> AppResult<(Option<TokenUsage>, bool)> {
+    ) -> AppResult<(Option<TokenUsage>, bool, Vec<StreamedToolCall>)> {
         let mut body = json!({
             "model": model,
             "messages": messages,
@@ -130,6 +142,9 @@ impl AiClient {
         let mut stream = resp.bytes_stream().eventsource();
         let mut usage = None;
         let mut truncated = true; // until we see [DONE]
+        // Reassembled by streamed `index`; kept dense so `into_iter` yields them
+        // in call order.
+        let mut tool_calls: Vec<StreamedToolCall> = Vec::new();
 
         loop {
             tokio::select! {
@@ -164,12 +179,34 @@ impl AiClient {
                                 if !txt.is_empty() { on_delta("reasoning", txt); }
                             }
                         }
+                        if let Some(calls) = delta.get("tool_calls").and_then(|c| c.as_array()) {
+                            for call in calls {
+                                let idx = call.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as usize;
+                                if tool_calls.len() <= idx {
+                                    tool_calls.resize(idx + 1, StreamedToolCall::default());
+                                }
+                                let slot = &mut tool_calls[idx];
+                                if let Some(id) = call.get("id").and_then(|i| i.as_str()) {
+                                    if !id.is_empty() { slot.id = id.to_string(); }
+                                }
+                                if let Some(f) = call.get("function") {
+                                    if let Some(name) = f.get("name").and_then(|n| n.as_str()) {
+                                        if !name.is_empty() { slot.name.push_str(name); }
+                                    }
+                                    if let Some(args) = f.get("arguments").and_then(|a| a.as_str()) {
+                                        slot.arguments.push_str(args);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
 
-        Ok((usage, truncated))
+        // Drop any empty slots the model never filled (defensive — sparse index).
+        tool_calls.retain(|c| !c.name.is_empty());
+        Ok((usage, truncated, tool_calls))
     }
 }
 

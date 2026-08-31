@@ -43,6 +43,12 @@ pub struct ChatMessage {
     pub model: Option<String>,
     pub status: String,
     pub created_at: String,
+    /// Present on a Studio assistant turn that proposed tool calls (P6). Shape is
+    /// `{ id, name, arguments }[]`; `unknown` here because MCP tool calls (P7)
+    /// may extend it. `null` for every Live Illustrator message.
+    #[serde(default)]
+    #[ts(type = "{ id: string; name: string; arguments: unknown }[] | null")]
+    pub tool_calls: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, ts_rs::TS)]

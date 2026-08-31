@@ -11,4 +11,5 @@ pub mod retrieval;
 pub mod search;
 pub mod settings;
 pub mod sources;
+pub mod studio;
 pub mod viewer;

@@ -92,7 +92,7 @@ fn load_thread(project_db: &Connection, thread_id: &str) -> AppResult<Thread> {
             .ok_or_else(|| AppError::new("THREAD_NOT_FOUND", "error.thread.notFound", thread_id))?;
 
     let mut stmt = project_db.prepare(
-        "SELECT id, role, content, citations, model, status, created_at
+        "SELECT id, role, content, citations, model, status, created_at, tool_calls
          FROM messages WHERE thread_id = ?1 ORDER BY created_at",
     )?;
     let messages: Vec<ChatMessage> = stmt
@@ -105,6 +105,9 @@ fn load_thread(project_db: &Connection, thread_id: &str) -> AppResult<Thread> {
                 model: r.get(4)?,
                 status: r.get(5)?,
                 created_at: r.get(6)?,
+                tool_calls: r
+                    .get::<_, Option<String>>(7)?
+                    .and_then(|s| serde_json::from_str(&s).ok()),
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -208,7 +211,7 @@ fn finish_generate(
     app: &AppHandle,
     reg: &StreamRegistry,
     stream_id: &str,
-    res: AppResult<(Option<TokenUsage>, bool)>,
+    res: AppResult<(Option<TokenUsage>, bool, Vec<crate::services::ai::client::StreamedToolCall>)>,
     content: String,
     projects_root: &Path,
     project_id: &str,
@@ -219,7 +222,7 @@ fn finish_generate(
     model: &str,
 ) {
     match res {
-        Ok((usage, truncated)) => {
+        Ok((usage, truncated, _tool_calls)) => {
             if !content.trim().is_empty() {
                 if let Ok(db) = projects::open_db(projects_root, project_id) {
                     let cites = serde_json::json!([]); // page explanation cites the page implicitly
@@ -360,7 +363,7 @@ pub async fn ask(
                     msg_id,
                     content,
                     serde_json::to_string(&citations).unwrap_or("[]".into()),
-                    if matches!(res, Ok((_, true))) { "complete" } else if res.is_err() { "error" } else { "complete" }
+                    if matches!(res, Ok((_, true, _))) { "complete" } else if res.is_err() { "error" } else { "complete" }
                 ],
             );
             let _ = db.execute("UPDATE threads SET updated_at=?2 WHERE id=?1", params![thread_id, now_iso8601()]);
@@ -372,7 +375,7 @@ pub async fn ask(
         });
 
         match res {
-            Ok((usage, truncated)) => {
+            Ok((usage, truncated, _)) => {
                 let _ = app.emit("stream://done", StreamDone { stream_id: sid.clone(), cancelled: token.is_cancelled(), truncated, usage });
             }
             Err(e) => emit_error(&app, &sid, e, &reg),
@@ -503,7 +506,7 @@ fn build_page_context(
     Ok(PageContext { source_name, position, text: body })
 }
 
-fn build_rag_block(items: &[retrieval::HybridHit], lang: &str) -> String {
+pub(crate) fn build_rag_block(items: &[retrieval::HybridHit], lang: &str) -> String {
     let head = match lang {
         "ja" => "以下は資料からの抜粋です。回答では必ず [S1] のような形で出典を示してください。",
         "zh-Hans" | "zh" => "以下是资料摘录。回答时请用 [S1] 之类的形式标注出处。",
@@ -538,7 +541,7 @@ fn rag_system(lang: &str, project: &str) -> String {
 
 /// Map `[S1]`, `[S2]`… in the answer to real citations, dropping tags with no
 /// backing context item (I-5).
-fn resolve_citations(text: &str, items: &[retrieval::HybridHit]) -> Vec<Citation> {
+pub(crate) fn resolve_citations(text: &str, items: &[retrieval::HybridHit]) -> Vec<Citation> {
     let mut used = std::collections::BTreeSet::new();
     let bytes = text.as_bytes();
     let mut i = 0;

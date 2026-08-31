@@ -29,6 +29,14 @@ impl StreamRegistry {
         self.inner.lock().unwrap().insert(id.clone(), token.clone());
         (id, token)
     }
+    /// Register a token under a caller-chosen key (Studio uses `studio:<tabId>`
+    /// so `studio_cancel` can stop a running tool loop it never saw an id for).
+    /// Any existing token under the key is replaced.
+    pub fn start_keyed(&self, key: &str) -> CancellationToken {
+        let token = CancellationToken::new();
+        self.inner.lock().unwrap().insert(key.to_string(), token.clone());
+        token
+    }
     pub fn cancel(&self, id: &str) -> bool {
         if let Some(t) = self.inner.lock().unwrap().get(id) {
             t.cancel();
@@ -114,7 +122,7 @@ pub async fn stream_chat(
         .await;
 
     match res {
-        Ok((usage, truncated)) => {
+        Ok((usage, truncated, _)) => {
             let _ = app.emit(
                 "stream://done",
                 StreamDone {

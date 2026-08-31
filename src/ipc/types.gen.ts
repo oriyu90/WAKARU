@@ -20,9 +20,21 @@ export type AppError = { code: string, message: string, i18nKey: string, details
 
 export type AppInfo = { version: string, buildDate: string, dataDir: string, license: string, };
 
+/**
+ * A file produced in `workspace/` by a Studio tool call (FR-T7). Survives the
+ * tab that made it (AC-6-10).
+ */
+export type Artifact = { id: string, threadId: string | null, relPath: string, bytes: number, mime: string | null, importedSourceId: string | null, createdAt: string, };
+
 export type AskInput = { projectId: string, threadId: string, text: string, scope: Scope, };
 
-export type ChatMessage = { id: string, role: string, content: string, citations: Citation[], model: string | null, status: string, createdAt: string, };
+export type ChatMessage = { id: string, role: string, content: string, citations: Citation[], model: string | null, status: string, createdAt: string, 
+/**
+ * Present on a Studio assistant turn that proposed tool calls (P6). Shape is
+ * `{ id, name, arguments }[]`; `unknown` here because MCP tool calls (P7)
+ * may extend it. `null` for every Live Illustrator message.
+ */
+toolCalls: { id: string; name: string; arguments: unknown }[] | null, };
 
 export type Citation = { sourceId: string, sourceName: string, documentId: string | null, chunkId: string | null, locator: unknown, quote: string | null, };
 
@@ -235,6 +247,46 @@ export type StreamDone = { streamId: string, cancelled: boolean, truncated: bool
  * `stream://error` payload.
  */
 export type StreamError = { streamId: string, error: AppError, };
+
+export type StudioSendInput = { projectId: string, tabId: string, text: string, 
+/**
+ * `"project"` or `"source:<id>"`.
+ */
+scope: string, };
+
+/**
+ * Returned by `studio_send` / `studio_resolve_tool`. The frontend refetches
+ * tabs + artifacts on success; this is the loop's own summary of what happened.
+ */
+export type StudioSendResult = { 
+/**
+ * How many model round-trips the loop ran (0..=10).
+ */
+iterations: number, 
+/**
+ * The loop stopped at the 10-iteration cap with tool calls still pending —
+ * the frontend shows a "続行" button (AC-6-8).
+ */
+needsContinue: boolean, 
+/**
+ * A `write_file` call is waiting for the reader's approval (AC-6-5 card).
+ */
+awaitingApproval: boolean, 
+/**
+ * The reader cancelled mid-loop (`studio_cancel`).
+ */
+cancelled: boolean, 
+/**
+ * Convenience: how many context messages were folded into a summary this
+ * turn (AC-6-9). 0 when nothing was trimmed.
+ */
+summarisedMessages: number, };
+
+export type StudioTab = { id: string, threadId: string, title: string, ordinal: number, 
+/**
+ * `"project"` or `"source:<id>"` (docs/06 §6 scope selector).
+ */
+scope: string, messages: Array<ChatMessage>, };
 
 export type TestResult = { ok: boolean, models: Array<string>, latencyMs: number, supportsVision: boolean, supportsTools: boolean, supportsEmbed: boolean, jsonSchema: boolean, note: string | null, };
 

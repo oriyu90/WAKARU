@@ -5,8 +5,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Tabs } from "../../components/Tabs";
 import { ErrorState } from "../../components/ErrorState";
 import { projectsApi } from "../../ipc/projects";
+import { sourcesApi } from "../../ipc/sources";
 import { inTauri } from "../../ipc/client";
+import type { Citation } from "../../ipc/types.gen";
 import { Viewer } from "../viewer/Viewer";
+import type { ViewerFocusRequest } from "../viewer/Viewer";
+import { Studio } from "../studio/Studio";
 import styles from "./ProjectPage.module.css";
 
 type Pane = "viewer" | "studio";
@@ -15,10 +19,17 @@ export function ProjectPage() {
   const { projectId } = useParams();
   const { t } = useTranslation();
   const [pane, setPane] = useState<Pane>("viewer");
+  const [focus, setFocus] = useState<ViewerFocusRequest | null>(null);
 
   const project = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => projectsApi.open(projectId!),
+    enabled: inTauri && !!projectId,
+  });
+
+  const sources = useQuery({
+    queryKey: ["sources", projectId],
+    queryFn: () => sourcesApi.list(projectId!),
     enabled: inTauri && !!projectId,
   });
 
@@ -38,6 +49,12 @@ export function ProjectPage() {
     );
   }
 
+  const onCitation = (c: Citation) => {
+    if (!c.sourceId) return;
+    setFocus({ sourceId: c.sourceId, locator: c.locator, nonce: Date.now() });
+    setPane("viewer");
+  };
+
   return (
     <div className={styles.page}>
       <div className={styles.paneBar}>
@@ -54,11 +71,17 @@ export function ProjectPage() {
       </div>
 
       <div className={styles.paneBody}>
-        {pane === "viewer" ? (
-          <Viewer projectId={projectId} />
-        ) : (
-          <p className={styles.placeholder}>{t("project.studioPlaceholder")}</p>
-        )}
+        <div hidden={pane !== "viewer"} className={styles.paneFill}>
+          <Viewer projectId={projectId} focusRequest={focus} />
+        </div>
+        <div hidden={pane !== "studio"} className={styles.paneFill}>
+          <Studio
+            projectId={projectId}
+            projectName={project.data?.name ?? ""}
+            sources={sources.data ?? []}
+            onCitation={onCitation}
+          />
+        </div>
       </div>
     </div>
   );

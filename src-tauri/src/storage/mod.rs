@@ -16,8 +16,10 @@ pub const APP_MIGRATIONS: &[(&str, &str)] =
     &[("001_init", include_str!("../../migrations/app/001_init.sql"))];
 
 /// Per-project database migrations.
-pub const PROJECT_MIGRATIONS: &[(&str, &str)] =
-    &[("001_init", include_str!("../../migrations/project/001_init.sql"))];
+pub const PROJECT_MIGRATIONS: &[(&str, &str)] = &[
+    ("001_init", include_str!("../../migrations/project/001_init.sql")),
+    ("002_studio", include_str!("../../migrations/project/002_studio.sql")),
+];
 
 /// Open a `project.db`, run its migrations. Called when a project is opened.
 pub fn open_project_db(path: &Path) -> AppResult<Connection> {

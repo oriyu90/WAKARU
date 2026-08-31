@@ -11,6 +11,7 @@ mod projects;
 mod search;
 mod settings;
 mod sources;
+mod studio;
 mod viewer;
 
 pub use ai::*;
@@ -22,4 +23,5 @@ pub use projects::*;
 pub use search::*;
 pub use settings::*;
 pub use sources::*;
+pub use studio::*;
 pub use viewer::*;
