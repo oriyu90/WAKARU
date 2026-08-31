@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . && node scripts/check-design-rules.mjs",
+    "lint": "eslint . && node scripts/check-design-rules.mjs && node scripts/check-hardcoded.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "check:contrast": "node scripts/check-contrast.mjs",

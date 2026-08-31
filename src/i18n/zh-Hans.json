@@ -84,7 +84,15 @@
     "illustrator": "启用实时讲解",
     "section": {
       "appearance": "显示",
-      "ai": "AI"
+      "ai": "AI",
+      "general": "常规",
+      "transcription": "转录",
+      "mcp": "MCP",
+      "language": "语言",
+      "illustrator": "实时讲解",
+      "projects": "项目管理",
+      "shortcuts": "快捷键",
+      "about": "关于"
     },
     "themeLabel": "显示模式",
     "light": "浅色",
@@ -93,7 +101,18 @@
     "displaySize": "显示大小",
     "readingFont": "阅读字体",
     "monochrome": "单色",
-    "uiLanguage": "界面语言"
+    "uiLanguage": "界面语言",
+    "startupView": "启动界面",
+    "startupHome": "主页",
+    "startupLast": "上次打开的项目",
+    "checkUpdates": "启动时检查更新",
+    "comingIn": "此设置将在 Phase {{phase}} 添加。",
+    "aiResponseLang": "AI 回复语言",
+    "aiResponseHint": "讲解与对话使用的语言，可与界面语言分开设置。",
+    "followUi": "跟随界面语言",
+    "matchSource": "跟随资料语言",
+    "prefetch": "预取下一页",
+    "carryOver": "沿用上一页的对话"
   },
   "common": {
     "loading": "加载中",
@@ -206,5 +225,37 @@
     "ask": "提问…",
     "send": "发送",
     "toStudio": "发送到工作台"
+  },
+  "about": {
+    "version": "版本",
+    "license": "许可",
+    "dataDir": "数据文件夹",
+    "official": "官方 X",
+    "community": "社区 Discord",
+    "site": "网站",
+    "network": "WAKARU 会连接的地方",
+    "net1": "你登记的 AI / MCP 服务器",
+    "net2": "抓取你明确添加的网页链接",
+    "net3": "whisper / 嵌入模型下载（仅在你操作时）",
+    "net4": "更新检查（可关闭）",
+    "thirdParty": "使用的软件"
+  },
+  "shortcut": {
+    "sidebar": "开关侧栏",
+    "palette": "命令面板",
+    "findInPreview": "预览内查找",
+    "globalSearch": "全局搜索",
+    "closeTab": "关闭标签页",
+    "newStudioTab": "新建工作台标签",
+    "illustrator": "开关实时讲解",
+    "settings": "设置",
+    "pageNav": "翻页",
+    "dismiss": "关闭"
+  },
+  "wizard": {
+    "title": "欢迎使用 WAKARU",
+    "body": "一款本地优先的工具：导入你的资料，讲解你正在看的页面，并带引用地进行对话与创作。请选择语言和主题，AI 连接可稍后设置。",
+    "setUpAi": "设置 AI",
+    "start": "开始"
   }
 }

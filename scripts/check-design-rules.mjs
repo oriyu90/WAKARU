@@ -47,6 +47,11 @@ function walk(dir) {
       ) {
         fail(rel, line, "`outline: none` — a focus style must replace it", text);
       }
+      // Monochrome (docs/07 §3, D-07): the #app `filter` reparents `position:
+      // fixed` descendants, so the app uses `position: absolute` everywhere.
+      if (/position:\s*fixed/.test(text) && !text.trimStart().startsWith("/*")) {
+        fail(rel, line, "`position: fixed` is banned — monochrome filter breaks it (use absolute inside #app)", text);
+      }
       if (ALLOW_RAW.has(rel)) return;
       if (ext === ".css") {
         if (RAW_COLOR.test(text) && !/var\(--/.test(text) && !text.trimStart().startsWith("/*") && !/oklch\(0% 0 0/.test(text)) {

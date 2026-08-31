@@ -86,7 +86,15 @@
     "illustrator": "Enable Live Illustrator",
     "section": {
       "appearance": "Appearance",
-      "ai": "AI"
+      "ai": "AI",
+      "general": "General",
+      "transcription": "Transcription",
+      "mcp": "MCP",
+      "language": "Language",
+      "illustrator": "Live Illustrator",
+      "projects": "Project management",
+      "shortcuts": "Shortcuts",
+      "about": "About"
     },
     "themeLabel": "Theme",
     "light": "Light",
@@ -95,7 +103,18 @@
     "displaySize": "Display size",
     "readingFont": "Reading font",
     "monochrome": "Monochrome",
-    "uiLanguage": "Interface language"
+    "uiLanguage": "Interface language",
+    "startupView": "Startup screen",
+    "startupHome": "Home",
+    "startupLast": "Last opened project",
+    "checkUpdates": "Check for updates on start",
+    "comingIn": "This setting arrives in Phase {{phase}}.",
+    "aiResponseLang": "AI response language",
+    "aiResponseHint": "Language for explanations and chat — separate from the UI language.",
+    "followUi": "Follow UI language",
+    "matchSource": "Match the source language",
+    "prefetch": "Prefetch the next page",
+    "carryOver": "Carry over the previous page's conversation"
   },
   "common": {
     "loading": "Loading",
@@ -208,5 +227,37 @@
     "ask": "Ask a question…",
     "send": "Send",
     "toStudio": "Send to Studio"
+  },
+  "about": {
+    "version": "Version",
+    "license": "License",
+    "dataDir": "Data folder",
+    "official": "Official X",
+    "community": "Community Discord",
+    "site": "Website",
+    "network": "Where WAKARU connects",
+    "net1": "AI / MCP servers you registered",
+    "net2": "Fetching web links you explicitly added",
+    "net3": "whisper / embedding model downloads (on your action only)",
+    "net4": "Update check (can be turned off)",
+    "thirdParty": "Software in use"
+  },
+  "shortcut": {
+    "sidebar": "Toggle sidebar",
+    "palette": "Command palette",
+    "findInPreview": "Find in preview",
+    "globalSearch": "Global search",
+    "closeTab": "Close tab",
+    "newStudioTab": "New Studio tab",
+    "illustrator": "Toggle Live Illustrator",
+    "settings": "Settings",
+    "pageNav": "Page navigation",
+    "dismiss": "Dismiss / close"
+  },
+  "wizard": {
+    "title": "Welcome to WAKARU",
+    "body": "A local-first tool for ingesting your own documents, explaining the page you're on, and working from them with citations. Pick a language and theme. You can set up an AI connection any time.",
+    "setUpAi": "Set up AI",
+    "start": "Get started"
   }
 }

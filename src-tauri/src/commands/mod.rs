@@ -7,6 +7,7 @@ mod app;
 mod illustrator;
 mod projects;
 mod search;
+mod settings;
 mod sources;
 mod viewer;
 
@@ -15,5 +16,6 @@ pub use app::*;
 pub use illustrator::*;
 pub use projects::*;
 pub use search::*;
+pub use settings::*;
 pub use sources::*;
 pub use viewer::*;

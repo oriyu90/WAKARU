@@ -84,7 +84,15 @@
     "illustrator": "ライブ解説を有効化",
     "section": {
       "appearance": "表示",
-      "ai": "AI"
+      "ai": "AI",
+      "general": "一般",
+      "transcription": "文字起こし",
+      "mcp": "MCP",
+      "language": "言語",
+      "illustrator": "ライブ解説",
+      "projects": "プロジェクト管理",
+      "shortcuts": "ショートカット",
+      "about": "このアプリについて"
     },
     "themeLabel": "表示モード",
     "light": "ライト",
@@ -93,7 +101,18 @@
     "displaySize": "表示サイズ",
     "readingFont": "読み物フォント",
     "monochrome": "モノトーン",
-    "uiLanguage": "表示言語"
+    "uiLanguage": "表示言語",
+    "startupView": "起動時の画面",
+    "startupHome": "ホーム",
+    "startupLast": "最後に開いたプロジェクト",
+    "checkUpdates": "起動時に更新を確認",
+    "comingIn": "この設定は Phase {{phase}} で追加されます。",
+    "aiResponseLang": "AI の回答言語",
+    "aiResponseHint": "解説やチャットの言語。UI 言語と別に設定できます。",
+    "followUi": "UI 言語に合わせる",
+    "matchSource": "資料の言語に合わせる",
+    "prefetch": "次のページを先読み",
+    "carryOver": "前ページの会話を引き継ぐ"
   },
   "common": {
     "loading": "読み込み中",
@@ -206,5 +225,37 @@
     "ask": "質問する…",
     "send": "送信",
     "toStudio": "Studioへ送る"
+  },
+  "about": {
+    "version": "バージョン",
+    "license": "ライセンス",
+    "dataDir": "データ保存先",
+    "official": "公式 X",
+    "community": "コミュニティ Discord",
+    "site": "紹介サイト",
+    "network": "WAKARU が通信する先",
+    "net1": "登録した AI / MCP サーバー",
+    "net2": "明示的に追加した Web リンクの取得",
+    "net3": "whisper / 埋め込みモデルのダウンロード（操作時のみ）",
+    "net4": "更新チェック（設定でオフ可）",
+    "thirdParty": "使用しているソフトウェア"
+  },
+  "shortcut": {
+    "sidebar": "サイドバー開閉",
+    "palette": "コマンドパレット",
+    "findInPreview": "プレビュー内検索",
+    "globalSearch": "横断検索",
+    "closeTab": "タブを閉じる",
+    "newStudioTab": "Studio タブを追加",
+    "illustrator": "ライブ解説の開閉",
+    "settings": "設定",
+    "pageNav": "ページ送り",
+    "dismiss": "閉じる"
+  },
+  "wizard": {
+    "title": "WAKARU へようこそ",
+    "body": "手元の資料を取り込み、いま見ているページを解説させ、根拠付きで対話・制作できるローカルファーストのツールです。言語とテーマを選んでください。AI 接続は後からでも設定できます。",
+    "setUpAi": "AI を設定",
+    "start": "始める"
   }
 }

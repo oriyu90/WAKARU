@@ -15,6 +15,7 @@ import {
   SettingsIcon,
   FileIcon,
 } from "./Icons";
+import { FirstRun } from "./FirstRun";
 import styles from "./AppShell.module.css";
 
 const isMac =
@@ -159,6 +160,7 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+      <FirstRun />
     </div>
   );
 }

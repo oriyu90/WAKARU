@@ -134,3 +134,13 @@
 - **理由**: (1) D-09 でページのラスタライズを見送っており、Viewer に「Vision に渡すページ画像」がそもそも無い。(2) Vision 解析は取り込みブロッキングタスクに AI HTTP を持ち込み、構造化出力のパース・コスト制御・縮退が必要で規模が大きい。(3) テキスト層のある PDF/DOCX/PPTX/表計算/テキストでは抽出テキストで解説・検索が実用になる。画像ソースは Vision 無しでは「解析なし」表示になるが、閲覧はできる。
 - **影響**: `services/ingest/`（Vision 呼び出しを追加しない）、Live Illustrator は抽出テキストから解説（ページ画像は送らない）、ドロワーに「Vision非対応：テキストのみで解説」バナー（chat ロールの `supportsVision` が false のとき）。`AC-4-9` はバナー表示で満たす。`AC-1` の画像フィクスチャは `ready_partial` のまま。
 - **差し戻し条件**: D-09（ラスタライズ）を実装したら、その上で Vision 解析を取り込みに追加し D-nn で更新。
+
+## D-12 · 表示系設定（テーマ・表示サイズ・モノトーン・読み物フォント）はクライアント側 localStorage に置く
+
+- **日付**: 2026-08-31
+- **論点**: `docs/07 §1` の `Settings.display` はバックエンド `app.db` に置く前提。しかしテーマ/スケール/モノトーンは React マウント前に `<html>` へ適用しないと初回描画でちらつく（FOUC）。バックエンドから非同期取得すると必ず一瞬デフォルト表示になる。
+- **選択肢**: A) すべてバックエンド `Settings` に集約 ／ B) 表示系だけ `localStorage`（`wakaru.ui`, `stores/ui.ts`）に置き、それ以外（general/language/illustrator/ingest/sandbox/transcription/ai_budget）はバックエンド `Settings`（`app_get_settings`/`app_update_settings` + `settings://changed`）
+- **採用**: B
+- **理由**: FOUC 回避。表示系はマシンローカルの見た目設定でありエクスポート対象でもない。`docs/07 §1` の分割は実装都合として許容範囲。
+- **影響**: `stores/ui.ts`（表示系 + `illustratorEnabled` のミラー）、`domain/settings.rs` / `services/settings.rs`（表示系フィールドを持たない）、`main.tsx` が localStorage から初回ブートストラップ。
+- **差し戻し条件**: 表示系もエクスポート/同期したい要件が出たら、初回ブート用の同期キャッシュを別途持ちつつバックエンドを正とする方式へ。

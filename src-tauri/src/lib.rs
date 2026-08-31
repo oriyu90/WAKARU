@@ -99,6 +99,8 @@ pub fn run() {
             commands::ai_cancel_request,
             commands::ai_debug_chat,
             commands::search_query,
+            commands::app_get_settings,
+            commands::app_update_settings,
             commands::illustrator_get_or_create_thread,
             commands::illustrator_generate,
             commands::illustrator_ask,

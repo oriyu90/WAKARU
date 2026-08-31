@@ -10,6 +10,7 @@ pub mod job;
 pub mod locator;
 pub mod project;
 pub mod search;
+pub mod settings;
 pub mod source;
 pub mod viewer;
 

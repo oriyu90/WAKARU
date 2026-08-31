@@ -7,7 +7,7 @@ export function FileModifierPage() {
     <section className={styles.page}>
       <h1 className={styles.title}>{t("fileModifier.title")}</h1>
       <p className={styles.subtitle}>{t("fileModifier.subtitle")}</p>
-      <p className={styles.note}>Image → PDF and Text → MD/TXT arrive in Phase 8.</p>
+      <p className={styles.note}>{t("settings.comingIn", { phase: 8 })}</p>
     </section>
   );
 }

@@ -7,5 +7,6 @@ pub mod ingest;
 pub mod projects;
 pub mod retrieval;
 pub mod search;
+pub mod settings;
 pub mod sources;
 pub mod viewer;
