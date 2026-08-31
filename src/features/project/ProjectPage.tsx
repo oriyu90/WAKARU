@@ -6,7 +6,7 @@ import { Tabs } from "../../components/Tabs";
 import { ErrorState } from "../../components/ErrorState";
 import { projectsApi } from "../../ipc/projects";
 import { inTauri } from "../../ipc/client";
-import { SourceListPanel } from "./SourceListPanel";
+import { Viewer } from "../viewer/Viewer";
 import styles from "./ProjectPage.module.css";
 
 type Pane = "viewer" | "studio";
@@ -55,7 +55,7 @@ export function ProjectPage() {
 
       <div className={styles.paneBody}>
         {pane === "viewer" ? (
-          <SourceListPanel projectId={projectId} />
+          <Viewer projectId={projectId} />
         ) : (
           <p className={styles.placeholder}>{t("project.studioPlaceholder")}</p>
         )}

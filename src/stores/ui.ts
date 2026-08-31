@@ -10,6 +10,8 @@ type UiState = {
   scale: Scale;
   monochrome: boolean;
   readingFont: ReadingFont;
+  /** Live Illustrator global toggle (FR-L1). Backed by app settings in Phase 9. */
+  illustratorEnabled: boolean;
   openSidebar: () => void;
   closeSidebar: () => void;
   toggleSidebar: () => void;
@@ -17,11 +19,15 @@ type UiState = {
   setScale: (s: Scale) => void;
   setMonochrome: (v: boolean) => void;
   setReadingFont: (f: ReadingFont) => void;
+  setIllustratorEnabled: (v: boolean) => void;
 };
 
 const KEY = "wakaru.ui";
 
-type Persisted = Pick<UiState, "theme" | "scale" | "monochrome" | "readingFont">;
+type Persisted = Pick<
+  UiState,
+  "theme" | "scale" | "monochrome" | "readingFont" | "illustratorEnabled"
+>;
 
 function load(): Persisted {
   const fallback: Persisted = {
@@ -29,6 +35,7 @@ function load(): Persisted {
     scale: 100,
     monochrome: false,
     readingFont: "serif",
+    illustratorEnabled: false,
   };
   try {
     const raw = localStorage.getItem(KEY);
@@ -71,11 +78,15 @@ export const useUiStore = create<UiState>((set, get) => ({
     set({ readingFont });
     persist(get);
   },
+  setIllustratorEnabled: (illustratorEnabled) => {
+    set({ illustratorEnabled });
+    persist(get);
+  },
 }));
 
 function persist(get: () => UiState) {
-  const { theme, scale, monochrome, readingFont } = get();
-  save({ theme, scale, monochrome, readingFont });
+  const { theme, scale, monochrome, readingFont, illustratorEnabled } = get();
+  save({ theme, scale, monochrome, readingFont, illustratorEnabled });
 }
 
 /** Resolve `system` against the OS preference. */

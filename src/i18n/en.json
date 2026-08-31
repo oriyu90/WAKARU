@@ -72,7 +72,8 @@
     "placeholder": "Search across every project"
   },
   "settings": {
-    "title": "Settings"
+    "title": "Settings",
+    "illustrator": "Enable Live Illustrator"
   },
   "common": {
     "loading": "Loading",
@@ -114,5 +115,21 @@
     "SOURCE_DUPLICATE": "That file is already in this project.",
     "SOURCE_UNSUPPORTED_FORMAT": "This format isn't supported.",
     "PROJECT_DELETE_NAME_MISMATCH": "The project name doesn't match."
+  },
+  "viewer": {
+    "readonly": "Read-only",
+    "find": "Find…",
+    "wrap": "Wrap",
+    "nowrap": "No wrap",
+    "showSource": "Show source",
+    "showRendered": "Rendered",
+    "prevPage": "Previous page",
+    "nextPage": "Next page",
+    "rasterDeferred": "Page-image rendering isn't in this build yet — showing the extracted text.",
+    "openOriginal": "Open original URL",
+    "sourceList": "Source list",
+    "illustrator": "Live Illustrator",
+    "illustratorHandle": "Open Live Illustrator",
+    "illustratorSoon": "Live Illustrator arrives in Phase 4."
   }
 }

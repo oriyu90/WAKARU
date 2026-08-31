@@ -1,0 +1,117 @@
+.viewer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.strip {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-3xs);
+  height: var(--tab-height);
+  padding-inline: var(--space-2xs);
+  border-bottom: var(--rule-1) solid var(--color-rule);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  min-width: 6rem;
+  max-width: 14rem;
+  padding-inline: var(--space-xs);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--color-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab[data-active="true"] {
+  color: var(--color-ink-strong);
+  border-bottom-color: var(--color-accent);
+}
+@media (hover: hover) {
+  .tab:hover {
+    color: var(--color-ink);
+  }
+}
+.tab:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: -3px;
+  border-radius: var(--radius-sm);
+}
+.homeTab {
+  min-width: unset;
+  padding-inline: var(--space-sm);
+}
+.tabName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tabClose {
+  display: inline-flex;
+  border: none;
+  background: none;
+  padding: var(--space-3xs);
+  border-radius: var(--radius-sm);
+  color: var(--color-neutral);
+  cursor: pointer;
+  opacity: 0;
+}
+.tab:hover .tabClose,
+.tab[data-active="true"] .tabClose,
+.tab:focus-within .tabClose {
+  opacity: 1;
+}
+@media (hover: hover) {
+  .tabClose:hover {
+    background: var(--color-paper-3);
+    color: var(--color-ink);
+  }
+}
+
+.stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  background: var(--color-paper);
+}
+
+.handle {
+  flex: none;
+  inline-size: 0.5rem;
+  border: none;
+  border-inline-start: var(--rule-1) solid var(--color-rule);
+  background: var(--color-paper-2);
+  cursor: ew-resize;
+  transition: background-color var(--dur-short) var(--ease-out);
+}
+@media (hover: hover) {
+  .handle:hover {
+    background: var(--color-accent-weak);
+  }
+}
+.handle:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.drawerBody {
+  padding: var(--space-lg);
+  font-size: var(--fs-sm);
+  color: var(--color-muted);
+}

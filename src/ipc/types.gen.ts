@@ -9,6 +9,15 @@ export type AppInfo = { version: string, buildDate: string, dataDir: string, lic
 export type CreateProjectInput = { name: string, description: string | null, color: ProjectColor | null, };
 
 /**
+ * One page/slide/segment/sheet/section returned by `source_get_document`.
+ */
+export type DocumentPayload = { sourceId: string, ordinal: number, total: number, kind: string, title: string | null, text: string, 
+/**
+ * `wakaru-asset://` URL for the page image, when one exists.
+ */
+imageUrl: string | null, locator: unknown, };
+
+/**
  * A page / slide / segment / sheet / section — the citation unit (docs/03 §2 GLOSSARY).
  * Returned by `source_get_document` (wired in Phase 2).
  */
@@ -25,6 +34,8 @@ export type JobProgress = { jobId: string, projectId: string | null, sourceId: s
 
 export type JobStatus = "queued" | "running" | "done" | "failed" | "cancelled";
 
+export type OpenTabInput = { projectId: string, sourceId: string, locator: unknown | null, };
+
 export type Project = { id: string, name: string, description: string, color: ProjectColor, schemaVersion: string, createdAt: string, updatedAt: string, openedAt: string | null, archivedAt: string | null, sortOrder: number, };
 
 /**
@@ -40,6 +51,17 @@ export type ProjectSummary = { id: string, name: string, description: string, co
 
 export type Source = { id: string, kind: SourceKind, originalName: string, url: string | null, mime: string | null, bytes: number, sha256: string | null, status: SourceStatus, errorCode: string | null, errorMessage: string | null, lang: string | null, pageCount: number | null, durationMs: number | null, summary: string | null, addedAt: string, analyzedAt: string | null, };
 
+/**
+ * Lightweight source detail for a preview header (name, kind, page count,
+ * the reader-view asset URL for web links, etc.).
+ */
+export type SourceDetail = { id: string, kind: SourceKind, name: string, url: string | null, pageCount: number | null, status: SourceStatus, 
+/**
+ * `wakaru-asset://` URL to the primary rendered/original file, if any:
+ * the normalised image, or the saved web reader markdown.
+ */
+primaryAssetUrl: string | null, };
+
 export type SourceKind = "pdf" | "slides" | "doc" | "image" | "audio" | "video" | "sheet" | "text" | "markdown" | "json" | "jsonl" | "code" | "weblink";
 
 export type SourceStatus = "queued" | "analyzing" | "ready" | "ready_partial" | "failed";
@@ -50,3 +72,5 @@ export type SourceStatus = "queued" | "analyzing" | "ready" | "ready_partial" | 
 export type SourceStatusEvent = { projectId: string, sourceId: string, status: SourceStatus, errorCode: string | null, };
 
 export type UpdateProjectInput = { id: string, name: string | null, description: string | null, color: ProjectColor | null, };
+
+export type ViewerTab = { id: string, sourceId: string, kind: SourceKind, name: string, locator: unknown, pinned: boolean, ordinal: number, };

@@ -16,7 +16,13 @@ import type { SourceStatusEvent } from "../../ipc/types.gen";
 import { SourceRow } from "./SourceRow";
 import styles from "./SourceList.module.css";
 
-export function SourceListPanel({ projectId }: { projectId: string }) {
+export function SourceListPanel({
+  projectId,
+  onOpen,
+}: {
+  projectId: string;
+  onOpen?: (sourceId: string) => void;
+}) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const toast = useToast();
@@ -146,6 +152,7 @@ export function SourceListPanel({ projectId }: { projectId: string }) {
               <SourceRow
                 key={s.id}
                 source={s}
+                onOpen={onOpen ? () => onOpen(s.id) : undefined}
                 onReanalyze={() => reanalyze.mutate(s.id)}
                 onDelete={() => del.mutate(s.id)}
               />

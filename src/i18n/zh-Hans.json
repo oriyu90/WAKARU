@@ -70,7 +70,8 @@
     "placeholder": "在所有项目中搜索"
   },
   "settings": {
-    "title": "设置"
+    "title": "设置",
+    "illustrator": "启用实时讲解"
   },
   "common": {
     "loading": "加载中",
@@ -112,5 +113,21 @@
     "SOURCE_DUPLICATE": "该文件已存在于此项目。",
     "SOURCE_UNSUPPORTED_FORMAT": "不支持此格式。",
     "PROJECT_DELETE_NAME_MISMATCH": "项目名称不匹配。"
+  },
+  "viewer": {
+    "readonly": "只读",
+    "find": "查找…",
+    "wrap": "自动换行",
+    "nowrap": "取消换行",
+    "showSource": "显示源码",
+    "showRendered": "渲染视图",
+    "prevPage": "上一页",
+    "nextPage": "下一页",
+    "rasterDeferred": "此版本尚不支持页面图像渲染，当前显示提取的文本。",
+    "openOriginal": "打开原始网址",
+    "sourceList": "资料列表",
+    "illustrator": "实时讲解",
+    "illustratorHandle": "打开实时讲解",
+    "illustratorSoon": "实时讲解将在 Phase 4 实现。"
   }
 }

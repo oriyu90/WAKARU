@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub mod job;
 pub mod project;
 pub mod source;
+pub mod viewer;
 
 pub use job::*;
 

@@ -19,24 +19,38 @@ function formatBytes(n: number, lang: string) {
 
 export function SourceRow({
   source,
+  onOpen,
   onReanalyze,
   onDelete,
 }: {
   source: Source;
+  onOpen?: () => void;
   onReanalyze: () => void;
   onDelete: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const failed = source.status === "failed";
+  const openable = !failed && !!onOpen;
 
   return (
     <div className={styles.row} data-failed={failed}>
       <span className={styles.rowGlyph}>
         <StatusGlyph status={source.status} />
       </span>
-      <span className={styles.rowName} title={source.originalName}>
-        {source.originalName}
-      </span>
+      {openable ? (
+        <button
+          type="button"
+          className={`${styles.rowName} ${styles.rowNameButton}`}
+          title={source.originalName}
+          onClick={onOpen}
+        >
+          {source.originalName}
+        </button>
+      ) : (
+        <span className={styles.rowName} title={source.originalName}>
+          {source.originalName}
+        </span>
+      )}
       <span className={styles.rowKind}>{t(`sourceKind.${source.kind}`)}</span>
       <span className={`${styles.rowBytes} u-mono-nums`}>
         {formatBytes(source.bytes, i18n.language)}

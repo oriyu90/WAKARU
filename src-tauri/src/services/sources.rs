@@ -488,7 +488,7 @@ pub fn kind_to_str(k: SourceKind) -> &'static str {
     }
 }
 
-fn kind_from_str(s: &str) -> SourceKind {
+pub fn kind_from_str(s: &str) -> SourceKind {
     match s {
         "pdf" => SourceKind::Pdf,
         "slides" => SourceKind::Slides,

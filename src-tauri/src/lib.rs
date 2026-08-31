@@ -28,6 +28,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .register_uri_scheme_protocol(services::assets::SCHEME, |ctx, request| {
+            asset_response(ctx.app_handle(), request)
+        })
         .setup(|app| {
             let handle = app.handle();
 
@@ -75,7 +78,55 @@ pub fn run() {
             commands::source_add_url,
             commands::source_reanalyze,
             commands::source_delete,
+            commands::source_get_document,
+            commands::source_detail,
+            commands::source_asset_url,
+            commands::viewer_get_tabs,
+            commands::viewer_open_tab,
+            commands::viewer_close_tab,
+            commands::viewer_update_locator,
+            commands::viewer_pin_tab,
+            commands::viewer_reorder_tabs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running WAKARU");
+}
+
+/// Serve a `wakaru-asset://` request from a project's sandboxed files.
+fn asset_response(
+    app: &tauri::AppHandle,
+    request: tauri::http::Request<Vec<u8>>,
+) -> tauri::http::Response<std::borrow::Cow<'static, [u8]>> {
+    use tauri::http::{Response, StatusCode};
+    let not_found = || {
+        Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(std::borrow::Cow::Borrowed(&b""[..]))
+            .unwrap()
+    };
+
+    let Some(state) = app.try_state::<AppState>() else {
+        return not_found();
+    };
+    // request.uri() -> wakaru-asset://localhost/<pid>/<sid>/<rel...>
+    let path = request.uri().path().to_string();
+    let resolved = match services::assets::resolve(&state.projects_dir, &path) {
+        Ok(p) => p,
+        Err(e) => {
+            tracing::warn!(path, code = %e.code, "asset request denied");
+            return Response::builder()
+                .status(StatusCode::FORBIDDEN)
+                .body(std::borrow::Cow::Borrowed(&b""[..]))
+                .unwrap();
+        }
+    };
+    match std::fs::read(&resolved) {
+        Ok(bytes) => Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", services::assets::content_type(&resolved))
+            .header("Cache-Control", "no-cache")
+            .body(std::borrow::Cow::Owned(bytes))
+            .unwrap(),
+        Err(_) => not_found(),
+    }
 }

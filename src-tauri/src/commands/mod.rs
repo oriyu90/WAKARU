@@ -5,7 +5,9 @@
 mod app;
 mod projects;
 mod sources;
+mod viewer;
 
 pub use app::*;
 pub use projects::*;
 pub use sources::*;
+pub use viewer::*;

@@ -70,7 +70,8 @@
     "placeholder": "すべてのプロジェクトを横断して検索"
   },
   "settings": {
-    "title": "設定"
+    "title": "設定",
+    "illustrator": "ライブ解説を有効化"
   },
   "common": {
     "loading": "読み込み中",
@@ -112,5 +113,21 @@
     "SOURCE_DUPLICATE": "このファイルはすでにこのプロジェクトにあります。",
     "SOURCE_UNSUPPORTED_FORMAT": "この形式には対応していません。",
     "PROJECT_DELETE_NAME_MISMATCH": "プロジェクト名が一致しません。"
+  },
+  "viewer": {
+    "readonly": "閲覧専用",
+    "find": "検索…",
+    "wrap": "折り返し",
+    "nowrap": "折り返し解除",
+    "showSource": "ソースを表示",
+    "showRendered": "整形表示",
+    "prevPage": "前のページ",
+    "nextPage": "次のページ",
+    "rasterDeferred": "このビルドではページ画像の描画は未対応です。抽出テキストを表示しています。",
+    "openOriginal": "元のURLを開く",
+    "sourceList": "ソース一覧",
+    "illustrator": "ライブ解説",
+    "illustratorHandle": "ライブ解説を開く",
+    "illustratorSoon": "ライブ解説は Phase 4 で実装されます。"
   }
 }

@@ -84,6 +84,15 @@ export function SettingsPage() {
             />
           </div>
 
+          <div className={styles.switchRow}>
+            <span className={styles.switchLabel}>{t("settings.illustrator")}</span>
+            <Switch
+              label={t("settings.illustrator")}
+              checked={ui.illustratorEnabled}
+              onChange={(e) => ui.setIllustratorEnabled(e.target.checked)}
+            />
+          </div>
+
           <Field label="Interface language">
             {({ id }) => (
               <Select
