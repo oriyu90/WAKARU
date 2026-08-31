@@ -38,6 +38,12 @@ toolCalls: { id: string; name: string; arguments: unknown }[] | null, };
 
 export type Citation = { sourceId: string, sourceName: string, documentId: string | null, chunkId: string | null, locator: unknown, quote: string | null, };
 
+export type CommandOutput = { stdout: string, stderr: string, exitCode: number | null, timedOut: boolean, 
+/**
+ * One or both streams hit [`MAX_OUTPUT_BYTES`] and were cut.
+ */
+truncated: boolean, };
+
 export type CreateProjectInput = { name: string, description: string | null, color: ProjectColor | null, };
 
 export type DetailLevel = "simple" | "standard" | "detailed";
@@ -148,6 +154,40 @@ ui: string,
 aiResponse: string, };
 
 export type Locator = { "t": "page", page: number, bbox: [number, number, number, number] | null, } | { "t": "time", tStart: number, tEnd: number, speaker: string | null, } | { "t": "region", bbox: [number, number, number, number], } | { "t": "cell", sheet: string, range: string, } | { "t": "line", start: number, end: number, } | { "t": "path", pointer: string, } | { "t": "anchor", selector: string, char_start: number | null, char_end: number | null, } | { "t": "whole" };
+
+export type McpConnectResult = { tools: Array<McpTool>, };
+
+export type McpServer = { id: string, name: string, 
+/**
+ * `"stdio"` (supported) or `"http"` (deferred — DECISIONS D-14).
+ */
+transport: string, command: string | null, args: Array<string>, url: string | null, 
+/**
+ * Names of env vars this server sets (values are not exposed — a value may
+ * be a `keychain:<ref>`).
+ */
+envKeys: Array<string>, enabled: boolean, connected: boolean, lastError: string | null, };
+
+export type McpTool = { serverId: string, serverName: string, 
+/**
+ * The tool's own name, as the server reports it.
+ */
+name: string, description: string | null, 
+/**
+ * `"<serverSlug>__<name>"` — what the model sees (docs/05 §6.3).
+ */
+qualifiedName: string, 
+/**
+ * `"ask"` | `"always_allow"` | `"deny"`.
+ */
+policy: string, };
+
+export type McpUpsertInput = { id: string | null, name: string, transport: string, command: string | null, args: Array<string>, url: string | null, 
+/**
+ * `name -> value`. A value of `keychain:<ref>` is resolved from the OS
+ * keychain at connect time; anything else is stored as-is.
+ */
+env: Record<string, string>, };
 
 export type OpenTabInput = { projectId: string, sourceId: string, locator: unknown | null, };
 

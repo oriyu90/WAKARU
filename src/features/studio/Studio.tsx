@@ -414,10 +414,17 @@ function MessageRow({
         <section className={styles.approval} aria-label={t("studio.approvalTitle")}>
           <strong>{t("studio.approvalTitle")}</strong>
           <p>{t("studio.approvalBody")}</p>
-          <p className={styles.approvalTool}>{t("studio.toolWriteFile")}</p>
-          <pre className={styles.approvalArgs}>
-            {calls.map((c) => JSON.stringify(c.arguments, null, 2)).join("\n")}
-          </pre>
+          {calls.map((c, i) => (
+            <div key={c.id ?? i}>
+              <p className={styles.approvalTool}>{c.name}</p>
+              {/* Full arguments, never abbreviated (AC-7-2). */}
+              <pre className={styles.approvalArgs}>
+                {typeof c.arguments === "string"
+                  ? c.arguments
+                  : JSON.stringify(c.arguments, null, 2)}
+              </pre>
+            </div>
+          ))}
           <div className={styles.approvalActions}>
             <Button variant="primary" onClick={onAllow} loading={busy}>
               {t("studio.allow")}

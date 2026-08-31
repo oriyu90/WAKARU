@@ -10,6 +10,7 @@ pub mod export;
 pub mod file_modifier;
 pub mod job;
 pub mod locator;
+pub mod mcp;
 pub mod project;
 pub mod search;
 pub mod settings;

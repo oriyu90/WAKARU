@@ -153,6 +153,8 @@
     "close": "閉じる",
     "save": "保存",
     "saved": "保存済み",
+    "edit": "編集",
+    "delete": "削除",
     "details": "詳細"
   },
   "sourceKind": {
@@ -288,8 +290,8 @@
       "tool": "ツール"
     },
     "toolResult": "ツールの結果",
-    "approvalTitle": "ファイル書き込みを許可しますか？",
-    "approvalBody": "アシスタントが作業領域にファイルを書き込もうとしています。",
+    "approvalTitle": "この操作を許可しますか？",
+    "approvalBody": "アシスタントがツールを実行しようとしています。下の引数を確認してください。",
     "toolWriteFile": "write_file",
     "allow": "許可",
     "deny": "拒否",
@@ -304,6 +306,28 @@
     "downloaded": "{{path}} に保存しました",
     "importFailed": "そのファイルを取り込めませんでした。",
     "cancelled": "停止しました。"
+  },
+  "mcp": {
+    "stdioOnly": "このリリースでは stdio の MCP サーバのみ対応します。サーバは手動で接続し、失敗してもそのサーバだけが切り離されます。",
+    "empty": "MCP サーバがありません",
+    "emptyBody": "ローカルの MCP サーバを追加すると、Studio で追加のツールが使えます。",
+    "connected": "接続済み",
+    "disconnected": "未接続",
+    "connect": "接続",
+    "disconnect": "切断",
+    "add": "サーバを追加",
+    "addServer": "MCP サーバを追加",
+    "editServer": "MCP サーバを編集",
+    "name": "名前",
+    "command": "コマンド",
+    "commandHint": "絶対パスまたは PATH 上の名前。シェルを介さず起動します。",
+    "args": "引数",
+    "env": "環境変数",
+    "envHint": "1 行に NAME=value を 1 つ。値は OS のキーチェーンに保存され、平文にはなりません。",
+    "policy": "承認",
+    "policyAsk": "毎回確認",
+    "policyAllow": "常に許可",
+    "policyDeny": "拒否"
   },
   "about": {
     "version": "バージョン",

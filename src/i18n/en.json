@@ -155,6 +155,8 @@
     "close": "Close",
     "save": "Save",
     "saved": "Saved",
+    "edit": "Edit",
+    "delete": "Delete",
     "details": "Details"
   },
   "sourceKind": {
@@ -291,8 +293,8 @@
       "tool": "Tool"
     },
     "toolResult": "Tool result",
-    "approvalTitle": "Approve file write?",
-    "approvalBody": "The assistant wants to write a file into the workspace.",
+    "approvalTitle": "Approve this action?",
+    "approvalBody": "The assistant wants to run a tool. Review the arguments below.",
     "toolWriteFile": "write_file",
     "allow": "Allow",
     "deny": "Deny",
@@ -308,6 +310,28 @@
     "downloaded": "Saved to {{path}}",
     "importFailed": "Couldn't import that file.",
     "cancelled": "Stopped."
+  },
+  "mcp": {
+    "stdioOnly": "Only stdio MCP servers are supported in this release. Servers connect on demand; a server that fails isolates to itself.",
+    "empty": "No MCP servers",
+    "emptyBody": "Add a local MCP server to give Studio extra tools.",
+    "connected": "Connected",
+    "disconnected": "Not connected",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "add": "Add server",
+    "addServer": "Add MCP server",
+    "editServer": "Edit MCP server",
+    "name": "Name",
+    "command": "Command",
+    "commandHint": "Absolute path or a name on PATH. Started without a shell.",
+    "args": "Arguments",
+    "env": "Environment",
+    "envHint": "One NAME=value per line. Values are kept in the OS keychain, never in plain text.",
+    "policy": "Approval",
+    "policyAsk": "Ask each time",
+    "policyAllow": "Always allow",
+    "policyDeny": "Deny"
   },
   "about": {
     "version": "Version",

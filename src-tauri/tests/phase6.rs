@@ -90,7 +90,7 @@ fn write_file_rejects_paths_outside_the_workspace() {
         r#"{ "path": "../escape.txt", "content": "x" }"#,
     )
     .unwrap_err();
-    assert_eq!(err.code, "STUDIO_PATH_DENIED");
+    assert_eq!(err.code, "SANDBOX_PATH_DENIED");
     assert!(!projects::project_dir(&root, &pid).join("escape.txt").exists());
 }
 

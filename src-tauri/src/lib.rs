@@ -125,9 +125,22 @@ pub fn run() {
             commands::studio_list_artifacts,
             commands::studio_import_artifact_as_source,
             commands::studio_download_artifact,
+            commands::mcp_list_servers,
+            commands::mcp_upsert_server,
+            commands::mcp_delete_server,
+            commands::mcp_connect,
+            commands::mcp_disconnect,
+            commands::mcp_set_tool_policy,
+            commands::mcp_server_stderr,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running WAKARU");
+        .build(tauri::generate_context!())
+        .expect("error while building WAKARU")
+        .run(|_app, event| {
+            // Never orphan a stdio MCP child (docs/05 §6.1).
+            if let tauri::RunEvent::Exit = event {
+                tauri::async_runtime::block_on(services::mcp::shutdown_all());
+            }
+        });
 }
 
 /// Serve a `wakaru-asset://` request from a project's sandboxed files.

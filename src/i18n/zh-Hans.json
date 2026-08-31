@@ -153,6 +153,8 @@
     "close": "关闭",
     "save": "保存",
     "saved": "已保存",
+    "edit": "编辑",
+    "delete": "删除",
     "details": "详情"
   },
   "sourceKind": {
@@ -288,8 +290,8 @@
       "tool": "工具"
     },
     "toolResult": "工具结果",
-    "approvalTitle": "允许写入文件？",
-    "approvalBody": "助手想向工作区写入一个文件。",
+    "approvalTitle": "允许此操作？",
+    "approvalBody": "助手想运行一个工具。请查看下方参数。",
     "toolWriteFile": "write_file",
     "allow": "允许",
     "deny": "拒绝",
@@ -304,6 +306,28 @@
     "downloaded": "已保存到 {{path}}",
     "importFailed": "无法导入该文件。",
     "cancelled": "已停止。"
+  },
+  "mcp": {
+    "stdioOnly": "本次发布仅支持 stdio 的 MCP 服务器。服务器按需连接；某个服务器失败只会影响它自己。",
+    "empty": "没有 MCP 服务器",
+    "emptyBody": "添加一个本地 MCP 服务器，为 Studio 提供额外工具。",
+    "connected": "已连接",
+    "disconnected": "未连接",
+    "connect": "连接",
+    "disconnect": "断开",
+    "add": "添加服务器",
+    "addServer": "添加 MCP 服务器",
+    "editServer": "编辑 MCP 服务器",
+    "name": "名称",
+    "command": "命令",
+    "commandHint": "绝对路径或 PATH 中的名称。不经过 shell 启动。",
+    "args": "参数",
+    "env": "环境变量",
+    "envHint": "每行一个 NAME=value。值保存在操作系统钥匙串中，不会明文存储。",
+    "policy": "批准",
+    "policyAsk": "每次询问",
+    "policyAllow": "始终允许",
+    "policyDeny": "拒绝"
   },
   "about": {
     "version": "版本",
