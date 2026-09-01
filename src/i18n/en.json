@@ -93,7 +93,7 @@
     "willOrganise": "\"Organise\" structures it with AI — it does not summarise.",
     "organise": "Organise",
     "showDiff": "Show diff",
-    "shrunkWarn": "Under 70% of the original — check the diff for lost content.",
+    "shrunkWarn": "Under 70% of the original. Markdown saving is blocked; check the diff or save the original as TXT.",
     "saveAs": "Save as",
     "organisedMd": "Organised MD",
     "plainTxt": "Plain TXT",

@@ -91,7 +91,7 @@
     "willOrganise": "「整理」用 AI 进行结构化，不做摘要。",
     "organise": "整理",
     "showDiff": "显示差异",
-    "shrunkWarn": "少于原文 70%，请通过差异检查是否丢失内容。",
+    "shrunkWarn": "少于原文 70%，已阻止保存 Markdown。请检查差异，或将原文保存为 TXT。",
     "saveAs": "保存格式",
     "organisedMd": "整理后的 MD",
     "plainTxt": "原样 TXT",

@@ -140,8 +140,8 @@
   --color-rule-strong: oklch(55% 0.017 66);
   --color-neutral: oklch(62% 0.012 64);
   --color-muted: oklch(73% 0.010 62);
-  --color-ink: oklch(91% 0.010 66);
-  --color-ink-strong: oklch(97% 0.006 66);
+  --color-ink: oklch(100% 0 0);
+  --color-ink-strong: oklch(100% 0 0);
 
   --color-accent: oklch(72% 0.125 42);
   --color-accent-ink: oklch(18% 0.02 60);
@@ -155,7 +155,7 @@
   --overlay-scrim: oklch(10% 0.012 66 / 0.55);
   --overlay-panel: oklch(20.5% 0.015 66 / 0.90);
   --topbar: oklch(13% 0.014 66);
-  --topbar-ink: oklch(93% 0.010 66);
+  --topbar-ink: oklch(100% 0 0);
   --shadow-whisper: 0 1px 2px oklch(0% 0 0 / 0.40);
   --shadow-overlay: 0 10px 30px oklch(0% 0 0 / 0.55);
 }

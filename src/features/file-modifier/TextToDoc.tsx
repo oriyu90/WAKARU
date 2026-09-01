@@ -47,7 +47,7 @@ export function TextToDoc() {
   });
 
   const output = stream.text;
-  const shrunk = output && input && output.length < input.length * 0.7;
+  const suspiciousOutput = isSuspiciouslyShort(input, output);
 
   const diff = useMemo(() => (showDiff ? lineDiff(input, output) : []), [showDiff, input, output]);
 
@@ -111,7 +111,7 @@ export function TextToDoc() {
                 </Button>
               </>
             ) : null}
-            {shrunk ? <span className={styles.warn}>{t("fileModifier.shrunkWarn")}</span> : null}
+            {suspiciousOutput ? <span className={styles.warn}>{t("fileModifier.shrunkWarn")}</span> : null}
           </div>
         </div>
       </div>
@@ -155,7 +155,7 @@ export function TextToDoc() {
         <Button
           variant="primary"
           loading={save.isPending}
-          disabled={!dir || !name.trim() || (format === "md" ? !output : !input)}
+          disabled={!dir || !name.trim() || (format === "md" ? !output || suspiciousOutput : !input)}
           onClick={() => save.mutate()}
         >
           {t("common.save")}
@@ -163,6 +163,10 @@ export function TextToDoc() {
       </div>
     </div>
   );
+}
+
+export function isSuspiciouslyShort(input: string, output: string): boolean {
+  return Boolean(input && output && output.length < input.length * 0.7);
 }
 
 type DiffLine = { op: " " | "+" | "-"; text: string };

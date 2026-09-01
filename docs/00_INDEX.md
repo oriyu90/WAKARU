@@ -44,6 +44,7 @@
 | [`09_受け入れ基準とテスト.md`](09_受け入れ基準とテスト.md) | フェーズ別AC、テスト戦略、手動検証チェックリスト |
 | [`DECISIONS.md`](DECISIONS.md) | 決定記録。**実装中の判断はここに追記してから実装する**（既にD-01〜D-05を記録済み） |
 | [`GLOSSARY.md`](GLOSSARY.md) | 3言語の対訳用語集。UIに新しい語を出す前にここへ追記する |
+| [`STATIC_FUNCTION_AUDIT.md`](STATIC_FUNCTION_AUDIT.md) | 資料閲覧・解説・Studio文書作成・低性能モデル・ダークUIの静的監査 |
 
 ---
 

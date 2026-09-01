@@ -91,7 +91,7 @@
     "willOrganise": "「整形」で AI が構造化します（要約はしません）。",
     "organise": "整形",
     "showDiff": "差分を表示",
-    "shrunkWarn": "元の70%未満です。情報が落ちていないか差分で確認してください。",
+    "shrunkWarn": "元の70%未満です。Markdown保存を停止しました。差分を確認するか、原文をTXTで保存してください。",
     "saveAs": "保存形式",
     "organisedMd": "整理されたMD",
     "plainTxt": "そのままTXT",

@@ -65,6 +65,12 @@ const PAIRS = [
 ];
 
 let fails = 0;
+for (const token of ["color-ink", "color-ink-strong", "topbar-ink"]) {
+  if (JSON.stringify(dark[token]) !== JSON.stringify([1, 0, 0])) {
+    fails++;
+    console.error(`  [dark] ${token}: expected exact white`);
+  }
+}
 for (const [name, map] of [
   ["light", light],
   ["dark", map_or_die(dark)],
