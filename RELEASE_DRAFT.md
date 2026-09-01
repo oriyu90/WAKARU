@@ -2,11 +2,14 @@
 
 Implementation, automated verification, native startup/migration testing, and
 bundle verification are complete (2026-09-01) — see `QUALITY_REPORT.md`.
+The existing GitHub pre-release was replaced in place, its release assets were
+verified through the GitHub API, and the public docs/site were published in
+`oriyu90/WAKARU@9be9487` and `oriyu90/studio-rizi@68f01c6`.
 The verified DMG is
 `src-tauri/target/release/bundle/dmg/WAKARU_0.0.0_aarch64.dmg`.
 
 SHA-256:
-`047b136fb57c2624a3add0f1d5d72e56be87629f6b11448f6f797d6caa748634`.
+`7faf6d4a720f6f13754dccec1ef7588833123eb7e68b57863ae9ad35111fd92e`.
 
 ---
 
@@ -70,21 +73,18 @@ Run the app once end-to-end and confirm it's good. (Plan Part 4 step 6 /
 
 ---
 
-## 6. Create the GitHub pre-release
+## 6. Create or replace the GitHub pre-release
 
 ```bash
 cd ~/places/適当/work/WAKARU
-gh release create v0.0.0 \
-  --repo oriyu90/WAKARU \
-  --prerelease \
-  --title "WAKARU v0.0.0" \
-  --notes-file RELEASE_NOTES.md \
+gh release upload v0.0.0 --repo oriyu90/WAKARU --clobber \
   src-tauri/target/release/bundle/dmg/WAKARU_0.0.0_aarch64.dmg \
   src-tauri/target/release/bundle/dmg/WAKARU_0.0.0_aarch64.dmg.sha256
+gh release edit v0.0.0 --repo oriyu90/WAKARU \
+  --title "WAKARU v0.0.0" --notes-file RELEASE_NOTES.md --prerelease
 ```
 
-Add `--draft` instead of `--prerelease` first if you want to eyeball it on
-GitHub before it goes live.
+For a new tag, use `gh release create` with the same assets and `--prerelease`.
 
 **Release body** = `RELEASE_NOTES.md` (this repo). Pre-release, matching v0.1.0's
 1.0.0 pre-release status per `WAKARU.md`.

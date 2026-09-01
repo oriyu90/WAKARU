@@ -15,6 +15,13 @@ legacy-database imports, production Markdown/CSV previews, the collapsed search
 field, keyword-only embedding fallback, and newly disclosed PDF/XML denial-of-
 service risks. Existing project data is migrated in place.
 
+The current replacement also hardens document work for smaller models. Source
+text, retrieved excerpts, file contents, and tab transcripts are now separated
+from system instructions and explicitly treated as untrusted data. Studio uses
+a short verify-before-writing workflow and must create a workspace file when a
+document is requested. The text organiser blocks Markdown saving when its output
+falls below 70% of the source, and primary dark-theme text is now exact white.
+
 - **Two API formats** — choose OpenAI-compatible or Anthropic-compatible per
   connection. The Anthropic adapter supports native authentication, top-level
   system instructions, image blocks, tool definitions/results, structured
@@ -23,6 +30,10 @@ service risks. Existing project data is migrated in place.
   filler, repetition, and unnecessary structure. Live Illustrator combines a
   plain-language first explanation with examples, misconception handling, and
   an optional short understanding check. No external Skill source is bundled.
+- **Safer document workflows** — page text and RAG excerpts are passed as
+  bounded user data rather than system instructions; Studio file requests use
+  the complete `write_file` path, and suspiciously shortened organiser output
+  cannot be saved as Markdown.
 - **Reliability hardening** — validated endpoint URLs, safe database migration
   for existing profiles, incomplete-stream detection, no caching of truncated
   explanations, recoverable poisoned locks, safe corrupt-ZIP errors, and

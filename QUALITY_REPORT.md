@@ -12,7 +12,7 @@ migration verification, log review, and final DMG verification.
 |---|---|---|
 | Type check | `npm run typecheck` | pass |
 | Lint + design rules + no hardcoded strings | `npm run lint` | pass |
-| Unit tests | `npm test` (vitest) | 6 passed |
+| Unit tests | `npm test` (vitest) | 9 passed |
 | Contrast (OKLCH → sRGB WCAG recompute) | `npm run check:contrast` | pass — body ≥ 4.5:1, UI edges ≥ 3:1 |
 | i18n key parity (en / ja / zh-Hans) | `npm run check:i18n` | pass — 327 keys × 3 |
 
@@ -22,13 +22,13 @@ migration verification, log review, and final DMG verification.
 |---|---|---|
 | Rust formatting | `cargo fmt --check` | pass |
 | Clippy (all targets, warnings = errors) | `cargo clippy --all-targets -- -D warnings` | pass |
-| Tests | `cargo test --all-targets --all-features` | 177 passed, 0 failed |
+| Tests | `cargo test --all-targets --all-features` | 182 passed, 0 failed |
 | Licenses | `cargo deny check licenses` | ok — no GPL/AGPL/LGPL (`deny.toml`) |
 | Dependency bans / sources | `cargo deny check bans sources` | ok |
 | ts-rs binding drift | `cargo test export_bindings` + git diff | no diff |
 
-Test breakdown: 139 library unit tests + 38 integration tests
-(`tests/phase{1..10}.rs`) + 6 frontend unit tests.
+Test breakdown: 144 library unit tests + 38 integration tests
+(`tests/phase{1..10}.rs`) + 9 frontend unit tests.
 
 New compatibility and reliability coverage includes Anthropic profile migration,
 Base URL boundary validation, OpenAI-to-Anthropic system/tool/tool-result
@@ -37,6 +37,11 @@ text, usage and streamed tool arguments, and prompt-policy presence in all
 three UI languages. Legacy database fixtures prove that the app adopts the old
 schema, preserves rows, and repairs the old FTS shape even when an earlier build
 already marked that migration as applied.
+
+The current replacement adds regression coverage for source/system separation
+in Illustrator and the organiser, Studio's untrusted project-context boundary,
+mandatory complete-file tool guidance for smaller models, suspiciously short
+organiser output, and exact-white primary dark-theme text.
 
 Security-relevant coverage:
 
@@ -76,6 +81,8 @@ routes without sending fixture content off-device.
 | Studio request over the configured endpoint | pass; source-grounded answer, `[S1]` citation and Socratic check displayed |
 | FTS-only operation without an embedding profile/table | pass; clean no-op, no missing-table warning |
 | Search-bar usability at desktop and narrow widths | pass after flex sizing repair |
+| Current replacement starts from the signed production bundle | pass; native window opened and exited normally |
+| Dark-theme primary text and File Modifier layout | pass in local production-equivalent web UI; primary tokens resolve to exact white |
 
 ### Defects found and fixed before replacing v0.0.0
 
@@ -109,8 +116,8 @@ routes without sending fixture content off-device.
 | `codesign --verify --deep --strict` — `.app` **inside the mounted DMG** | valid on disk, satisfies its Designated Requirement |
 | `spctl -a -t exec` | **rejected** — expected for ad-hoc/unnotarized; README documents right-click → Open |
 | Signature | `adhoc`, Identifier `com.yukiorita.wakaru`, TeamIdentifier not set |
-| Size | 11,415,586 bytes |
-| `shasum -a 256` | `047b136fb57c2624a3add0f1d5d72e56be87629f6b11448f6f797d6caa748634` |
+| Size | 11,419,293 bytes |
+| `shasum -a 256` | `7faf6d4a720f6f13754dccec1ef7588833123eb7e68b57863ae9ad35111fd92e` |
 
 x64 build not attempted (only arm64 is distributed, matching v0.1.0).
 

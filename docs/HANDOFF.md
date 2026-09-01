@@ -25,13 +25,18 @@ prefixes). Working tree clean.
 
 | Gate | How | State |
 |---|---|---|
-| Frontend | `npm run typecheck && npm run lint && npm test && npm run check:contrast && npm run check:i18n` | green |
-| Backend | `cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo test` | green — 167 tests |
+| Frontend | `npm run typecheck && npm run lint && npm test && npm run check:contrast && npm run check:i18n` | green — 9 tests |
+| Backend | `cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo test` | green — 182 tests |
 | Licenses | `cd src-tauri && cargo deny check licenses bans sources` | green — no GPL/AGPL/LGPL |
 
 The current release work follows `IMPLEMENTATION_PLAN_v0.0.0.md`: dual API
 formats, built-in Studio/Illustrator behaviour, reliability hardening, final
 DMG verification, then public docs and Studio RIZI updates.
+
+The 2026-09-01 replacement at source commit `0c3d411` additionally separates
+all document/RAG context from system instructions, strengthens Studio file
+creation for smaller models, blocks suspiciously shortened Markdown output,
+and uses exact-white primary text in dark mode. See `STATIC_FUNCTION_AUDIT.md`.
 
 ## Layout
 
