@@ -13,10 +13,14 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 |---|---|---|
 | adler2 | 2.0.1 | 0BSD OR MIT OR Apache-2.0 |
 | adobe-cmap-parser | 0.4.1 | MIT |
+| aes | 0.8.4 | MIT OR Apache-2.0 |
+| aes | 0.9.3 | MIT OR Apache-2.0 |
 | ahash | 0.8.12 | MIT OR Apache-2.0 |
 | aho-corasick | 1.1.5 | Unlicense OR MIT |
+| aliasable | 0.1.3 | MIT |
 | alloc-no-stdlib | 2.0.4 | BSD-3-Clause |
 | alloc-stdlib | 0.2.4 | BSD-3-Clause |
+| allsorts-azul | 0.17.2 | Apache-2.0 |
 | android_system_properties | 0.1.6 | MIT OR Apache-2.0 |
 | anyhow | 1.0.104 | MIT OR Apache-2.0 |
 | arbitrary | 1.4.2 | MIT OR Apache-2.0 |
@@ -34,6 +38,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | async-trait | 0.1.92 | MIT OR Apache-2.0 |
 | atk | 0.18.2 | MIT |
 | atk-sys | 0.18.2 | MIT |
+| atoi_simd | 0.18.1 | MIT OR Apache-2.0 |
 | atomic-waker | 1.1.2 | Apache-2.0 OR MIT |
 | autocfg | 1.5.1 | Apache-2.0 OR MIT |
 | base64 | 0.21.7 | MIT OR Apache-2.0 |
@@ -46,6 +51,9 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | bitflags | 1.3.2 | MIT/Apache-2.0 |
 | bitflags | 2.13.1 | MIT OR Apache-2.0 |
 | block-buffer | 0.10.4 | MIT OR Apache-2.0 |
+| block-buffer | 0.12.1 | MIT OR Apache-2.0 |
+| block-padding | 0.3.3 | MIT OR Apache-2.0 |
+| block-padding | 0.4.2 | MIT OR Apache-2.0 |
 | block2 | 0.6.2 | MIT |
 | blocking | 1.7.0 | Apache-2.0 OR MIT |
 | brotli | 8.0.4 | BSD-3-Clause AND MIT |
@@ -59,21 +67,26 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | bytes | 1.12.1 | MIT |
 | cairo-rs | 0.18.5 | MIT |
 | cairo-sys-rs | 0.18.2 | MIT |
-| calamine | 0.26.1 | MIT |
+| calamine | 0.36.1 | MIT |
 | camino | 1.2.5 | MIT OR Apache-2.0 |
 | cargo_metadata | 0.19.2 | MIT |
 | cargo_toml | 0.22.3 | Apache-2.0 OR MIT |
 | cargo-platform | 0.1.9 | MIT OR Apache-2.0 |
+| cbc | 0.1.2 | MIT OR Apache-2.0 |
+| cbc | 0.2.1 | MIT OR Apache-2.0 |
 | cc | 1.4.4 | MIT OR Apache-2.0 |
 | cesu8 | 1.1.0 | Apache-2.0/MIT |
 | cexpr | 0.6.0 | Apache-2.0/MIT |
 | cfb | 0.7.3 | MIT |
+| cff-parser | 0.2.0 | MIT OR Apache-2.0 |
 | cfg_aliases | 0.2.2 | MIT |
 | cfg-expr | 0.15.8 | MIT OR Apache-2.0 |
 | cfg-if | 1.0.4 | MIT OR Apache-2.0 |
 | chacha20 | 0.10.2 | MIT OR Apache-2.0 |
 | chardetng | 0.1.17 | Apache-2.0 OR MIT |
 | chrono | 0.4.45 | MIT OR Apache-2.0 |
+| cipher | 0.4.4 | MIT OR Apache-2.0 |
+| cipher | 0.5.2 | MIT OR Apache-2.0 |
 | clang-sys | 1.9.1 | Apache-2.0 |
 | cmake | 0.1.58 | MIT OR Apache-2.0 |
 | codepage | 0.1.2 | Apache-2.0 OR MIT |
@@ -82,12 +95,14 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | compression-codecs | 0.4.38 | MIT OR Apache-2.0 |
 | compression-core | 0.4.32 | MIT OR Apache-2.0 |
 | concurrent-queue | 2.5.0 | Apache-2.0 OR MIT |
+| const-oid | 0.10.2 | Apache-2.0 OR MIT |
 | cookie | 0.18.2 | MIT OR Apache-2.0 |
 | core-foundation | 0.10.1 | MIT OR Apache-2.0 |
 | core-foundation | 0.9.4 | MIT OR Apache-2.0 |
 | core-foundation-sys | 0.8.7 | MIT OR Apache-2.0 |
 | core-graphics | 0.25.0 | MIT OR Apache-2.0 |
 | core-graphics-types | 0.2.0 | MIT OR Apache-2.0 |
+| cpubits | 0.1.1 | MIT OR Apache-2.0 |
 | cpufeatures | 0.2.17 | MIT OR Apache-2.0 |
 | cpufeatures | 0.3.1 | MIT OR Apache-2.0 |
 | crc32fast | 1.5.1 | MIT OR Apache-2.0 |
@@ -95,9 +110,11 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | crossbeam-utils | 0.8.22 | MIT OR Apache-2.0 |
 | crunchy | 0.2.4 | MIT |
 | crypto-common | 0.1.7 | MIT OR Apache-2.0 |
-| cssparser | 0.31.2 | MPL-2.0 |
+| crypto-common | 0.2.2 | MIT OR Apache-2.0 |
 | cssparser | 0.36.0 | MPL-2.0 |
+| cssparser | 0.37.0 | MPL-2.0 |
 | cssparser-macros | 0.6.1 | MPL-2.0 |
+| cssparser-macros | 0.7.0 | MPL-2.0 |
 | csv | 1.4.0 | Unlicense/MIT |
 | csv-core | 0.1.13 | Unlicense/MIT |
 | ctor | 0.8.0 | Apache-2.0 OR MIT |
@@ -106,15 +123,16 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | darling_core | 0.23.0 | MIT |
 | darling_macro | 0.23.0 | MIT |
 | dbus | 0.9.12 | Apache-2.0/MIT |
+| debug_unsafe | 0.1.4 | MIT OR Apache-2.0 |
 | defmt | 1.1.1 | MIT OR Apache-2.0 |
 | defmt-macros | 1.1.1 | MIT OR Apache-2.0 |
 | defmt-parser | 1.0.0 | MIT OR Apache-2.0 |
 | deranged | 0.5.8 | MIT OR Apache-2.0 |
 | derive_arbitrary | 1.4.2 | MIT OR Apache-2.0 |
-| derive_more | 0.99.20 | MIT |
 | derive_more | 2.1.1 | MIT |
 | derive_more-impl | 2.1.1 | MIT |
 | digest | 0.10.7 | MIT OR Apache-2.0 |
+| digest | 0.11.3 | MIT OR Apache-2.0 |
 | dirs | 6.0.0 | MIT OR Apache-2.0 |
 | dirs-sys | 0.5.0 | MIT OR Apache-2.0 |
 | dispatch2 | 0.3.1 | Zlib OR Apache-2.0 OR MIT |
@@ -129,7 +147,9 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | dtor-proc-macro | 0.0.6 | Apache-2.0 OR MIT |
 | dunce | 1.0.5 | CC0-1.0 OR MIT-0 OR Apache-2.0 |
 | dyn-clone | 1.0.20 | MIT OR Apache-2.0 |
-| ego-tree | 0.6.3 | ISC |
+| ecb | 0.1.2 | MIT |
+| ecb | 0.2.1 | MIT OR Apache-2.0 |
+| ego-tree | 0.11.0 | ISC |
 | either | 1.18.0 | MIT OR Apache-2.0 |
 | embed_plist | 1.2.2 | MIT OR Apache-2.0 |
 | embed-resource | 3.0.11 | MIT |
@@ -148,6 +168,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | fallible-iterator | 0.3.0 | MIT/Apache-2.0 |
 | fallible-streaming-iterator | 0.1.9 | MIT/Apache-2.0 |
 | fancy-regex | 0.13.0 | MIT |
+| fast-float2 | 0.2.4 | MIT OR Apache-2.0 |
 | fastrand | 2.5.0 | Apache-2.0 OR MIT |
 | fax | 0.2.7 | MIT |
 | fdeflate | 0.3.7 | MIT OR Apache-2.0 |
@@ -161,7 +182,6 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | foreign-types-shared | 0.3.1 | MIT/Apache-2.0 |
 | form_urlencoded | 1.2.2 | MIT OR Apache-2.0 |
 | fs_extra | 1.3.0 | MIT |
-| futf | 0.1.5 | MIT / Apache-2.0 |
 | futures | 0.3.34 | MIT OR Apache-2.0 |
 | futures-channel | 0.3.34 | MIT OR Apache-2.0 |
 | futures-core | 0.3.34 | MIT OR Apache-2.0 |
@@ -172,7 +192,6 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | futures-sink | 0.3.34 | MIT OR Apache-2.0 |
 | futures-task | 0.3.34 | MIT OR Apache-2.0 |
 | futures-util | 0.3.34 | MIT OR Apache-2.0 |
-| fxhash | 0.2.1 | Apache-2.0/MIT |
 | gdk | 0.18.2 | MIT |
 | gdk-pixbuf | 0.18.5 | MIT |
 | gdk-pixbuf-sys | 0.18.0 | MIT |
@@ -192,6 +211,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | glib-macros | 0.18.5 | MIT |
 | glib-sys | 0.18.1 | MIT |
 | glob | 0.3.4 | MIT OR Apache-2.0 |
+| glyph-names | 0.2.0 | BSD-3-Clause |
 | gobject-sys | 0.18.0 | MIT |
 | gtk | 0.18.2 | MIT |
 | gtk-sys | 0.18.2 | MIT |
@@ -205,12 +225,13 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | heck | 0.5.0 | MIT OR Apache-2.0 |
 | hermit-abi | 0.5.2 | MIT OR Apache-2.0 |
 | hex | 0.4.3 | MIT OR Apache-2.0 |
-| html5ever | 0.27.0 | MIT OR Apache-2.0 |
 | html5ever | 0.38.0 | MIT OR Apache-2.0 |
+| html5ever | 0.39.0 | MIT OR Apache-2.0 |
 | http | 1.5.0 | MIT OR Apache-2.0 |
 | http-body | 1.1.0 | MIT |
 | http-body-util | 0.1.5 | MIT |
 | httparse | 1.10.1 | MIT OR Apache-2.0 |
+| hybrid-array | 0.4.14 | MIT OR Apache-2.0 |
 | hyper | 1.11.1 | MIT |
 | hyper-rustls | 0.27.9 | Apache-2.0 OR ISC OR MIT |
 | hyper-util | 0.1.20 | MIT |
@@ -233,6 +254,8 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | indexmap | 2.14.1 | Apache-2.0 OR MIT |
 | infer | 0.16.0 | MIT |
 | infer | 0.19.0 | MIT |
+| inout | 0.1.4 | MIT OR Apache-2.0 |
+| inout | 0.2.2 | MIT OR Apache-2.0 |
 | ipnet | 2.12.1 | MIT OR Apache-2.0 |
 | is-docker | 0.2.0 | MIT |
 | is-wsl | 0.4.0 | MIT |
@@ -264,21 +287,19 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | libloading | 0.8.9 | ISC |
 | libredox | 0.1.21 | MIT |
 | libsqlite3-sys | 0.30.1 | MIT |
-| linked-hash-map | 0.5.6 | MIT/Apache-2.0 |
 | linux-keyutils | 0.2.5 | Apache-2.0 OR MIT |
 | linux-raw-sys | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | litemap | 0.8.3 | Unicode-3.0 |
 | lock_api | 0.4.14 | MIT OR Apache-2.0 |
 | log | 0.4.34 | MIT OR Apache-2.0 |
-| lopdf | 0.31.0 | MIT |
-| lopdf | 0.34.0 | MIT |
+| lopdf | 0.42.0 | MIT |
+| lopdf | 0.44.0 | MIT |
 | lru-slab | 0.1.2 | MIT OR Apache-2.0 OR Zlib |
-| mac | 0.1.1 | MIT/Apache-2.0 |
-| markup5ever | 0.12.1 | MIT OR Apache-2.0 |
 | markup5ever | 0.38.0 | MIT OR Apache-2.0 |
+| markup5ever | 0.39.0 | MIT OR Apache-2.0 |
 | matchers | 0.2.0 | MIT |
 | md-5 | 0.10.6 | MIT OR Apache-2.0 |
-| md5 | 0.7.0 | Apache-2.0/MIT |
+| md-5 | 0.11.0 | MIT OR Apache-2.0 |
 | memchr | 2.8.3 | Unlicense OR MIT |
 | memoffset | 0.9.1 | MIT |
 | mime | 0.3.17 | MIT OR Apache-2.0 |
@@ -294,6 +315,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | new_debug_unreachable | 1.0.6 | MIT |
 | nix | 0.31.3 | MIT |
 | nom | 7.1.3 | MIT |
+| nom | 8.0.0 | MIT |
 | nu-ansi-term | 0.50.3 | MIT |
 | num_enum | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
 | num_enum_derive | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
@@ -320,28 +342,22 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | open | 5.4.2 | MIT |
 | option-ext | 0.2.0 | MPL-2.0 |
 | ordered-stream | 0.2.0 | MIT OR Apache-2.0 |
-| owned_ttf_parser | 0.19.0 | Apache-2.0 |
+| ouroboros | 0.18.5 | MIT OR Apache-2.0 |
+| ouroboros_macro | 0.18.5 | MIT OR Apache-2.0 |
 | pango | 0.18.3 | MIT |
 | pango-sys | 0.18.0 | MIT |
 | parking | 2.2.1 | Apache-2.0 OR MIT |
 | parking_lot | 0.12.5 | MIT OR Apache-2.0 |
 | parking_lot_core | 0.9.12 | MIT OR Apache-2.0 |
 | pastey | 0.2.3 | MIT OR Apache-2.0 |
-| pdf-extract | 0.7.12 | MIT |
+| pathfinder_geometry | 0.5.1 | MIT/Apache-2.0 |
+| pathfinder_simd | 0.5.6 | MIT OR Apache-2.0 |
+| pdf-extract | 0.12.0 | MIT |
 | percent-encoding | 2.3.2 | MIT OR Apache-2.0 |
-| phf | 0.10.1 | MIT |
-| phf | 0.11.3 | MIT |
 | phf | 0.13.1 | MIT |
-| phf_codegen | 0.10.0 | MIT |
-| phf_codegen | 0.11.3 | MIT |
 | phf_codegen | 0.13.1 | MIT |
-| phf_generator | 0.10.0 | MIT |
-| phf_generator | 0.11.3 | MIT |
 | phf_generator | 0.13.1 | MIT |
-| phf_macros | 0.11.3 | MIT |
 | phf_macros | 0.13.1 | MIT |
-| phf_shared | 0.10.0 | MIT |
-| phf_shared | 0.11.3 | MIT |
 | phf_shared | 0.13.1 | MIT |
 | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT |
 | piper | 0.2.5 | MIT OR Apache-2.0 |
@@ -351,27 +367,24 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | png | 0.18.1 | MIT OR Apache-2.0 |
 | polling | 3.11.0 | Apache-2.0 OR MIT |
 | pom | 1.1.0 | MIT |
-| pom | 3.4.0 | MIT |
 | portable-atomic | 1.15.0 | Apache-2.0 OR MIT |
 | portable-atomic-util | 0.2.7 | Apache-2.0 OR MIT |
 | postscript | 0.14.1 | Apache-2.0/MIT |
 | potential_utf | 0.1.6 | Unicode-3.0 |
 | powerfmt | 0.2.0 | MIT OR Apache-2.0 |
-| ppv-lite86 | 0.2.21 | MIT OR Apache-2.0 |
 | precomputed-hash | 0.1.1 | MIT |
 | prettyplease | 0.2.37 | MIT OR Apache-2.0 |
-| printpdf | 0.7.0 | MIT |
+| printpdf | 0.12.7 | MIT |
 | proc-macro-crate | 1.3.1 | MIT OR Apache-2.0 |
 | proc-macro-crate | 2.0.2 | MIT OR Apache-2.0 |
 | proc-macro-crate | 3.5.0 | MIT OR Apache-2.0 |
 | proc-macro-error | 1.0.4 | MIT OR Apache-2.0 |
 | proc-macro-error-attr | 1.0.4 | MIT OR Apache-2.0 |
 | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 |
+| proc-macro2-diagnostics | 0.10.1 | MIT/Apache-2.0 |
 | process-wrap | 9.1.0 | Apache-2.0 OR MIT |
 | pxfm | 0.1.30 | BSD-3-Clause OR Apache-2.0 |
 | quick-error | 2.0.1 | MIT/Apache-2.0 |
-| quick-xml | 0.31.0 | MIT |
-| quick-xml | 0.36.2 | MIT |
 | quick-xml | 0.41.0 | MIT |
 | quinn | 0.11.11 | MIT OR Apache-2.0 |
 | quinn-proto | 0.11.17 | MIT OR Apache-2.0 |
@@ -380,10 +393,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | r-efi | 5.3.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
 | r-efi | 6.0.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
 | rand | 0.10.2 | MIT OR Apache-2.0 |
-| rand | 0.8.8 | MIT OR Apache-2.0 |
-| rand_chacha | 0.3.1 | MIT OR Apache-2.0 |
 | rand_core | 0.10.1 | MIT OR Apache-2.0 |
-| rand_core | 0.6.4 | MIT OR Apache-2.0 |
 | rand_pcg | 0.10.2 | MIT OR Apache-2.0 |
 | rangemap | 1.8.0 | MIT/Apache-2.0 |
 | raw-window-handle | 0.6.2 | MIT OR Apache-2.0 OR Zlib |
@@ -417,12 +427,12 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | schemars_derive | 0.8.22 | MIT |
 | schemars_derive | 1.2.2 | MIT |
 | scopeguard | 1.2.0 | MIT OR Apache-2.0 |
-| scraper | 0.20.0 | ISC |
+| scraper | 0.27.0 | ISC |
 | security-framework | 2.11.1 | MIT OR Apache-2.0 |
 | security-framework | 3.7.0 | MIT OR Apache-2.0 |
 | security-framework-sys | 2.17.0 | MIT OR Apache-2.0 |
-| selectors | 0.25.0 | MPL-2.0 |
 | selectors | 0.36.1 | MPL-2.0 |
+| selectors | 0.38.0 | MPL-2.0 |
 | semver | 1.0.28 | MIT OR Apache-2.0 |
 | serde | 1.0.229 | MIT OR Apache-2.0 |
 | serde_core | 1.0.229 | MIT OR Apache-2.0 |
@@ -439,15 +449,14 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | serde-untagged | 0.1.9 | MIT OR Apache-2.0 |
 | serialize-to-javascript | 0.1.2 | MIT OR Apache-2.0 |
 | serialize-to-javascript-impl | 0.1.2 | MIT OR Apache-2.0 |
-| servo_arc | 0.3.0 | MIT/Apache-2.0 |
 | servo_arc | 0.4.3 | MIT OR Apache-2.0 |
 | sha2 | 0.10.9 | MIT OR Apache-2.0 |
+| sha2 | 0.11.0 | MIT OR Apache-2.0 |
 | sharded-slab | 0.1.7 | MIT |
 | shlex | 1.3.0 | MIT OR Apache-2.0 |
 | shlex | 2.0.1 | MIT OR Apache-2.0 |
 | signal-hook-registry | 1.4.8 | MIT OR Apache-2.0 |
 | simd-adler32 | 0.3.10 | MIT |
-| siphasher | 0.3.11 | MIT/Apache-2.0 |
 | siphasher | 1.0.3 | MIT/Apache-2.0 |
 | slab | 0.4.12 | MIT |
 | smallvec | 1.15.2 | MIT OR Apache-2.0 |
@@ -457,10 +466,10 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | soup3-sys | 0.5.0 | MIT |
 | sqlite-vec | 0.1.9 | MIT/Apache-2.0 |
 | stable_deref_trait | 1.2.1 | MIT OR Apache-2.0 |
-| string_cache | 0.8.9 | MIT OR Apache-2.0 |
+| static_assertions | 1.1.0 | MIT OR Apache-2.0 |
 | string_cache | 0.9.0 | MIT OR Apache-2.0 |
-| string_cache_codegen | 0.5.4 | MIT OR Apache-2.0 |
 | string_cache_codegen | 0.6.1 | MIT OR Apache-2.0 |
+| stringprep | 0.1.5 | MIT/Apache-2.0 |
 | strsim | 0.11.1 | MIT |
 | subtle | 2.6.1 | BSD-3-Clause |
 | swift-rs | 1.0.8 | MIT OR Apache-2.0 |
@@ -501,7 +510,6 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | tauri-utils | 2.9.3 | Apache-2.0 OR MIT |
 | tauri-winres | 0.3.6 | MIT |
 | tempfile | 3.27.0 | MIT OR Apache-2.0 |
-| tendril | 0.4.3 | MIT/Apache-2.0 |
 | tendril | 0.5.1 | MIT OR Apache-2.0 |
 | termcolor | 1.4.1 | Unlicense OR MIT |
 | thiserror | 1.0.69 | MIT OR Apache-2.0 |
@@ -547,24 +555,30 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | try-lock | 0.2.5 | MIT |
 | ts-rs | 10.1.0 | MIT |
 | ts-rs-macros | 10.1.0 | MIT |
-| ttf-parser | 0.19.2 | MIT OR Apache-2.0 |
+| ttf-parser | 0.25.1 | MIT OR Apache-2.0 |
 | type1-encoding-parser | 0.1.1 | MIT |
+| typed-path | 0.12.3 | MIT OR Apache-2.0 |
 | typeid | 1.0.3 | MIT OR Apache-2.0 |
 | typenum | 1.20.1 | MIT OR Apache-2.0 |
+| ucd-trie | 0.1.7 | MIT OR Apache-2.0 |
 | uds_windows | 1.2.1 | MIT |
 | unic-char-property | 0.9.0 | MIT/Apache-2.0 |
 | unic-char-range | 0.9.0 | MIT/Apache-2.0 |
 | unic-common | 0.9.0 | MIT/Apache-2.0 |
 | unic-ucd-ident | 0.9.0 | MIT/Apache-2.0 |
 | unic-ucd-version | 0.9.0 | MIT/Apache-2.0 |
+| unicode-bidi | 0.3.18 | MIT OR Apache-2.0 |
+| unicode-canonical-combining-class | 1.0.0 | Apache-2.0 |
+| unicode-general-category | 1.1.0 | Apache-2.0 |
 | unicode-ident | 1.0.24 | (MIT OR Apache-2.0) AND Unicode-3.0 |
+| unicode-joining-type | 1.0.0 | Apache-2.0 |
 | unicode-normalization | 0.1.25 | MIT OR Apache-2.0 |
+| unicode-properties | 0.1.4 | MIT/Apache-2.0 |
 | unicode-segmentation | 1.13.3 | MIT OR Apache-2.0 |
 | unicode-width | 0.2.2 | MIT OR Apache-2.0 |
 | untrusted | 0.9.0 | ISC |
 | url | 2.5.8 | MIT OR Apache-2.0 |
 | urlpattern | 0.3.0 | MIT |
-| utf-8 | 0.7.6 | MIT OR Apache-2.0 |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT |
 | uuid | 1.26.0 | Apache-2.0 OR MIT |
 | valuable | 0.1.1 | MIT |
@@ -594,6 +608,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | webview2-com-macros | 0.8.1 | MIT |
 | webview2-com-sys | 0.38.2 | MIT |
 | weezl | 0.1.12 | MIT OR Apache-2.0 |
+| weezl | 0.2.1 | MIT OR Apache-2.0 |
 | whisper-rs | 0.14.4 | Unlicense |
 | whisper-rs-sys | 0.13.1 | Unlicense |
 | winapi | 0.3.9 | MIT/Apache-2.0 |
@@ -662,6 +677,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | wry | 0.55.1 | Apache-2.0 OR MIT |
 | x11 | 2.21.0 | MIT |
 | x11-dl | 2.21.0 | MIT |
+| yansi | 1.0.1 | MIT OR Apache-2.0 |
 | yoke | 0.8.3 | Unicode-3.0 |
 | yoke-derive | 0.8.2 | Unicode-3.0 |
 | zbus | 5.19.0 | MIT |
@@ -677,6 +693,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | zerovec | 0.11.8 | Unicode-3.0 |
 | zerovec-derive | 0.11.6 | Unicode-3.0 |
 | zip | 2.4.2 | MIT |
+| zip | 8.6.0 | MIT |
 | zlib-rs | 0.6.7 | Zlib |
 | zmij | 1.0.23 | MIT |
 | zopfli | 0.8.3 | Apache-2.0 |
@@ -686,4 +703,4 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | zvariant_derive | 5.15.0 | MIT |
 | zvariant_utils | 4.2.0 | MIT |
 
-Total: 674 crates.
+Total: 691 crates.

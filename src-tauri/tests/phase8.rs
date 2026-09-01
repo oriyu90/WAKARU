@@ -35,6 +35,9 @@ fn ac_8_1_multiple_images_become_one_pdf_with_chosen_options() {
     assert_eq!(&bytes[..4], b"%PDF");
     // two embedded images -> a non-trivial file
     assert!(bytes.len() > 5_000, "pdf too small: {}", bytes.len());
+    // Parse the complete object graph, rather than accepting a file that only
+    // happens to start with the PDF magic bytes.
+    assert!(pdf_extract::extract_text(&out.path).is_ok());
 }
 
 #[test]

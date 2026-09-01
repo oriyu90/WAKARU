@@ -10,9 +10,9 @@ use crate::services::ai::client::AiClient;
 use crate::services::ai::{profiles, StreamRegistry};
 use base64::Engine;
 use printpdf::{
-    ColorBits, ColorSpace, Image as PdfImage, ImageTransform, ImageXObject, Mm, PdfDocument, Px,
+    Mm, Op, PdfDocument, PdfPage, PdfSaveOptions, RawImage, RawImageData, RawImageFormat,
+    XObjectTransform,
 };
-use std::io::BufWriter;
 use std::path::Path;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
@@ -81,10 +81,10 @@ pub fn images_to_pdf(input: &ImagesToPdfInput) -> AppResult<WrittenFile> {
             "no images selected",
         ));
     }
-    let (doc, page1, layer1) = PdfDocument::new("WAKARU", Mm(210.0), Mm(297.0), "Layer 1");
-    let mut first = Some((page1, layer1));
+    let mut doc = PdfDocument::new("WAKARU");
+    let mut pages = Vec::with_capacity(input.images.len());
 
-    for (i, path) in input.images.iter().enumerate() {
+    for path in &input.images {
         let dyn_img = ::image::open(path).map_err(|e| {
             AppError::new("FM_BAD_IMAGE", "error.fm.badImage", format!("{path}: {e}"))
         })?;
@@ -103,13 +103,6 @@ pub fn images_to_pdf(input: &ImagesToPdfInput) -> AppResult<WrittenFile> {
         } else {
             page_mm(&input.page_size, landscape)
         };
-
-        let (page_idx, layer_idx) = match first.take() {
-            Some(p) => p,
-            None => doc.add_page(Mm(pw), Mm(ph), "Layer 1"),
-        };
-        // fix page size for the first page if it wasn't A4
-        let layer = doc.get_page(page_idx).get_layer(layer_idx);
 
         let m = margin_mm(&input.margin);
         let (avail_w, avail_h) = (pw - 2.0 * m, ph - 2.0 * m);
@@ -130,39 +123,43 @@ pub fn images_to_pdf(input: &ImagesToPdfInput) -> AppResult<WrittenFile> {
         let x = m + (avail_w - draw_w) / 2.0;
         let y = m + (avail_h - draw_h) / 2.0;
 
-        let rgba = dyn_img.to_rgb8();
-        let pdf_image = PdfImage::from(ImageXObject {
-            width: Px(rgba.width() as usize),
-            height: Px(rgba.height() as usize),
-            color_space: ColorSpace::Rgb,
-            bits_per_component: ColorBits::Bit8,
-            interpolate: true,
-            image_data: rgba.into_raw(),
-            image_filter: None,
-            clipping_bbox: None,
-            smask: None,
-        });
+        let rgb = dyn_img.to_rgb8();
+        let (rgb_width, rgb_height) = (rgb.width() as usize, rgb.height() as usize);
+        let image = RawImage {
+            pixels: RawImageData::U8(rgb.into_raw()),
+            width: rgb_width,
+            height: rgb_height,
+            data_format: RawImageFormat::RGB8,
+            tag: Vec::new(),
+        };
+        let image_id = doc.add_image(&image);
         let scale_x = draw_w / px_to_mm(iw);
         let scale_y = draw_h / px_to_mm(ih);
-        pdf_image.add_to_layer(
-            layer.clone(),
-            ImageTransform {
-                translate_x: Some(Mm(x)),
-                translate_y: Some(Mm(y)),
-                scale_x: Some(scale_x),
-                scale_y: Some(scale_y),
-                ..Default::default()
-            },
-        );
-        let _ = i;
+        pages.push(PdfPage::new(
+            Mm(pw),
+            Mm(ph),
+            vec![Op::UseXobject {
+                id: image_id,
+                transform: XObjectTransform {
+                    translate_x: Some(Mm(x).into_pt()),
+                    translate_y: Some(Mm(y).into_pt()),
+                    scale_x: Some(scale_x),
+                    scale_y: Some(scale_y),
+                    dpi: Some(96.0),
+                    ..Default::default()
+                },
+            }],
+        ));
     }
 
     if let Some(parent) = Path::new(&input.dest_path).parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let file = std::fs::File::create(&input.dest_path)?;
-    doc.save(&mut BufWriter::new(file))
-        .map_err(|e| AppError::internal(format!("pdf save: {e}")))?;
+    let mut warnings = Vec::new();
+    let bytes = doc
+        .with_pages(pages)
+        .save(&PdfSaveOptions::default(), &mut warnings);
+    std::fs::write(&input.dest_path, bytes)?;
     Ok(WrittenFile {
         path: input.dest_path.clone(),
     })

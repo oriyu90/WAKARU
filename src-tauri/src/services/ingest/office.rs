@@ -5,7 +5,7 @@
 use super::Unit;
 use crate::domain::source::SourceKind;
 use crate::error::{AppError, AppResult};
-use quick_xml::events::Event;
+use quick_xml::events::{BytesText, Event};
 use quick_xml::Reader;
 use std::io::Read;
 use std::path::Path;
@@ -57,7 +57,7 @@ fn collect_tag_text(xml: &str, local: &str) -> String {
                 out.push('\n');
             }
             Ok(Event::Text(t)) if capture => {
-                if let Ok(s) = t.unescape() {
+                if let Some(s) = decode_text(&t) {
                     out.push_str(&s);
                 }
             }
@@ -74,6 +74,13 @@ fn local_name(qname: &[u8]) -> &[u8] {
         Some(i) => &qname[i + 1..],
         None => qname,
     }
+}
+
+fn decode_text(text: &BytesText<'_>) -> Option<String> {
+    let decoded = text.decode().ok()?;
+    quick_xml::escape::unescape(&decoded)
+        .ok()
+        .map(|s| s.into_owned())
 }
 
 fn parse_pptx(path: &Path) -> AppResult<Vec<Unit>> {
@@ -155,7 +162,10 @@ fn parse_docx(path: &Path) -> AppResult<Vec<Unit>> {
                         .flatten()
                         .find(|a| local_name(a.key.as_ref()) == b"val")
                     {
-                        if let Ok(val) = v.unescape_value() {
+                        if let Ok(val) = v.decoded_and_normalized_value(
+                            quick_xml::XmlVersion::Implicit1_0,
+                            reader.decoder(),
+                        ) {
                             if let Some(rest) = val.strip_prefix("Heading") {
                                 p_heading = rest.trim().parse::<u8>().ok();
                             }
@@ -171,7 +181,10 @@ fn parse_docx(path: &Path) -> AppResult<Vec<Unit>> {
                     .flatten()
                     .find(|a| local_name(a.key.as_ref()) == b"val")
                 {
-                    if let Ok(val) = v.unescape_value() {
+                    if let Ok(val) = v.decoded_and_normalized_value(
+                        quick_xml::XmlVersion::Implicit1_0,
+                        reader.decoder(),
+                    ) {
                         if let Some(rest) = val.strip_prefix("Heading") {
                             p_heading = rest.trim().parse::<u8>().ok();
                         }
@@ -179,7 +192,7 @@ fn parse_docx(path: &Path) -> AppResult<Vec<Unit>> {
                 }
             }
             Ok(Event::Text(t)) if capture_t => {
-                if let Ok(s) = t.unescape() {
+                if let Some(s) = decode_text(&t) {
                     p_text.push_str(&s);
                 }
             }

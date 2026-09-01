@@ -61,12 +61,17 @@ pub async fn index_source(
     source_id: &str,
     mut on_progress: impl FnMut(u32, u32),
 ) -> AppResult<u32> {
-    let mut stmt = project_db.prepare(
+    // SQLite resolves every table reference while preparing a statement, so an
+    // `OR NOT EXISTS(...)` guard cannot protect a subquery that names a missing
+    // vec0 table. Choose the statement shape before preparing it.
+    let sql = if has_vectors(project_db) {
         "SELECT c.rowid, c.text FROM chunks c
          WHERE c.source_id = ?1
-           AND (NOT EXISTS (SELECT 1 FROM sqlite_master WHERE name='chunk_vectors')
-                OR c.rowid NOT IN (SELECT chunk_rowid FROM chunk_vectors))",
-    )?;
+           AND c.rowid NOT IN (SELECT chunk_rowid FROM chunk_vectors)"
+    } else {
+        "SELECT c.rowid, c.text FROM chunks c WHERE c.source_id = ?1"
+    };
+    let mut stmt = project_db.prepare(sql)?;
     let pending: Vec<(i64, String)> = stmt
         .query_map([source_id], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
@@ -129,4 +134,48 @@ fn bytemuck_f32(v: &[f32]) -> Vec<u8> {
         out.extend_from_slice(&x.to_le_bytes());
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn no_embedding_binding_is_a_clean_noop_without_a_vector_table() {
+        let app_db = crate::storage::open_in_memory().unwrap();
+        crate::storage::migrate::run(
+            &app_db,
+            crate::storage::APP_MIGRATIONS,
+            crate::storage::APP_SCHEMA_VERSION,
+        )
+        .unwrap();
+        let project_db = crate::storage::open_in_memory().unwrap();
+        crate::storage::migrate::run(
+            &project_db,
+            crate::storage::PROJECT_MIGRATIONS,
+            crate::storage::PROJECT_SCHEMA_VERSION,
+        )
+        .unwrap();
+        project_db
+            .execute_batch(
+                "INSERT INTO sources(
+                   id, kind, original_name, rel_path, status, added_at
+                 ) VALUES ('s1', 'text', 'a.txt', 'sources/s1/a.txt', 'ready', 'now');
+                 INSERT INTO documents(
+                   id, source_id, ordinal, kind, text, locator
+                 ) VALUES ('d1', 's1', 1, 'text', 'hello', '{}');
+                 INSERT INTO chunks(
+                   id, source_id, document_id, ordinal, text, text_bigram,
+                   locator, created_at
+                 ) VALUES ('c1', 's1', 'd1', 1, 'hello', 'hello', '{}', 'now');",
+            )
+            .unwrap();
+
+        let indexed = index_source(&app_db, &project_db, "s1", |_, _| {})
+            .await
+            .unwrap();
+
+        assert_eq!(indexed, 0);
+        assert!(!has_vectors(&project_db));
+    }
 }

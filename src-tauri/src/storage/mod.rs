@@ -105,6 +105,9 @@ pub fn open_app_db(path: &Path) -> AppResult<Connection> {
 /// upgrade from trying to recreate `projects` and aborting at launch.
 fn adopt_legacy_app_schema(conn: &Connection) -> AppResult<()> {
     ensure_tracking_tables(conn)?;
+    if table_exists(conn, "global_index")? {
+        repair_legacy_global_index(conn)?;
+    }
     if migration_applied(conn, "001_init")? || !table_exists(conn, "projects")? {
         return Ok(());
     }
@@ -136,6 +139,50 @@ fn adopt_legacy_app_schema(conn: &Connection) -> AppResult<()> {
         mark_migration_applied(conn, "002_ai_protocol")?;
     }
     tracing::info!("adopted legacy app database baseline");
+    Ok(())
+}
+
+/// Early builds created the cross-project FTS mirror without `body_raw`.
+/// FTS5 virtual tables cannot add a column with `ALTER TABLE`, so rebuild the
+/// mirror atomically and use the indexed body as the display fallback for any
+/// rows that already exist. The per-project databases remain the source of
+/// truth and future writes populate both fields independently.
+fn repair_legacy_global_index(conn: &Connection) -> AppResult<()> {
+    if column_exists(conn, "global_index", "body_raw")? {
+        return Ok(());
+    }
+    for required in ["project_id", "source_id", "kind", "ref_id", "title", "body"] {
+        if !column_exists(conn, "global_index", required)? {
+            return Err(AppError::new(
+                "MIGRATION_FAILED",
+                "error.db.migration",
+                format!("legacy global search index is missing column: {required}"),
+            ));
+        }
+    }
+
+    let tx = conn.unchecked_transaction()?;
+    tx.execute_batch(
+        "CREATE VIRTUAL TABLE global_index_repaired USING fts5(
+           project_id UNINDEXED,
+           source_id  UNINDEXED,
+           kind       UNINDEXED,
+           ref_id     UNINDEXED,
+           title,
+           body,
+           body_raw   UNINDEXED,
+           tokenize = 'unicode61 remove_diacritics 2'
+         );
+         INSERT INTO global_index_repaired(
+           rowid, project_id, source_id, kind, ref_id, title, body, body_raw
+         )
+         SELECT rowid, project_id, source_id, kind, ref_id, title, body, body
+         FROM global_index;
+         DROP TABLE global_index;
+         ALTER TABLE global_index_repaired RENAME TO global_index;",
+    )?;
+    tx.commit()?;
+    tracing::info!("repaired legacy global search index schema");
     Ok(())
 }
 
@@ -233,7 +280,14 @@ mod legacy_tests {
              CREATE TABLE whisper_models(name TEXT PRIMARY KEY);
              CREATE TABLE mcp_servers(id TEXT PRIMARY KEY);
              CREATE TABLE mcp_tool_policies(server_id TEXT, tool_name TEXT);
-             CREATE TABLE global_index(body TEXT);",
+             CREATE VIRTUAL TABLE global_index USING fts5(
+                project_id UNINDEXED, source_id UNINDEXED, kind UNINDEXED,
+                ref_id UNINDEXED, title, body,
+                tokenize = 'unicode61 remove_diacritics 2'
+             );
+             INSERT INTO global_index(
+                project_id, source_id, kind, ref_id, title, body
+             ) VALUES ('p1', 's1', 'source', 'd1', 'Legacy', 'indexed text');",
         )
         .unwrap();
 
@@ -241,7 +295,46 @@ mod legacy_tests {
         migrate::run(&conn, APP_MIGRATIONS, APP_SCHEMA_VERSION).unwrap();
         assert!(column_exists(&conn, "ai_profiles", "json_schema").unwrap());
         assert!(column_exists(&conn, "ai_profiles", "protocol").unwrap());
+        assert!(column_exists(&conn, "global_index", "body_raw").unwrap());
+        let preserved: (String, String) = conn
+            .query_row(
+                "SELECT body, body_raw FROM global_index WHERE source_id = 's1'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(preserved, ("indexed text".into(), "indexed text".into()));
         assert!(migration_applied(&conn, "001_init").unwrap());
         assert!(migration_applied(&conn, "002_ai_protocol").unwrap());
+    }
+
+    #[test]
+    fn already_adopted_legacy_app_still_repairs_the_old_fts_shape() {
+        let conn = open_in_memory().unwrap();
+        ensure_tracking_tables(&conn).unwrap();
+        conn.execute_batch(
+            "CREATE VIRTUAL TABLE global_index USING fts5(
+                project_id UNINDEXED, source_id UNINDEXED, kind UNINDEXED,
+                ref_id UNINDEXED, title, body,
+                tokenize = 'unicode61 remove_diacritics 2'
+             );
+             INSERT INTO global_index(
+                project_id, source_id, kind, ref_id, title, body
+             ) VALUES ('p1', 's1', 'source', 'd1', 'Legacy', 'indexed text');",
+        )
+        .unwrap();
+        mark_migration_applied(&conn, "001_init").unwrap();
+
+        adopt_legacy_app_schema(&conn).unwrap();
+
+        assert!(column_exists(&conn, "global_index", "body_raw").unwrap());
+        let display: String = conn
+            .query_row(
+                "SELECT body_raw FROM global_index WHERE source_id = 's1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(display, "indexed text");
     }
 }

@@ -12,11 +12,25 @@
 .bar {
   flex: none;
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-sm);
   align-items: center;
 }
 .bar > :first-child {
-  flex: 1;
+  flex: 1 1 24rem;
+  min-width: min(100%, 14rem);
+}
+.bar > select {
+  flex: 0 1 20rem;
+  width: auto;
+  min-width: 12rem;
+}
+@media (max-width: 42rem) {
+  .bar > :first-child,
+  .bar > select {
+    flex-basis: 100%;
+    width: 100%;
+  }
 }
 .body {
   flex: 1;

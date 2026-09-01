@@ -39,14 +39,14 @@ encoding_rs = "0.8"
 chardetng = "0.1"                           # charset sniffing
 csv = "1"
 tiktoken-rs = "0.6"                         # cl100k_base token estimate (docs/04 §10)
-pdf-extract = "0.7"                         # PDF text (pure Rust; rasterisation deferred, D-09)
+pdf-extract = "0.12"                        # PDF text (pure Rust; rasterisation deferred, D-09)
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "bmp", "tiff", "webp"] }
 kamadak-exif = "0.5"                        # EXIF orientation
-calamine = "0.26"                           # xlsx / xls
+calamine = "0.36"                           # xlsx / xls
 zip = { version = "2", default-features = false, features = ["deflate"] }
-quick-xml = "0.36"                          # OOXML (pptx / docx)
+quick-xml = "0.41"                          # OOXML (pptx / docx)
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "gzip", "brotli", "json", "stream"] }
-scraper = "0.20"                            # HTML -> readable text (web links)
+scraper = "0.27"                            # HTML -> readable text (web links)
 
 # AI layer (Phase 3)
 keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
@@ -55,7 +55,7 @@ futures-util = "0.3"
 sqlite-vec = "0.1"                          # vec0 virtual table for chunk_vectors
 
 # File Modifier (Phase 8)
-printpdf = "0.7"                            # images -> PDF
+printpdf = { version = "0.12.7", default-features = false } # images -> PDF
 base64 = "0.22"                             # small image previews
 
 # async + jobs

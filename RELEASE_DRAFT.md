@@ -6,7 +6,7 @@ The verified DMG is
 `src-tauri/target/release/bundle/dmg/WAKARU_0.0.0_aarch64.dmg`.
 
 SHA-256:
-`92b615bd511f2a226b0c6e5168cd4ba2086062c1d7aa2b4909e0f4255822d672`.
+`047b136fb57c2624a3add0f1d5d72e56be87629f6b11448f6f797d6caa748634`.
 
 ---
 
@@ -17,7 +17,8 @@ SHA-256:
   README / LICENSE / release assets / site pointers ("source stays private").
 - So there is nothing to `git push` for the source. The release publishes the
   **built DMG + docs**, not the code.
-- Working tree is clean; last commit `4d8913d` (`phase(11): release prep`).
+- The replacement changes are committed locally before release upload; the
+  public repository must never receive this source tree.
 
 ---
 

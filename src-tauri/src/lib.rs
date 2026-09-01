@@ -154,13 +154,28 @@ fn asset_response(
     app: &tauri::AppHandle,
     request: tauri::http::Request<Vec<u8>>,
 ) -> tauri::http::Response<std::borrow::Cow<'static, [u8]>> {
-    use tauri::http::{Response, StatusCode};
+    use tauri::http::{Method, Response, StatusCode};
     let not_found = || {
         Response::builder()
             .status(StatusCode::NOT_FOUND)
+            .header("Access-Control-Allow-Origin", "*")
             .body(std::borrow::Cow::Borrowed(&b""[..]))
             .unwrap()
     };
+
+    // WebKit treats `fetch(wakaru-asset://...)` as a cross-origin request even
+    // though the protocol is registered only inside this app. Text, CSV and
+    // transcript previews use fetch, while images/media load the same URLs as
+    // element sources. Return CORS headers consistently so both paths work in
+    // the signed production WebView.
+    if request.method() == Method::OPTIONS {
+        return Response::builder()
+            .status(StatusCode::NO_CONTENT)
+            .header("Access-Control-Allow-Origin", "*")
+            .header("Access-Control-Allow-Methods", "GET, OPTIONS")
+            .body(std::borrow::Cow::Borrowed(&b""[..]))
+            .unwrap();
+    }
 
     let Some(state) = app.try_state::<AppState>() else {
         return not_found();
@@ -173,6 +188,7 @@ fn asset_response(
             tracing::warn!(path, code = %e.code, "asset request denied");
             return Response::builder()
                 .status(StatusCode::FORBIDDEN)
+                .header("Access-Control-Allow-Origin", "*")
                 .body(std::borrow::Cow::Borrowed(&b""[..]))
                 .unwrap();
         }
@@ -182,6 +198,7 @@ fn asset_response(
             .status(StatusCode::OK)
             .header("Content-Type", services::assets::content_type(&resolved))
             .header("Cache-Control", "no-cache")
+            .header("Access-Control-Allow-Origin", "*")
             .body(std::borrow::Cow::Owned(bytes))
             .unwrap(),
         Err(_) => not_found(),
