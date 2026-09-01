@@ -1,15 +1,12 @@
-# v0.0.0 release record
+# v0.0.1 release record
 
-Implementation, automated verification, native startup/migration testing, and
-bundle verification are complete (2026-09-01) — see `QUALITY_REPORT.md`.
-The existing GitHub pre-release was replaced in place, its release assets were
-verified through the GitHub API, and the public docs/site were published in
-`oriyu90/WAKARU@818ff51` and `oriyu90/studio-rizi@68f01c6`.
-The verified DMG is
-`src-tauri/target/release/bundle/dmg/WAKARU_0.0.0_aarch64.dmg`.
+Implementation, automated verification, responsive browser testing, native
+startup testing, and bundle verification are complete (2026-09-02) — see
+`QUALITY_REPORT.md`. The verified DMG is
+`src-tauri/target/release/bundle/dmg/WAKARU_0.0.1_aarch64.dmg`.
 
 SHA-256:
-`d63a72a9b8f11b88e763bf4cbc763c2a695d0b0ae456cd5c01db73a9591cbc34`.
+`1b5f0d7200880f008cfbc4e9fde6b8c83629dd506ae7b8ec320cdcfcae32fe84`.
 
 ---
 
@@ -38,7 +35,7 @@ Output app: `src-tauri/target/release/bundle/macos/WAKARU.app`
 ## 2. Verify the bundle
 
 ```bash
-DMG=src-tauri/target/release/bundle/dmg/WAKARU_0.0.0_aarch64.dmg
+DMG=src-tauri/target/release/bundle/dmg/WAKARU_0.0.1_aarch64.dmg
 hdiutil verify "$DMG"
 MP=$(mktemp -d); hdiutil attach "$DMG" -mountpoint "$MP" -nobrowse
 codesign --verify --deep --strict --verbose=2 "$MP/WAKARU.app"
@@ -63,7 +60,7 @@ hdiutil detach "$MP"
 
 ```bash
 cd src-tauri/target/release/bundle/dmg
-shasum -a 256 WAKARU_0.0.0_aarch64.dmg
+shasum -a 256 WAKARU_0.0.1_aarch64.dmg
 ```
 
 ## 5. Owner confirmation
@@ -77,11 +74,11 @@ Run the app once end-to-end and confirm it's good. (Plan Part 4 step 6 /
 
 ```bash
 cd ~/places/適当/work/WAKARU
-gh release upload v0.0.0 --repo oriyu90/WAKARU --clobber \
-  src-tauri/target/release/bundle/dmg/WAKARU_0.0.0_aarch64.dmg \
-  src-tauri/target/release/bundle/dmg/WAKARU_0.0.0_aarch64.dmg.sha256
-gh release edit v0.0.0 --repo oriyu90/WAKARU \
-  --title "WAKARU v0.0.0" --notes-file RELEASE_NOTES.md --prerelease
+gh release upload v0.0.1 --repo oriyu90/WAKARU --clobber \
+  src-tauri/target/release/bundle/dmg/WAKARU_0.0.1_aarch64.dmg \
+  src-tauri/target/release/bundle/dmg/WAKARU_0.0.1_aarch64.dmg.sha256
+gh release edit v0.0.1 --repo oriyu90/WAKARU \
+  --title "WAKARU v0.0.1" --notes-file RELEASE_NOTES.md --prerelease
 ```
 
 For a new tag, use `gh release create` with the same assets and `--prerelease`.
@@ -117,7 +114,7 @@ Commit as `Yuki <yukiseno0911@gmail.com>`.
 
 ### 7c. Private `common-rules-document/WAKARU.md`
 
-Bump: current version → `0.0.0`, scope note (full re-development, Tauri v2 +
+Bump: current version → `0.0.1`, scope note (full re-development, Tauri v2 +
 Rust + Hallmark React), open TODOs (PDF raster D-09, local embeddings D-10,
 Vision D-11, Studio streaming D-13, MCP HTTP D-14, Silero/keyframes D-15,
 Win/Linux unverified).
@@ -139,13 +136,13 @@ you configure.
 
 ## Install (macOS, Apple Silicon)
 
-Download `WAKARU_0.0.0_aarch64.dmg` from the [latest release](../../releases/latest).
+Download `WAKARU_0.0.1_aarch64.dmg` from the [v0.0.1 release](../../releases/tag/v0.0.1).
 The app is ad-hoc signed and **not notarized** — on first launch, right-click
 it and choose **Open** to get past Gatekeeper.
 
 Verify the download:
 
-    shasum -a 256 WAKARU_0.0.0_aarch64.dmg
+    shasum -a 256 WAKARU_0.0.1_aarch64.dmg
     # compare against RELEASE_CHECKSUMS.txt in the release
 
 ## Requirements
@@ -176,7 +173,7 @@ Verify the download:
   explicitly add, Whisper model downloads you start, and the update check
   (which can be turned off).
 
-## Limitations (v0.0.0)
+## Limitations (v0.0.1)
 
 - Windows / Linux builds are unverified and not distributed.
 - PDF/slide pages show extracted text, not rendered images.

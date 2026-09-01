@@ -1,8 +1,8 @@
-# WAKARU v0.0.0
+# WAKARU v0.0.1
 
-A reliability-focused build of the fully redeveloped WAKARU app on Tauri v2,
-Rust, and React. This release number intentionally follows the requested
-`v0.0.0` label even though an earlier public prerelease was tagged `v0.1.0`.
+A reliability and responsive-layout update to the fully redeveloped WAKARU app
+on Tauri v2, Rust, and React. It supersedes the v0.0.0 pre-release while
+preserving existing projects and settings.
 
 macOS (Apple Silicon) only for this release, ad-hoc signed and **not
 notarized** — on first launch, right-click the app and choose *Open* to get
@@ -10,12 +10,13 @@ past Gatekeeper.
 
 ## What's in it
 
-This tag was replaced after native runtime testing. The replacement repairs
+The v0.0.0 line repaired
 legacy-database imports, production Markdown/CSV previews, the collapsed search
 field, keyword-only embedding fallback, and newly disclosed PDF/XML denial-of-
-service risks. Existing project data is migrated in place.
+service risks. v0.0.1 adds the responsive, compatible-API, and MCP hardening
+described below. Existing project data is migrated in place.
 
-The current replacement also hardens document work for smaller models. Source
+This release also hardens document work for smaller models. Source
 text, retrieved excerpts, file contents, and tab transcripts are now separated
 from system instructions and explicitly treated as untrusted data. Studio uses
 a short verify-before-writing workflow and must create a workspace file when a

@@ -1,4 +1,4 @@
-# WAKARU v0.0.0 — handoff
+# WAKARU v0.0.1 — handoff
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
@@ -21,7 +21,7 @@ a from-scratch Hallmark React frontend.
   never push source there. If you want an off-site backup, add a *private*
   remote deliberately.
 - Author `Yuki Orita` / `Yuki_Orita`, MIT. Bundle id `com.yukiorita.wakaru`.
-- Version `0.0.0`, identical in `package.json`, `src-tauri/Cargo.toml`,
+- Version `0.0.1`, identical in `package.json`, `src-tauri/Cargo.toml`,
   `src-tauri/tauri.conf.json`.
 
 ## Status

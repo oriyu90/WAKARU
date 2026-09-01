@@ -9,7 +9,7 @@ frontend.
 
 ## Status
 
-**v0.0.0 release candidate.** All implementation phases are complete. AI
+**v0.0.1 release candidate.** All implementation phases are complete. AI
 connections support OpenAI-compatible and Anthropic-compatible wire formats;
 Studio applies a concise editorial quality policy, and Live Illustrator applies
 plain-language, understanding-oriented teaching guidance on every request.

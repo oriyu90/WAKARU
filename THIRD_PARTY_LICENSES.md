@@ -349,7 +349,6 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | parking | 2.2.1 | Apache-2.0 OR MIT |
 | parking_lot | 0.12.5 | MIT OR Apache-2.0 |
 | parking_lot_core | 0.9.12 | MIT OR Apache-2.0 |
-| pastey | 0.2.3 | MIT OR Apache-2.0 |
 | pathfinder_geometry | 0.5.1 | MIT/Apache-2.0 |
 | pathfinder_simd | 0.5.6 | MIT OR Apache-2.0 |
 | pdf-extract | 0.12.0 | MIT |
@@ -408,8 +407,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | reqwest | 0.13.4 | MIT OR Apache-2.0 |
 | rfd | 0.16.0 | MIT |
 | ring | 0.17.14 | Apache-2.0 AND ISC |
-| rmcp | 2.2.0 | Apache-2.0 |
-| rmcp-macros | 2.2.0 | Apache-2.0 |
+| rmcp | 3.0.1 | Apache-2.0 |
 | rusqlite | 0.32.1 | MIT |
 | rustc_version | 0.4.1 | MIT OR Apache-2.0 |
 | rustc-hash | 1.1.0 | Apache-2.0/MIT |
@@ -425,7 +423,6 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | schemars | 0.9.0 | MIT |
 | schemars | 1.2.2 | MIT |
 | schemars_derive | 0.8.22 | MIT |
-| schemars_derive | 1.2.2 | MIT |
 | scopeguard | 1.2.0 | MIT OR Apache-2.0 |
 | scraper | 0.27.0 | ISC |
 | security-framework | 2.11.1 | MIT OR Apache-2.0 |
@@ -438,7 +435,6 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | serde_core | 1.0.229 | MIT OR Apache-2.0 |
 | serde_derive | 1.0.229 | MIT OR Apache-2.0 |
 | serde_derive_internals | 0.29.1 | MIT OR Apache-2.0 |
-| serde_derive_internals | 0.30.0 | MIT OR Apache-2.0 |
 | serde_json | 1.0.151 | MIT OR Apache-2.0 |
 | serde_repr | 0.1.21 | MIT OR Apache-2.0 |
 | serde_spanned | 0.6.9 | MIT OR Apache-2.0 |
@@ -703,4 +699,4 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | zvariant_derive | 5.15.0 | MIT |
 | zvariant_utils | 4.2.0 | MIT |
 
-Total: 691 crates.
+Total: 687 crates.
