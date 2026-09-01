@@ -4,7 +4,7 @@ Implementation, automated verification, native startup/migration testing, and
 bundle verification are complete (2026-09-01) — see `QUALITY_REPORT.md`.
 The existing GitHub pre-release was replaced in place, its release assets were
 verified through the GitHub API, and the public docs/site were published in
-`oriyu90/WAKARU@9be9487` and `oriyu90/studio-rizi@68f01c6`.
+`oriyu90/WAKARU@818ff51` and `oriyu90/studio-rizi@68f01c6`.
 The verified DMG is
 `src-tauri/target/release/bundle/dmg/WAKARU_0.0.0_aarch64.dmg`.
 
