@@ -208,8 +208,13 @@ impl AiClient {
         let mut stream = resp.bytes_stream().eventsource();
         let mut usage = None;
         let mut truncated = true; // until we see [DONE]
-                                  // Reassembled by streamed `index`; kept dense so `into_iter` yields
-                                  // calls in their original order.
+                                  // OpenAI-compatible providers report an otherwise cleanly terminated
+                                  // response as `finish_reason: "length"` when the output budget is
+                                  // exhausted. `[DONE]` still follows, so the transport alone cannot
+                                  // distinguish this from a complete answer.
+        let mut output_limit_reached = false;
+        // Reassembled by streamed `index`; kept dense so `into_iter` yields
+        // calls in their original order.
         let mut tool_calls: Vec<StreamedToolCall> = Vec::new();
 
         loop {
@@ -225,10 +230,15 @@ impl AiClient {
                         Err(_) => break, // connection dropped -> truncated
                     };
                     if ev.data == "[DONE]" {
-                        truncated = false;
+                        truncated = output_limit_reached;
                         break;
                     }
                     let Ok(chunk): Result<Value, _> = serde_json::from_str(&ev.data) else { continue };
+                    if chunk.pointer("/choices/0/finish_reason").and_then(Value::as_str)
+                        == Some("length")
+                    {
+                        output_limit_reached = true;
+                    }
                     if let Some(u) = chunk.get("usage").filter(|u| !u.is_null()) {
                         usage = Some(TokenUsage {
                             prompt_tokens: u.get("prompt_tokens").and_then(|x| x.as_u64()).unwrap_or(0) as u32,
@@ -832,6 +842,36 @@ mod tests {
         assert!(lower.contains("x-api-key: secret-test-key"));
         assert!(lower.contains("anthropic-version: 2023-06-01"));
         assert!(request.contains("\"system\":\"sys\""));
+    }
+
+    #[tokio::test]
+    async fn openai_length_finish_is_reported_as_truncated_even_with_done() {
+        let events = concat!(
+            "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}\n\n",
+            "data: [DONE]\n\n"
+        );
+        let (base, _request_rx) = serve_once(events);
+        let client = AiClient::new(ApiProtocol::Openai, &base, None, Vec::new(), 5_000).unwrap();
+        let mut text = String::new();
+        let (_usage, truncated, calls) = client
+            .chat_stream(
+                "test-model",
+                json!([{ "role": "user", "content": "write" }]),
+                &json!({ "max_tokens": 3 }),
+                &CancellationToken::new(),
+                |kind, delta| {
+                    if kind == "text" {
+                        text.push_str(delta);
+                    }
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(text, "partial");
+        assert!(truncated);
+        assert!(calls.is_empty());
     }
 
     fn serve_once(body: &'static str) -> (String, mpsc::Receiver<String>) {

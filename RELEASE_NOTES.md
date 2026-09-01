@@ -35,8 +35,8 @@ falls below 70% of the source, and primary dark-theme text is now exact white.
   the complete `write_file` path, and suspiciously shortened organiser output
   cannot be saved as Markdown.
 - **Reliability hardening** — validated endpoint URLs, safe database migration
-  for existing profiles, incomplete-stream detection, no caching of truncated
-  explanations, recoverable poisoned locks, safe corrupt-ZIP errors, and
+  for existing profiles, incomplete-stream and output-limit detection, no
+  caching of truncated explanations, recoverable poisoned locks, safe corrupt-ZIP errors, and
   visible failures when saving AI settings.
 
 - **Projects & ingestion** — self-contained project folders; add PDFs, images,
