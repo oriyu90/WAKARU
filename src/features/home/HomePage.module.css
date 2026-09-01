@@ -14,8 +14,24 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr));
   gap: var(--space-md);
+}
+
+@media (max-width: 32rem) {
+  .page {
+    padding: var(--space-lg);
+  }
+  .head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (max-height: 30rem) {
+  .page {
+    padding-block: var(--space-md) var(--space-xl);
+  }
 }
 
 .skelCard {

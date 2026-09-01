@@ -4,6 +4,33 @@ Generated 2026-09-01 from a clean run of every automated gate, native macOS
 interaction tests against a fixture library and local compatible API, database
 migration verification, log review, and final DMG verification.
 
+## 2026-09-02 responsive / LAN API / MCP re-audit
+
+- Responsive browser matrix passed at 240×320, 320×568, 568×320, 960×640,
+  1280×840 and 1600×500. Home, Settings, File Modifier, Search and the
+  component-state preview kept document width equal to viewport width; tall
+  content remained reachable through the intended inner/main scrollers.
+- 960×640 and 320×568 also passed at 150% display scale. A remaining 4 px
+  Search select overflow found only at 320×568/150% was fixed and retested.
+- OpenAI-compatible and Anthropic-compatible profile paths were statically
+  re-audited. LAN `http://` URLs remain valid, `/v1` remains an explicit part
+  of the configured base URL, headers and timeout bounds are validated, and
+  auth/protocol headers cannot be silently overridden by custom headers.
+- Capability probes now require an actual named tool call and parse valid
+  schema-constrained JSON; a merely successful HTTP response no longer creates
+  those two false-positive capability flags.
+- MCP now uses exactly pinned `rmcp 3.0.1`, prefers the MCP 2026-07-28 discover
+  lifecycle, and falls back to 2025-11-25 initialization. The official
+  `@modelcontextprotocol/server-everything` stdio server passed real tool-list
+  discovery and an `echo` call. Timeouts, graceful cleanup, catalog refresh,
+  duplicate-name isolation, strict JSON arguments, secret-redacted stderr and
+  all standard result content kinds are covered by the implementation.
+- Fresh gates: frontend production build, lint/design rules, 9 unit tests,
+  contrast and 327×3 i18n parity all pass. Rust fmt and warning-as-error clippy
+  pass; 185 normal backend tests pass with 2 explicit live/manual tests ignored,
+  and the ignored MCP interoperability test passes when run manually. Cargo
+  license, ban and source checks pass.
+
 ## Automated gates — all green
 
 ### Frontend

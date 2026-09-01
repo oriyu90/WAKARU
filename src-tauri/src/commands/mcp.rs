@@ -29,6 +29,24 @@ pub fn mcp_upsert_server(
             "server name is required",
         ));
     }
+    if input.transport != "stdio" {
+        return Err(AppError::new(
+            "MCP_TRANSPORT_UNSUPPORTED",
+            "error.mcp.transportUnsupported",
+            "only stdio MCP servers are supported",
+        ));
+    }
+    if input
+        .command
+        .as_deref()
+        .is_none_or(|command| command.trim().is_empty())
+    {
+        return Err(AppError::new(
+            "MCP_NO_COMMAND",
+            "error.mcp.noCommand",
+            "stdio server needs a command",
+        ));
+    }
     let id = input
         .id
         .clone()
@@ -39,15 +57,35 @@ pub fn mcp_upsert_server(
     let mut env_refs = serde_json::Map::new();
     if let Some(obj) = input.env.as_object() {
         for (k, v) in obj {
-            let Some(val) = v.as_str() else { continue };
+            if k.is_empty() || k.contains(['\0', '=']) {
+                return Err(AppError::new(
+                    "MCP_ENV_INVALID",
+                    "error.mcp.spawnFailed",
+                    format!("invalid environment variable name: {k}"),
+                ));
+            }
+            let val = v.as_str().ok_or_else(|| {
+                AppError::new(
+                    "MCP_ENV_INVALID",
+                    "error.mcp.spawnFailed",
+                    format!("environment variable {k} must be a string"),
+                )
+            })?;
             let stored = if let Some(reference) = val.strip_prefix("keychain:") {
+                if reference.is_empty() || reference.contains(['\0', '=']) {
+                    return Err(AppError::new(
+                        "MCP_ENV_INVALID",
+                        "error.mcp.spawnFailed",
+                        format!("invalid keychain reference for {k}"),
+                    ));
+                }
                 format!("keychain:{reference}")
             } else {
-                if let Ok(entry) =
-                    keyring::Entry::new(KEYRING_SERVICE, &format!("mcp_env:{id}:{k}"))
-                {
-                    let _ = entry.set_password(val);
-                }
+                let entry = keyring::Entry::new(KEYRING_SERVICE, &format!("mcp_env:{id}:{k}"))
+                    .map_err(|e| AppError::internal(format!("keyring: {e}")))?;
+                entry
+                    .set_password(val)
+                    .map_err(|e| AppError::internal(format!("keyring set: {e}")))?;
                 format!("keychain:{k}")
             };
             env_refs.insert(k.clone(), serde_json::Value::String(stored));

@@ -55,3 +55,15 @@
   font-size: var(--fs-2xs);
   color: var(--color-neutral);
 }
+
+@media (max-width: 32rem) {
+  .row,
+  .main {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .actions,
+  .dl {
+    flex-wrap: wrap;
+  }
+}

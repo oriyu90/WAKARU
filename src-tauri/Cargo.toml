@@ -5,7 +5,7 @@ description = "Local-first AI notebook for your own documents"
 authors = ["Yuki Orita"]
 license = "MIT"
 edition = "2021"
-rust-version = "1.78"
+rust-version = "1.88"
 
 [lib]
 name = "wakaru_lib"
@@ -67,7 +67,7 @@ thiserror = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
-rmcp = { version = "2.2.0", features = ["client", "macros", "transport-child-process"] }
+rmcp = { version = "=3.0.1", default-features = false, features = ["client", "transport-child-process"] }
 whisper-rs = { version = "0.14", default-features = false, features = ["metal"] }
 symphonia = { version = "0.5.5", features = ["mp3", "aac", "isomp4", "wav", "flac", "ogg"] }
 

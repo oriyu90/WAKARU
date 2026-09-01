@@ -3,7 +3,8 @@
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: 14rem 1fr 16rem;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr) minmax(12rem, 16rem);
+  overflow: hidden;
 }
 .emptyPane {
   flex: 1;
@@ -226,6 +227,7 @@
 }
 .composerRow > :first-child {
   flex: 1;
+  min-width: 0;
 }
 .composerBar {
   display: flex;
@@ -316,5 +318,45 @@
   }
   .workspace {
     display: none;
+  }
+}
+
+@media (max-width: 42rem) {
+  .studio {
+    display: flex;
+  }
+  .rail {
+    display: none;
+  }
+  .conversation {
+    flex: 1;
+  }
+}
+
+@media (max-width: 24rem) {
+  .messages {
+    padding: var(--space-sm);
+  }
+  .composer {
+    padding: var(--space-xs) var(--space-sm);
+  }
+  .composerBar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+  .scopeSel {
+    max-width: none;
+    width: 100%;
+  }
+}
+
+@media (max-height: 30rem) {
+  .messages {
+    padding-block: var(--space-sm);
+    gap: var(--space-sm);
+  }
+  .composer {
+    padding-block: var(--space-xs);
   }
 }

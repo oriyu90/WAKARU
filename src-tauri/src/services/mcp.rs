@@ -1,19 +1,20 @@
 //! MCP client (docs/05 §6, AC-7-1/3/4/11/12). Only the **stdio** transport is
-//! implemented for v0.2.0; Streamable HTTP is deferred (DECISIONS D-14 — its
-//! `rmcp` feature pulls native-tls / openssl-sys, a cross-platform build and
-//! `cargo deny` liability). Connections live in a process-global registry so a
+//! implemented for v0.0.0; Streamable HTTP is deferred until its remote auth,
+//! approval, and reconnect design is complete (DECISIONS D-14). Connections live in a process-global registry so a
 //! Studio tool loop can reach them without threading a handle through every
 //! call. A server that fails to connect or dies isolates to itself (AC-7-11).
 
 use crate::domain::mcp::{McpServer, McpTool};
 use crate::error::{AppError, AppResult};
-use rmcp::model::CallToolRequestParams;
+use rmcp::model::{CallToolRequestParams, ContentBlock, ProtocolVersion, ResourceContents};
+use rmcp::service::ClientLifecycleMode;
 use rmcp::service::{RoleClient, RunningService};
 use rmcp::transport::TokioChildProcess;
-use rmcp::ServiceExt;
+use rmcp::ClientServiceExt;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use tokio::sync::Mutex;
 
@@ -21,6 +22,10 @@ const KEYRING_SERVICE: &str = "com.yukiorita.wakaru";
 /// Env vars a stdio MCP server inherits (docs/05 §6.4 — no secrets by default).
 const ENV_ALLOWLIST: &[&str] = &["PATH", "HOME", "TMPDIR", "LANG"];
 const STDERR_KEEP_LINES: usize = 200;
+const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(25);
+const LIST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+const CALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+const CLOSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 
 struct Conn {
     service: RunningService<RoleClient, ()>,
@@ -33,8 +38,21 @@ struct Conn {
 #[derive(Clone)]
 struct ToolInfo {
     name: String,
+    alias: String,
     description: Option<String>,
     schema: Value,
+}
+
+fn decode_tools(raw: Vec<rmcp::model::Tool>) -> Vec<ToolInfo> {
+    raw.into_iter()
+        .map(|tool| ToolInfo {
+            name: tool.name.to_string(),
+            alias: tool_alias(&tool.name),
+            description: tool.description.map(|description| description.to_string()),
+            schema: serde_json::to_value(&*tool.input_schema)
+                .unwrap_or_else(|_| json!({ "type": "object" })),
+        })
+        .collect()
 }
 
 type Registry = Mutex<HashMap<String, Conn>>;
@@ -61,6 +79,33 @@ pub fn slugify(name: &str) -> String {
     } else {
         trimmed
     }
+}
+
+/// Stable, collision-resistant namespace for a configured server. Display names
+/// are not unique, but model-visible function names must be.
+pub fn server_slug(name: &str, id: &str) -> String {
+    let mut base = slugify(name);
+    base.truncate(12);
+    let suffix: String = id
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .take(8)
+        .collect();
+    if suffix.is_empty() {
+        base
+    } else {
+        format!("{base}_{suffix}")
+    }
+}
+
+/// OpenAI-compatible function-name alias for an MCP tool name. MCP names may
+/// be longer or contain characters rejected by compatible chat endpoints.
+pub fn tool_alias(name: &str) -> String {
+    let mut base = slugify(name);
+    base.truncate(24);
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    name.hash(&mut hasher);
+    format!("{base}_{:08x}", hasher.finish() as u32)
 }
 
 // ───────────────────────── persistence helpers ─────────────────────────
@@ -132,15 +177,20 @@ pub struct McpServerRow {
 /// loop consults, keyed by `<slug>__<tool>` (missing => `ask`).
 pub fn policy_map(app_db: &Connection) -> AppResult<HashMap<String, String>> {
     let mut stmt = app_db.prepare(
-        "SELECT s.name, p.tool_name, p.policy
+        "SELECT s.id, s.name, p.tool_name, p.policy
          FROM mcp_tool_policies p JOIN mcp_servers s ON s.id = p.server_id",
     )?;
-    let rows: Vec<(String, String, String)> = stmt
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+    let rows: Vec<(String, String, String, String)> = stmt
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
         .collect::<rusqlite::Result<_>>()?;
     Ok(rows
         .into_iter()
-        .map(|(name, tool, policy)| (format!("{}__{}", slugify(&name), tool), policy))
+        .map(|(id, name, tool, policy)| {
+            (
+                format!("{}__{}", server_slug(&name, &id), tool_alias(&tool)),
+                policy,
+            )
+        })
         .collect())
 }
 
@@ -196,6 +246,7 @@ pub async fn connect(
             cmd.env(key, v);
         }
     }
+    let mut secret_values = Vec::new();
     for (k, v) in &row.env {
         let Some(v) = v.as_str() else { continue };
         let resolved = if let Some(reference) = v.strip_prefix("keychain:") {
@@ -206,6 +257,9 @@ pub async fn connect(
         } else {
             v.to_string()
         };
+        if !resolved.is_empty() {
+            secret_values.push(resolved.clone());
+        }
         cmd.env(k, resolved);
     }
 
@@ -220,7 +274,10 @@ pub async fn connect(
         tokio::spawn(async move {
             use tokio::io::{AsyncBufReadExt, BufReader};
             let mut lines = BufReader::new(err).lines();
-            while let Ok(Some(line)) = lines.next_line().await {
+            while let Ok(Some(mut line)) = lines.next_line().await {
+                for secret in &secret_values {
+                    line = line.replace(secret, "[REDACTED]");
+                }
                 let mut g = buf.lock().unwrap_or_else(|e| e.into_inner());
                 g.push(line);
                 let overflow = g.len().saturating_sub(STDERR_KEEP_LINES);
@@ -231,7 +288,25 @@ pub async fn connect(
         });
     }
 
-    let service = ().serve(proc).await.map_err(|e| {
+    let service = tokio::time::timeout(
+        CONNECT_TIMEOUT,
+        ().serve_with_lifecycle(
+            proc,
+            ClientLifecycleMode::Auto {
+                preferred_versions: vec![ProtocolVersion::V_2026_07_28],
+                legacy_version: Some(ProtocolVersion::V_2025_11_25),
+            },
+        ),
+    )
+    .await
+    .map_err(|_| {
+        AppError::new(
+            "MCP_HANDSHAKE_TIMEOUT",
+            "error.mcp.handshakeFailed",
+            "MCP handshake timed out",
+        )
+    })?
+    .map_err(|e| {
         AppError::new(
             "MCP_HANDSHAKE_FAILED",
             "error.mcp.handshakeFailed",
@@ -239,29 +314,30 @@ pub async fn connect(
         )
     })?;
 
-    let raw = service.list_all_tools().await.map_err(|e| {
-        AppError::new(
-            "MCP_LIST_TOOLS_FAILED",
-            "error.mcp.listToolsFailed",
-            e.to_string(),
-        )
-    })?;
+    let raw = tokio::time::timeout(LIST_TIMEOUT, service.list_all_tools())
+        .await
+        .map_err(|_| {
+            AppError::new(
+                "MCP_LIST_TOOLS_TIMEOUT",
+                "error.mcp.listToolsFailed",
+                "MCP tools/list timed out",
+            )
+        })?
+        .map_err(|e| {
+            AppError::new(
+                "MCP_LIST_TOOLS_FAILED",
+                "error.mcp.listToolsFailed",
+                e.to_string(),
+            )
+        })?;
 
-    let slug = slugify(&row.name);
-    let tools: Vec<ToolInfo> = raw
-        .into_iter()
-        .map(|t| ToolInfo {
-            name: t.name.to_string(),
-            description: t.description.map(|d| d.to_string()),
-            schema: serde_json::to_value(&*t.input_schema)
-                .unwrap_or_else(|_| json!({ "type": "object" })),
-        })
-        .collect();
+    let slug = server_slug(&row.name, &row.id);
+    let tools = decode_tools(raw);
 
     let out: Vec<McpTool> = tools
         .iter()
         .map(|t| {
-            let qualified = format!("{slug}__{}", t.name);
+            let qualified = format!("{slug}__{}", t.alias);
             McpTool {
                 server_id: row.id.clone(),
                 server_name: row.name.clone(),
@@ -277,11 +353,11 @@ pub async fn connect(
         .collect();
 
     // Replace any previous connection for this server id.
-    let mut g = conns().lock().await;
-    if let Some(old) = g.remove(&row.id) {
-        let _ = old.service.cancel().await;
+    let old = conns().lock().await.remove(&row.id);
+    if let Some(mut old) = old {
+        let _ = old.service.close_with_timeout(CLOSE_TIMEOUT).await;
     }
-    g.insert(
+    conns().lock().await.insert(
         row.id.clone(),
         Conn {
             service,
@@ -295,8 +371,8 @@ pub async fn connect(
 }
 
 pub async fn disconnect(server_id: &str) {
-    if let Some(conn) = conns().lock().await.remove(server_id) {
-        let _ = conn.service.cancel().await;
+    if let Some(mut conn) = conns().lock().await.remove(server_id) {
+        let _ = conn.service.close_with_timeout(CLOSE_TIMEOUT).await;
     }
 }
 
@@ -308,11 +384,35 @@ pub async fn stderr_lines(server_id: &str) -> Vec<String> {
 }
 
 pub async fn connected_ids() -> Vec<String> {
-    conns().lock().await.keys().cloned().collect()
+    conns()
+        .lock()
+        .await
+        .iter()
+        .filter(|(_, conn)| !conn.service.is_closed())
+        .map(|(id, _)| id.clone())
+        .collect()
 }
 
 /// OpenAI `tools` entries for every connected server, namespaced (docs/05 §6.3).
 pub async fn studio_tool_defs() -> Vec<Value> {
+    // Re-list before building the model tool catalog. RMCP applies modern cache
+    // hints where available; legacy servers are simply queried again. A failed
+    // refresh keeps the last known catalog and does not break Studio.
+    let peers: Vec<(String, rmcp::Peer<RoleClient>)> = conns()
+        .lock()
+        .await
+        .iter()
+        .filter(|(_, conn)| !conn.service.is_closed())
+        .map(|(id, conn)| (id.clone(), conn.service.peer().clone()))
+        .collect();
+    for (id, peer) in peers {
+        if let Ok(Ok(raw)) = tokio::time::timeout(LIST_TIMEOUT, peer.list_all_tools()).await {
+            if let Some(conn) = conns().lock().await.get_mut(&id) {
+                conn.tools = decode_tools(raw);
+            }
+        }
+    }
+
     let g = conns().lock().await;
     let mut out = Vec::new();
     for conn in g.values() {
@@ -324,7 +424,7 @@ pub async fn studio_tool_defs() -> Vec<Value> {
             out.push(json!({
                 "type": "function",
                 "function": {
-                    "name": format!("{}__{}", conn.slug, t.name),
+                    "name": format!("{}__{}", conn.slug, t.alias),
                     "description": t.description.clone().unwrap_or_else(|| format!("{} (via {})", t.name, conn.server_name)),
                     "parameters": schema,
                 }
@@ -338,42 +438,97 @@ pub async fn studio_tool_defs() -> Vec<Value> {
 /// string is later stored as a `role: "tool"` message — the loop's system
 /// prompt tells the model that tool output is data, not instructions (AC-7-12).
 pub async fn call_tool(slug: &str, tool: &str, arguments: &str) -> AppResult<String> {
-    let g = conns().lock().await;
-    let conn = g
-        .values()
-        .find(|c| c.slug == slug)
-        .ok_or_else(|| AppError::new("MCP_NOT_CONNECTED", "error.mcp.notConnected", slug))?;
+    let (peer, tool_name) = {
+        let g = conns().lock().await;
+        let conn = g
+            .values()
+            .find(|c| c.slug == slug)
+            .ok_or_else(|| AppError::new("MCP_NOT_CONNECTED", "error.mcp.notConnected", slug))?;
+        let name = conn
+            .tools
+            .iter()
+            .find(|candidate| candidate.alias == tool)
+            .map(|candidate| candidate.name.clone())
+            .ok_or_else(|| AppError::new("MCP_TOOL_NOT_FOUND", "error.mcp.callFailed", tool))?;
+        (conn.service.peer().clone(), name)
+    };
 
-    let args: Option<Map<String, Value>> = serde_json::from_str(arguments.trim())
-        .ok()
-        .or_else(|| Some(Map::new()));
-    let mut params = CallToolRequestParams::new(tool.to_string());
-    if let Some(a) = args {
-        if !a.is_empty() {
-            params = params.with_arguments(a);
-        }
+    let args = if arguments.trim().is_empty() {
+        Map::new()
+    } else {
+        serde_json::from_str::<Value>(arguments.trim())
+            .map_err(|e| AppError::new("MCP_BAD_ARGUMENTS", "error.mcp.callFailed", e.to_string()))?
+            .as_object()
+            .cloned()
+            .ok_or_else(|| {
+                AppError::new(
+                    "MCP_BAD_ARGUMENTS",
+                    "error.mcp.callFailed",
+                    "tool arguments must be a JSON object",
+                )
+            })?
+    };
+    let mut params = CallToolRequestParams::new(tool_name);
+    if !args.is_empty() {
+        params = params.with_arguments(args);
     }
 
-    let res = conn
-        .service
-        .call_tool(params)
+    let res = tokio::time::timeout(CALL_TIMEOUT, peer.call_tool(params))
         .await
+        .map_err(|_| {
+            AppError::new(
+                "MCP_CALL_TIMEOUT",
+                "error.mcp.callFailed",
+                "MCP tool call timed out",
+            )
+        })?
         .map_err(|e| AppError::new("MCP_CALL_FAILED", "error.mcp.callFailed", e.to_string()))?;
 
-    // Flatten text content; a structured result falls back to its JSON.
+    // Keep every standard MCP content kind. Binary payloads are represented by
+    // metadata so a tool cannot flood the model context with base64 data.
     let mut text = String::new();
     for block in &res.content {
-        if let Some(t) = block.as_text() {
-            if !text.is_empty() {
-                text.push('\n');
-            }
-            text.push_str(&t.text);
+        let part = match block {
+            ContentBlock::Text(t) => t.text.clone(),
+            ContentBlock::Image(i) => format!(
+                "[image: {}, {} base64 characters]",
+                i.mime_type,
+                i.data.len()
+            ),
+            ContentBlock::Audio(a) => format!(
+                "[audio: {}, {} base64 characters]",
+                a.mime_type,
+                a.data.len()
+            ),
+            ContentBlock::Resource(r) => match &r.resource {
+                ResourceContents::TextResourceContents { uri, text, .. } => {
+                    format!("[resource: {uri}]\n{text}")
+                }
+                ResourceContents::BlobResourceContents {
+                    uri,
+                    blob,
+                    mime_type,
+                    ..
+                } => format!(
+                    "[resource: {uri}, {}, {} base64 characters]",
+                    mime_type.as_deref().unwrap_or("application/octet-stream"),
+                    blob.len()
+                ),
+                _ => "[resource: unsupported content kind]".into(),
+            },
+            ContentBlock::ResourceLink(r) => format!("[resource link: {} ({})]", r.name, r.uri),
+            _ => "[unsupported MCP content block]".into(),
+        };
+        if !text.is_empty() {
+            text.push('\n');
         }
+        text.push_str(&part);
     }
-    if text.is_empty() {
-        if let Some(sc) = &res.structured_content {
-            text = sc.to_string();
+    if let Some(sc) = &res.structured_content {
+        if !text.is_empty() {
+            text.push_str("\n[structured content]\n");
         }
+        text.push_str(&sc.to_string());
     }
     if res.is_error.unwrap_or(false) {
         return Ok(format!("ERROR (tool): {text}"));
@@ -388,8 +543,57 @@ pub async fn call_tool(slug: &str, tool: &str, arguments: &str) -> AppResult<Str
 /// Drop every live connection (called on app shutdown — stdio children must not
 /// be orphaned, docs/05 §6.1).
 pub async fn shutdown_all() {
-    let mut g = conns().lock().await;
-    for (_, conn) in g.drain() {
-        let _ = conn.service.cancel().await;
+    let drained: Vec<Conn> = conns().lock().await.drain().map(|(_, conn)| conn).collect();
+    for mut conn in drained {
+        let _ = conn.service.close_with_timeout(CLOSE_TIMEOUT).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn server_namespaces_are_stable_and_unique() {
+        assert_eq!(server_slug("My Server", "abc-123"), "my_server_abc123");
+        assert_ne!(
+            server_slug("duplicate", "11111111-a"),
+            server_slug("duplicate", "22222222-b")
+        );
+        let alias = tool_alias("tool.with spaces/and-a-very-long-name-that-exceeds-limits");
+        assert!(alias.len() <= 33);
+        assert!(alias
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '_'));
+    }
+
+    /// Manual interoperability check against the official MCP "everything"
+    /// server. Ignored in normal CI because it downloads an npm package.
+    #[tokio::test]
+    #[ignore = "requires network access and npx"]
+    async fn official_everything_server_lists_and_calls_tools() {
+        let row = McpServerRow {
+            id: "everything".into(),
+            name: "Everything".into(),
+            transport: "stdio".into(),
+            command: Some("npx".into()),
+            args: vec![
+                "-y".into(),
+                "@modelcontextprotocol/server-everything".into(),
+            ],
+            url: None,
+            env: Map::new(),
+        };
+        let tools = connect(row, &HashMap::new()).await.unwrap();
+        assert!(tools.iter().any(|tool| tool.name == "echo"));
+        let result = call_tool(
+            &server_slug("Everything", "everything"),
+            &tool_alias("echo"),
+            r#"{"message":"WAKARU_MCP_OK"}"#,
+        )
+        .await
+        .unwrap();
+        assert!(result.contains("WAKARU_MCP_OK"));
+        disconnect("everything").await;
     }
 }

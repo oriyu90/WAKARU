@@ -159,3 +159,23 @@
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
+
+@media (max-width: 36rem) {
+  .toolbar {
+    height: auto;
+    min-height: var(--toolbar-height);
+    padding-block: var(--space-xs);
+  }
+  .row {
+    grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+    gap: var(--space-xs);
+    padding-inline: var(--space-sm);
+  }
+  .rowKind,
+  .rowBytes {
+    display: none;
+  }
+  .rowActions {
+    opacity: 1;
+  }
+}

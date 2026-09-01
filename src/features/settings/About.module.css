@@ -41,3 +41,12 @@
 .lic {
   color: var(--color-neutral);
 }
+
+@media (max-width: 32rem) {
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .facts dd + dt {
+    margin-top: var(--space-xs);
+  }
+}

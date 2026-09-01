@@ -30,6 +30,7 @@
   .bar > select {
     flex-basis: 100%;
     width: 100%;
+    min-width: 0;
   }
 }
 .body {
@@ -96,4 +97,22 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+@media (max-width: 32rem) {
+  .page {
+    padding: var(--space-lg) var(--space-lg) 0;
+  }
+}
+
+@media (max-height: 30rem) {
+  .page {
+    padding-top: var(--space-md);
+  }
+  .title {
+    margin-bottom: var(--space-md);
+  }
+  .body {
+    padding-block: var(--space-md);
+  }
 }

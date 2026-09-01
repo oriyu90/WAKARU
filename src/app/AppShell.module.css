@@ -19,6 +19,7 @@
   background: var(--topbar);
   color: var(--topbar-ink);
   border-bottom: var(--rule-1) solid oklch(0% 0 0 / 0.2);
+  min-width: 0;
 }
 .topBar .wordmark {
   font-weight: var(--weight-strong);
@@ -26,6 +27,7 @@
   font-size: var(--fs-md);
 }
 .topBar .tagline {
+  min-width: 0;
   font-size: var(--fs-2xs);
   color: color-mix(in oklab, var(--topbar-ink) 62%, transparent);
   white-space: nowrap;
@@ -34,6 +36,7 @@
 }
 .spacer {
   flex: 1;
+  min-width: 0;
 }
 .kbd {
   font-family: var(--font-mono);
@@ -84,7 +87,7 @@
   inset-block: 0;
   inset-inline-start: 0;
   z-index: var(--z-dropdown);
-  inline-size: var(--sidebar-width);
+  inline-size: min(var(--sidebar-width), 100%);
   display: flex;
   flex-direction: column;
   background: var(--overlay-panel);
@@ -191,4 +194,16 @@
   padding: var(--space-xs);
   font-size: var(--fs-2xs);
   color: var(--color-muted);
+}
+
+@media (max-width: 30rem) {
+  .kbd {
+    display: none;
+  }
+}
+
+@media (max-width: 23rem) {
+  .topBar .tagline {
+    display: none;
+  }
 }

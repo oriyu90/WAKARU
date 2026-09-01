@@ -88,7 +88,7 @@ impl JobRegistry {
             .order
             .iter()
             .filter_map(|id| inner.jobs.get(id))
-            .filter(|j| project_id.map_or(true, |pid| j.project_id.as_deref() == Some(pid)))
+            .filter(|j| project_id.is_none_or(|pid| j.project_id.as_deref() == Some(pid)))
             .cloned()
             .collect()
     }

@@ -2,6 +2,7 @@
   flex: none;
   block-size: 100%;
   inline-size: 0;
+  max-inline-size: 100%;
   overflow: hidden;
   background: var(--color-paper);
   transition: inline-size var(--dur-long) var(--ease-out);
@@ -13,7 +14,7 @@
   border-inline-end: var(--rule-1) solid var(--color-rule);
 }
 .drawer[data-open="true"] {
-  inline-size: 24rem;
+  inline-size: min(24rem, 100%);
 }
 @media (prefers-reduced-motion: reduce) {
   .drawer {

@@ -79,9 +79,20 @@
 }
 
 .stage {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
+}
+
+@media (max-width: 42rem) {
+  .stage > :global([role="region"]) {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    z-index: var(--z-dropdown);
+    box-shadow: var(--shadow-overlay);
+  }
 }
 .pane {
   flex: 1;

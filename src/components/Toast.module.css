@@ -1,13 +1,13 @@
 .region {
   position: absolute;
-  inset-block-end: var(--space-lg);
-  inset-inline-end: var(--space-lg);
+  inset-block-end: max(var(--space-sm), env(safe-area-inset-bottom));
+  inset-inline-end: max(var(--space-sm), env(safe-area-inset-right));
   z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
   width: var(--toast-width);
-  max-width: calc(100vw - var(--space-xl));
+  max-width: calc(100vw - (2 * var(--space-sm)));
   pointer-events: none;
 }
 

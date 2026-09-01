@@ -1,7 +1,7 @@
 .dialog {
   width: var(--dialog-width);
-  max-width: calc(100vw - var(--space-xl));
-  max-height: min(80vh, 40rem);
+  max-width: calc(100vw - var(--space-md));
+  max-height: min(calc(100dvh - var(--space-md)), 40rem);
   margin: auto;
   padding: 0;
   border: var(--rule-1) solid var(--color-rule-strong);
@@ -54,4 +54,15 @@
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-md) var(--space-md);
   border-top: var(--rule-1) solid var(--color-rule);
+}
+
+@media (max-width: 24rem), (max-height: 24rem) {
+  .head,
+  .body,
+  .foot {
+    padding-inline: var(--space-sm);
+  }
+  .foot {
+    flex-wrap: wrap;
+  }
 }

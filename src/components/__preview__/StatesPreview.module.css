@@ -24,8 +24,21 @@
 }
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
   gap: var(--space-md);
+}
+
+@media (max-width: 32rem) {
+  .page {
+    padding: var(--space-lg);
+  }
+}
+
+@media (max-width: 24rem), (max-height: 30rem) {
+  .page {
+    padding: var(--space-md);
+    gap: var(--space-lg);
+  }
 }
 .forceHover {
   background: var(--color-paper-2) !important;

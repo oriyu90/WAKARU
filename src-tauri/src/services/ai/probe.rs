@@ -59,7 +59,8 @@ async fn model_ping(client: &AiClient, model: &str) -> bool {
 
 async fn probe_vision(client: &AiClient, model: &str) -> bool {
     let cancel = tokio_util::sync::CancellationToken::new();
-    client
+    let mut output = String::new();
+    let result = client
         .chat_stream(
             model,
             json!([{
@@ -71,10 +72,14 @@ async fn probe_vision(client: &AiClient, model: &str) -> bool {
             }]),
             &json!({ "max_tokens": 3 }),
             &cancel,
-            |_, _| {},
+            |kind, delta| {
+                if kind == "text" {
+                    output.push_str(delta);
+                }
+            },
         )
-        .await
-        .is_ok()
+        .await;
+    result.is_ok() && !output.trim().is_empty()
 }
 
 async fn probe_tools(client: &AiClient, model: &str) -> bool {
@@ -82,9 +87,10 @@ async fn probe_tools(client: &AiClient, model: &str) -> bool {
     client
         .chat_stream(
             model,
-            json!([{ "role": "user", "content": "hi" }]),
+            json!([{ "role": "user", "content": "Call the noop tool now." }]),
             &json!({
-                "max_tokens": 1,
+                "max_tokens": 16,
+                "tool_choice": "required",
                 "tools": [{
                     "type": "function",
                     "function": { "name": "noop", "description": "no-op", "parameters": { "type": "object", "properties": {} } }
@@ -94,12 +100,14 @@ async fn probe_tools(client: &AiClient, model: &str) -> bool {
             |_, _| {},
         )
         .await
-        .is_ok()
+        .map(|(_, _, calls)| calls.iter().any(|call| call.name == "noop"))
+        .unwrap_or(false)
 }
 
 async fn probe_json_schema(client: &AiClient, model: &str) -> bool {
     let cancel = tokio_util::sync::CancellationToken::new();
-    client
+    let mut output = String::new();
+    let result = client
         .chat_stream(
             model,
             json!([{ "role": "user", "content": "return {\"ok\":true}" }]),
@@ -114,8 +122,16 @@ async fn probe_json_schema(client: &AiClient, model: &str) -> bool {
                 }
             }),
             &cancel,
-            |_, _| {},
+            |kind, delta| {
+                if kind == "text" {
+                    output.push_str(delta);
+                }
+            },
         )
-        .await
-        .is_ok()
+        .await;
+    result.is_ok()
+        && serde_json::from_str::<serde_json::Value>(output.trim())
+            .ok()
+            .and_then(|v| v.get("ok").and_then(serde_json::Value::as_bool))
+            == Some(true)
 }

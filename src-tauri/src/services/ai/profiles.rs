@@ -89,11 +89,11 @@ pub fn upsert(app_db: &Connection, input: AiProfileInput) -> AppResult<AiProfile
             "name and base URL are required",
         ));
     }
-    let headers = input
-        .extra_headers
-        .unwrap_or(serde_json::json!({}))
-        .to_string();
-    let timeout = input.timeout_ms.unwrap_or(120_000).max(1000);
+    let headers = validate_extra_headers(input.extra_headers)?.to_string();
+    let timeout = input.timeout_ms.unwrap_or(120_000).clamp(1000, 1_800_000);
+    let default_model = input
+        .default_model
+        .and_then(|m| (!m.trim().is_empty()).then(|| m.trim().to_string()));
 
     let id = match input.id {
         Some(id) => {
@@ -106,7 +106,7 @@ pub fn upsert(app_db: &Connection, input: AiProfileInput) -> AppResult<AiProfile
                     name,
                     base_url,
                     input.protocol.as_str(),
-                    input.default_model,
+                    default_model,
                     headers,
                     timeout as i64
                 ],
@@ -124,7 +124,7 @@ pub fn upsert(app_db: &Connection, input: AiProfileInput) -> AppResult<AiProfile
                     name,
                     base_url,
                     input.protocol.as_str(),
-                    input.default_model,
+                    default_model,
                     headers,
                     timeout as i64,
                     now_iso8601()
@@ -148,6 +148,59 @@ pub fn upsert(app_db: &Connection, input: AiProfileInput) -> AppResult<AiProfile
     }
 
     get(app_db, &id)
+}
+
+fn validate_extra_headers(value: Option<serde_json::Value>) -> AppResult<serde_json::Value> {
+    let value = value.unwrap_or_else(|| serde_json::json!({}));
+    let object = value.as_object().ok_or_else(|| {
+        AppError::new(
+            "AI_PROFILE_INVALID",
+            "error.ai.profileInvalid",
+            "extra headers must be a JSON object",
+        )
+    })?;
+    let mut clean = serde_json::Map::new();
+    for (name, value) in object {
+        let lower = name.to_ascii_lowercase();
+        if matches!(
+            lower.as_str(),
+            "authorization"
+                | "x-api-key"
+                | "anthropic-version"
+                | "host"
+                | "content-length"
+                | "transfer-encoding"
+        ) {
+            return Err(AppError::new(
+                "AI_PROFILE_INVALID",
+                "error.ai.profileInvalid",
+                format!("{name} must be configured using the API key/protocol fields"),
+            ));
+        }
+        reqwest::header::HeaderName::from_bytes(name.as_bytes()).map_err(|_| {
+            AppError::new(
+                "AI_PROFILE_INVALID",
+                "error.ai.profileInvalid",
+                format!("invalid extra header name: {name}"),
+            )
+        })?;
+        let text = value.as_str().ok_or_else(|| {
+            AppError::new(
+                "AI_PROFILE_INVALID",
+                "error.ai.profileInvalid",
+                format!("extra header {name} must be a string"),
+            )
+        })?;
+        reqwest::header::HeaderValue::from_str(text).map_err(|_| {
+            AppError::new(
+                "AI_PROFILE_INVALID",
+                "error.ai.profileInvalid",
+                format!("invalid extra header value: {name}"),
+            )
+        })?;
+        clean.insert(name.clone(), serde_json::Value::String(text.to_string()));
+    }
+    Ok(serde_json::Value::Object(clean))
 }
 
 fn normalise_base_url(raw: &str) -> AppResult<String> {
@@ -330,6 +383,21 @@ mod tests {
             "not-a-url",
         ] {
             assert!(normalise_base_url(invalid).is_err(), "accepted {invalid}");
+        }
+    }
+
+    #[test]
+    fn extra_headers_reject_auth_overrides_and_invalid_values() {
+        assert!(validate_extra_headers(Some(serde_json::json!({
+            "X-Tenant": "local"
+        })))
+        .is_ok());
+        for invalid in [
+            serde_json::json!({"Authorization": "Basic secret"}),
+            serde_json::json!({"bad header": "x"}),
+            serde_json::json!({"X-Number": 1}),
+        ] {
+            assert!(validate_extra_headers(Some(invalid)).is_err());
         }
     }
 

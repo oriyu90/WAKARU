@@ -46,9 +46,9 @@ pub struct Capabilities {
 判定手順（`ai_test_profile`）：
 1. `GET /models` を叩く。失敗しても致命的にしない
 2. **実プローブを行う**：
-   - vision → 8×8px の1色PNGを付けた「この画像の色は？」を `max_tokens: 5` で送る。400/422 が返れば非対応
-   - tools → ダミーの `tools` 定義を付けて `max_tokens: 1` で送る。エラーなら非対応
-   - json_schema → 最小の `response_format` を付けて送る
+   - vision → 小さなPNGを付けて送信し、成功応答に実際のテキスト出力があることを確認する。400/422または空応答なら非対応
+   - tools → ダミーの `tools` と `tool_choice: required` を付け、HTTP成功だけでなく実際にそのツール呼び出しが返ることを確認する
+   - json_schema → 最小の `response_format` を付け、返った本文をJSONとして解析して必須値まで確認する
 3. 結果をDBに保存。ユーザーが手動で上書きすることも許す（誤判定の逃げ道）
 
 **能力が無い場合の縮退（degradation）は必ず実装し、UIに明示する。** 黙って劣化させない。
@@ -318,16 +318,19 @@ system prompt は「成果を特定 → 抜粋を確認 → 必要なら検索�
 | transport | 実装 |
 |---|---|
 | `stdio` | 子プロセスを起動し stdin/stdout でJSON-RPC。プロセスはアプリ終了時に必ず kill する |
-| `http` | Streamable HTTP（`POST` + SSE） |
+| `http` | **v0.0.0では未実装**（D-14）。登録・接続時に明示的な非対応エラーを返す |
 
-`rmcp` crate を使う。
+公式Rust SDK `rmcp = 3.0.1` を正確に固定して使う。MCP `2026-07-28` の
+`server/discover` を優先し、`2025-11-25` の initialize ライフサイクルへ自動フォールバックする。
 
 ### 6.2 ライフサイクル
 
 - サーバは**手動で接続**（自動接続しない）。設定画面と Studio のツールパネルから接続/切断できる
-- 接続時に `tools/list` を取得してキャッシュ。`notifications/tools/list_changed` を受けたら更新
+- 接続時にページネーション込みで `tools/list` を取得する。Studioへ渡す直前にも再取得し、現行仕様のキャッシュヒントはSDKに処理させる。更新失敗時だけ最後に成功した一覧を使う
 - 接続失敗はそのサーバだけ落ちる。Studio 全体は動き続ける
 - サーバのstderrはログに落とし、UIからも見られるようにする（デバッグ用）
+- discover/旧初期化、一覧取得、ツール呼び出し、終了はすべて上限時間を持つ
+- MCPの標準ContentBlock（text/image/audio/resource/resource_link）とstructuredContentを欠落させない。base64本体はモデルのコンテキストへ展開せず、種別・MIME・サイズとして渡す
 
 ### 6.3 ツール名の衝突
 

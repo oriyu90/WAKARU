@@ -4,7 +4,8 @@
   gap: var(--space-md);
   padding: var(--space-xl);
   max-width: 60rem;
-  height: 100%;
+  min-height: 100%;
+  min-width: 0;
   overflow-y: auto;
 }
 .title {
@@ -24,6 +25,7 @@
 }
 .toolBar {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-sm);
 }
 
@@ -85,6 +87,7 @@
 }
 .dirRow > :first-child {
   flex: 1;
+  min-width: 0;
 }
 .actions {
   display: flex;
@@ -113,13 +116,35 @@
   align-self: flex-end;
 }
 .outputBox {
-  min-height: 24rem;
-  max-height: 24rem;
+  min-height: clamp(12rem, 45dvh, 24rem);
+  max-height: min(24rem, 55dvh);
   overflow-y: auto;
   border: var(--rule-1) solid var(--color-rule-strong);
   border-radius: var(--radius-md);
   background: var(--color-paper-3);
   padding: var(--space-sm);
+}
+
+@media (max-width: 42rem) {
+  .page {
+    padding: var(--space-lg);
+  }
+  .textGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .outputBox {
+    min-height: 12rem;
+  }
+}
+
+@media (max-width: 24rem), (max-height: 30rem) {
+  .page {
+    padding: var(--space-md);
+  }
+  .tool {
+    gap: var(--space-md);
+    padding-top: var(--space-sm);
+  }
 }
 .plain,
 .diff {

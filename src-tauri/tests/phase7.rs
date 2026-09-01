@@ -36,8 +36,13 @@ fn ac_7_4_tool_policy_is_recorded_and_revocable() {
     // "Always allow" is persisted, keyed by <slug>__<tool>.
     mcp::set_policy(&db, "srv1", "read_file", "always_allow").unwrap();
     let map = mcp::policy_map(&db).unwrap();
+    let qualified = format!(
+        "{}__{}",
+        mcp::server_slug("Files FS", "srv1"),
+        mcp::tool_alias("read_file")
+    );
     assert_eq!(
-        map.get("files_fs__read_file").map(String::as_str),
+        map.get(&qualified).map(String::as_str),
         Some("always_allow")
     );
 
@@ -46,7 +51,7 @@ fn ac_7_4_tool_policy_is_recorded_and_revocable() {
     assert_eq!(
         mcp::policy_map(&db)
             .unwrap()
-            .get("files_fs__read_file")
+            .get(&qualified)
             .map(String::as_str),
         Some("ask")
     );
@@ -72,7 +77,7 @@ fn deleting_a_server_cascades_its_policies() {
 
 #[tokio::test]
 async fn http_transport_is_refused_this_release() {
-    // DECISIONS D-14: stdio only for v0.2.0.
+    // DECISIONS D-14: stdio only for v0.0.0.
     let row = mcp::McpServerRow {
         id: "x".into(),
         name: "Remote".into(),

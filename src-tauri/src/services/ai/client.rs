@@ -50,6 +50,9 @@ impl AiClient {
 
     fn req(&self, method: reqwest::Method, path: &str) -> reqwest::RequestBuilder {
         let mut rb = self.http.request(method, format!("{}{path}", self.base));
+        for (h, v) in &self.extra_headers {
+            rb = rb.header(h.as_str(), v.as_str());
+        }
         if let Some(k) = &self.key {
             rb = match self.protocol {
                 ApiProtocol::Openai => rb.bearer_auth(k),
@@ -58,9 +61,6 @@ impl AiClient {
         }
         if self.protocol == ApiProtocol::Anthropic {
             rb = rb.header("anthropic-version", "2023-06-01");
-        }
-        for (h, v) in &self.extra_headers {
-            rb = rb.header(h.as_str(), v.as_str());
         }
         rb
     }

@@ -9,13 +9,16 @@
 
 html {
   font-size: 16px; /* overridden by [data-scale] */
+  width: 100%;
+  height: 100%;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
-  min-height: 100vh;
+  width: 100%;
+  min-height: 100%;
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-ui);
@@ -31,8 +34,11 @@ body {
  * monochrome `filter` on #app does not reparent fixed elements (docs/07 §3). */
 #app {
   position: relative;
-  width: 100vw;
+  width: 100%;
   height: 100vh;
+  height: 100dvh;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
 

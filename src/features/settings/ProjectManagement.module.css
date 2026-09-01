@@ -56,3 +56,17 @@
   font-size: var(--fs-2xs);
   color: var(--color-muted);
 }
+
+@media (max-width: 36rem) {
+  .bar,
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .row {
+    grid-template-columns: 1.5rem minmax(0, 1fr) 1.5rem;
+  }
+  .meta {
+    display: none;
+  }
+}

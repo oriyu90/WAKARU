@@ -2,6 +2,12 @@
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
+2026-09-02 follow-up: the workbench is responsive across extreme portrait and
+low-landscape viewports, compatible-API profile validation and capability
+probing are stricter, and MCP was upgraded to the 2026-07-28 lifecycle with a
+legacy fallback. See `UI_NETWORK_MCP_REMEDIATION_PLAN.md` and the latest section
+of `QUALITY_REPORT.md`.
+
 ## What this repo is
 
 A **full re-development** of WAKARU. v0.1.0's application source was lost (not on
@@ -26,7 +32,7 @@ prefixes). Working tree clean.
 | Gate | How | State |
 |---|---|---|
 | Frontend | `npm run typecheck && npm run lint && npm test && npm run check:contrast && npm run check:i18n` | green — 9 tests |
-| Backend | `cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo test` | green — 183 tests; live Ornith test ignored by default |
+| Backend | `cd src-tauri && cargo clippy --all-targets --all-features -- -D warnings && cargo test --all-targets --all-features` | green — 185 tests; live Ornith and manual MCP tests ignored by default; manual MCP test passes |
 | Licenses | `cd src-tauri && cargo deny check licenses bans sources` | green — no GPL/AGPL/LGPL |
 
 The current release work follows `IMPLEMENTATION_PLAN_v0.0.0.md`: dual API
@@ -53,7 +59,7 @@ src-tauri/src/
     whisper/             model manager + audio decode/VAD + whisper-rs engine
     studio.rs            the agentic tool loop
     sandbox.rs           resolve_in_sandbox + run_command (I-7)
-    mcp.rs               rmcp stdio client + connection registry
+    mcp.rs               rmcp 3.0.1 stdio client (2026-07-28 + legacy) + connection registry
   storage/               rusqlite, migrations, forward-only runner
   jobs/                  tokio worker pool + job://progress
 migrations/{app,project}/*.sql
