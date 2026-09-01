@@ -22,12 +22,12 @@ migration verification, log review, and final DMG verification.
 |---|---|---|
 | Rust formatting | `cargo fmt --check` | pass |
 | Clippy (all targets, warnings = errors) | `cargo clippy --all-targets -- -D warnings` | pass |
-| Tests | `cargo test --all-targets --all-features` | 182 passed, 0 failed |
+| Tests | `cargo test --all-targets --all-features` | 183 passed, 0 failed; 1 authorised live test ignored by default |
 | Licenses | `cargo deny check licenses` | ok — no GPL/AGPL/LGPL (`deny.toml`) |
 | Dependency bans / sources | `cargo deny check bans sources` | ok |
 | ts-rs binding drift | `cargo test export_bindings` + git diff | no diff |
 
-Test breakdown: 144 library unit tests + 38 integration tests
+Test breakdown: 145 library unit tests + 38 integration tests
 (`tests/phase{1..10}.rs`) + 9 frontend unit tests.
 
 New compatibility and reliability coverage includes Anthropic profile migration,
@@ -41,7 +41,15 @@ already marked that migration as applied.
 The current replacement adds regression coverage for source/system separation
 in Illustrator and the organiser, Studio's untrusted project-context boundary,
 mandatory complete-file tool guidance for smaller models, suspiciously short
-organiser output, and exact-white primary dark-theme text.
+organiser output, exact-white primary dark-theme text, and OpenAI-compatible
+`finish_reason: "length"` handling.
+
+An explicitly authorised live test against `Ornith-1.5-35B-A3B-MLX-4bit`
+passed model discovery, streaming, Vision and tool probes, grounded
+Illustrator output, prompt-injection resistance, and a four-round Studio
+workflow that created and registered `kestrel-summary.md`. The endpoint does
+not implement `/v1/embeddings`, so search correctly remains FTS-only. See
+the private maintainer validation record for the endpoint-specific details.
 
 Security-relevant coverage:
 
@@ -116,8 +124,8 @@ routes without sending fixture content off-device.
 | `codesign --verify --deep --strict` — `.app` **inside the mounted DMG** | valid on disk, satisfies its Designated Requirement |
 | `spctl -a -t exec` | **rejected** — expected for ad-hoc/unnotarized; README documents right-click → Open |
 | Signature | `adhoc`, Identifier `com.yukiorita.wakaru`, TeamIdentifier not set |
-| Size | 11,419,293 bytes |
-| `shasum -a 256` | `7faf6d4a720f6f13754dccec1ef7588833123eb7e68b57863ae9ad35111fd92e` |
+| Size | 11,419,349 bytes |
+| `shasum -a 256` | `d63a72a9b8f11b88e763bf4cbc763c2a695d0b0ae456cd5c01db73a9591cbc34` |
 
 x64 build not attempted (only arm64 is distributed, matching v0.1.0).
 
