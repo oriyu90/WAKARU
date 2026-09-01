@@ -49,7 +49,7 @@ passed model discovery, streaming, Vision and tool probes, grounded
 Illustrator output, prompt-injection resistance, and a four-round Studio
 workflow that created and registered `kestrel-summary.md`. The endpoint does
 not implement `/v1/embeddings`, so search correctly remains FTS-only. See
-`docs/LIVE_ORNITH_VALIDATION.md`.
+the private maintainer validation record for the endpoint-specific details.
 
 Security-relevant coverage:
 
