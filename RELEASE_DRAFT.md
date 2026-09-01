@@ -9,7 +9,7 @@ The verified DMG is
 `src-tauri/target/release/bundle/dmg/WAKARU_0.0.0_aarch64.dmg`.
 
 SHA-256:
-`7faf6d4a720f6f13754dccec1ef7588833123eb7e68b57863ae9ad35111fd92e`.
+`d63a72a9b8f11b88e763bf4cbc763c2a695d0b0ae456cd5c01db73a9591cbc34`.
 
 ---
 
