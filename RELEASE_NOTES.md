@@ -10,6 +10,11 @@ past Gatekeeper.
 
 ## What's in it
 
+This tag was replaced after native runtime testing. The replacement repairs
+legacy-database imports, production Markdown/CSV previews, the collapsed search
+field, keyword-only embedding fallback, and newly disclosed PDF/XML denial-of-
+service risks. Existing project data is migrated in place.
+
 - **Two API formats** — choose OpenAI-compatible or Anthropic-compatible per
   connection. The Anthropic adapter supports native authentication, top-level
   system instructions, image blocks, tool definitions/results, structured
