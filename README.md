@@ -23,7 +23,7 @@ WAKARUは、手元の資料（PDF・DOCX・PPTX・スプレッドシート・画
 
 ## ダウンロード
 
-[WAKARU v0.0.0](https://github.com/oriyu90/WAKARU/releases/tag/v0.0.0) から `WAKARU_0.0.0_aarch64.dmg` を取得してください。
+[WAKARU v0.0.1](https://github.com/oriyu90/WAKARU/releases/tag/v0.0.1) から `WAKARU_0.0.1_aarch64.dmg` を取得してください。
 
 - **動作条件**: Apple Silicon Mac / macOS 12以降
 - Windows／Linux向けの実行ファイルは、実機での検証が完了していないため現時点では配布していません

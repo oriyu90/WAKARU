@@ -1,8 +1,43 @@
-# WAKARU v0.0.0 — Quality report
+# WAKARU v0.0.1 — Quality report
 
-Generated 2026-09-01 from a clean run of every automated gate, native macOS
+Generated 2026-09-02 from a clean run of every automated gate, native macOS
 interaction tests against a fixture library and local compatible API, database
 migration verification, log review, and final DMG verification.
+
+## v0.0.1 release verification — 2026-09-02
+
+- Version metadata is aligned at `0.0.1` in npm, Cargo, and Tauri manifests.
+- v0.0.1 includes the responsive/LAN API/MCP re-audit below and all fixes from
+  v0.0.0. Existing application data formats remain compatible.
+- The final automated gates, native bundle checks, DMG checksum, and published
+  release-asset verification are recorded in the release section below.
+
+## 2026-09-02 responsive / LAN API / MCP re-audit
+
+- Responsive browser matrix passed at 240×320, 320×568, 568×320, 960×640,
+  1280×840 and 1600×500. Home, Settings, File Modifier, Search and the
+  component-state preview kept document width equal to viewport width; tall
+  content remained reachable through the intended inner/main scrollers.
+- 960×640 and 320×568 also passed at 150% display scale. A remaining 4 px
+  Search select overflow found only at 320×568/150% was fixed and retested.
+- OpenAI-compatible and Anthropic-compatible profile paths were statically
+  re-audited. LAN `http://` URLs remain valid, `/v1` remains an explicit part
+  of the configured base URL, headers and timeout bounds are validated, and
+  auth/protocol headers cannot be silently overridden by custom headers.
+- Capability probes now require an actual named tool call and parse valid
+  schema-constrained JSON; a merely successful HTTP response no longer creates
+  those two false-positive capability flags.
+- MCP now uses exactly pinned `rmcp 3.0.1`, prefers the MCP 2026-07-28 discover
+  lifecycle, and falls back to 2025-11-25 initialization. The official
+  `@modelcontextprotocol/server-everything` stdio server passed real tool-list
+  discovery and an `echo` call. Timeouts, graceful cleanup, catalog refresh,
+  duplicate-name isolation, strict JSON arguments, secret-redacted stderr and
+  all standard result content kinds are covered by the implementation.
+- Fresh gates: frontend production build, lint/design rules, 9 unit tests,
+  contrast and 327×3 i18n parity all pass. Rust fmt and warning-as-error clippy
+  pass; 185 normal backend tests pass with 2 explicit live/manual tests ignored,
+  and the ignored MCP interoperability test passes when run manually. Cargo
+  license, ban and source checks pass.
 
 ## Automated gates — all green
 
@@ -22,12 +57,12 @@ migration verification, log review, and final DMG verification.
 |---|---|---|
 | Rust formatting | `cargo fmt --check` | pass |
 | Clippy (all targets, warnings = errors) | `cargo clippy --all-targets -- -D warnings` | pass |
-| Tests | `cargo test --all-targets --all-features` | 183 passed, 0 failed; 1 authorised live test ignored by default |
+| Tests | `cargo test --all-targets --all-features` | 185 passed, 0 failed; 2 authorised live/manual tests ignored by default |
 | Licenses | `cargo deny check licenses` | ok — no GPL/AGPL/LGPL (`deny.toml`) |
 | Dependency bans / sources | `cargo deny check bans sources` | ok |
 | ts-rs binding drift | `cargo test export_bindings` + git diff | no diff |
 
-Test breakdown: 145 library unit tests + 38 integration tests
+Test breakdown: 147 library unit tests + 38 integration tests
 (`tests/phase{1..10}.rs`) + 9 frontend unit tests.
 
 New compatibility and reliability coverage includes Anthropic profile migration,
@@ -113,7 +148,25 @@ routes without sending fixture content off-device.
    Office, XML and HTML dependencies were upgraded to fixed generations;
    image-to-PDF was ported to the current API and retested.
 
-## Build & bundle — v0.0.0 arm64
+## Build & bundle — v0.0.1 arm64
+
+| Gate | Result |
+|---|---|
+| `APPLE_SIGNING_IDENTITY="-" MACOSX_DEPLOYMENT_TARGET=12.0 npm run tauri build -- --bundles app` | pass |
+| Bundle | `WAKARU_0.0.1_aarch64.dmg`, `WAKARU.app`; arm64, version `0.0.1`, ad-hoc signed, **not notarized** |
+| `hdiutil verify` | checksum VALID |
+| `codesign --verify --deep --strict` — build output and mounted-DMG app | valid on disk, satisfies its Designated Requirement |
+| Mounted-DMG launch | process remained healthy for the 6-second startup probe; terminated cleanly by the test |
+| Startup-log secret scan | 0 API-key/auth-header patterns |
+| Signature | `adhoc`, Identifier `com.yukiorita.wakaru`, TeamIdentifier not set |
+| Size | 11,525,041 bytes |
+| `shasum -a 256` | `1b5f0d7200880f008cfbc4e9fde6b8c83629dd506ae7b8ec320cdcfcae32fe84` |
+
+The official `@modelcontextprotocol/server-everything` ignored interoperability
+test was run explicitly for the release build and passed discovery, tool-list
+retrieval, and an `echo` call.
+
+## Previous build record — v0.0.0 arm64
 
 | Gate | Result |
 |---|---|
@@ -153,4 +206,4 @@ signature were then independently verified.
 
 These broader fixture/API-dependent checks remain release-candidate follow-up
 work. No reproducible crash, data-loss defect, high-severity security defect,
-or automated regression remains open; v0.0.0 is published as a pre-release.
+or automated regression remains open; v0.0.1 is published as a pre-release.

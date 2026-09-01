@@ -1,8 +1,8 @@
-# WAKARU v0.0.0
+# WAKARU v0.0.1
 
-A reliability-focused build of the fully redeveloped WAKARU app on Tauri v2,
-Rust, and React. This release number intentionally follows the requested
-`v0.0.0` label even though an earlier public prerelease was tagged `v0.1.0`.
+A reliability and responsive-layout update to the fully redeveloped WAKARU app
+on Tauri v2, Rust, and React. It supersedes the v0.0.0 pre-release while
+preserving existing projects and settings.
 
 macOS (Apple Silicon) only for this release, ad-hoc signed and **not
 notarized** — on first launch, right-click the app and choose *Open* to get
@@ -10,12 +10,13 @@ past Gatekeeper.
 
 ## What's in it
 
-This tag was replaced after native runtime testing. The replacement repairs
+The v0.0.0 line repaired
 legacy-database imports, production Markdown/CSV previews, the collapsed search
 field, keyword-only embedding fallback, and newly disclosed PDF/XML denial-of-
-service risks. Existing project data is migrated in place.
+service risks. v0.0.1 adds the responsive, compatible-API, and MCP hardening
+described below. Existing project data is migrated in place.
 
-The current replacement also hardens document work for smaller models. Source
+This release also hardens document work for smaller models. Source
 text, retrieved excerpts, file contents, and tab transcripts are now separated
 from system instructions and explicitly treated as untrusted data. Studio uses
 a short verify-before-writing workflow and must create a workspace file when a
@@ -56,7 +57,16 @@ falls below 70% of the source, and primary dark-theme text is now exact white.
   …), `@`-mention of other tabs, a `workspace/` folder, and artifact cards you
   can add back as sources or download.
 - **MCP** — connect local stdio MCP servers; per-tool approval policy
-  (ask / always allow / deny), revocable from Settings.
+  (ask / always allow / deny), revocable from Settings. The client prefers MCP
+  2026-07-28 discovery and falls back to legacy initialization, bounds every
+  network/process wait, refreshes tool catalogs, and preserves standard tool
+  result content without expanding binary base64 into the model context.
+- **Responsive workbench** — settings, Studio, Viewer drawers, source rows and
+  file tools adapt down to narrow portrait and low landscape windows instead
+  of losing the right or bottom half of the interface.
+- **Safer compatible-API setup** — LAN HTTP endpoints remain supported; base
+  URLs, custom headers and timeouts are validated, while capability tests now
+  verify real tool calls and valid structured JSON instead of transport success alone.
 - **Sandbox** — everything `write_file` / `run_command` touch is confined to
   `workspace/`: no shell, scrubbed environment, path-traversal and symlink
   escapes rejected, output capped, timeouts kill the whole process group.
