@@ -19,7 +19,12 @@ pub struct ImageResult {
     pub derived_rel: String,
 }
 
-pub fn parse_image(abs_path: &Path, derived_dir: &Path, data_dir: &Path) -> AppResult<ImageResult> {
+pub fn parse_image(
+    abs_path: &Path,
+    derived_dir: &Path,
+    data_dir: &Path,
+    ocr_enabled: bool,
+) -> AppResult<ImageResult> {
     let img = image::open(abs_path).map_err(|e| {
         AppError::new(
             "SOURCE_PARSE",
@@ -58,8 +63,10 @@ pub fn parse_image(abs_path: &Path, derived_dir: &Path, data_dir: &Path) -> AppR
 
     // Best-effort OCR of the normalised copy. Failure (offline, model download,
     // decode) is non-fatal — the image is still viewable, just not text-searchable.
-    if let Some(unit) = run_ocr(&out, derived_dir, data_dir) {
-        units.push(unit);
+    if ocr_enabled {
+        if let Some(unit) = run_ocr(&out, derived_dir, data_dir) {
+            units.push(unit);
+        }
     }
 
     Ok(ImageResult {

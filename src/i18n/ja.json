@@ -142,7 +142,9 @@
     "followUi": "UI 言語に合わせる",
     "matchSource": "資料の言語に合わせる",
     "prefetch": "次のページを先読み",
-    "carryOver": "前ページの会話を引き継ぐ"
+    "carryOver": "前ページの会話を引き継ぐ",
+    "ocr": "文字認識（OCR）",
+    "ocrNote": "取り込んだ画像から文字を読み取り、スキャンPDFにも OCR を提供します。OCR モデルは初回のみダウンロードされます。"
   },
   "common": {
     "loading": "読み込み中",

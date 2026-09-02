@@ -4,13 +4,13 @@ export type AddFilesInput = { projectId: string, paths: Array<string>, };
 
 export type AiBudget = { contextTokens: number, maxOutputTokens: number, maxImagesPerRequest: number, rerank: boolean, concurrency: number, warnAboveTokens: number | null, };
 
-export type AiProfile = { id: string, name: string, baseUrl: string, protocol: ApiProtocol,
+export type AiProfile = { id: string, name: string, baseUrl: string, protocol: ApiProtocol, 
 /**
  * The API key is never returned — only whether one is stored.
  */
 hasKey: boolean, defaultModel: string | null, supportsVision: boolean, supportsTools: boolean, supportsEmbed: boolean, jsonSchema: boolean, extraHeaders: Record<string, string>, timeoutMs: number, createdAt: string, lastOkAt: string | null, };
 
-export type AiProfileInput = { id: string | null, name: string, baseUrl: string, protocol: ApiProtocol,
+export type AiProfileInput = { id: string | null, name: string, baseUrl: string, protocol: ApiProtocol, 
 /**
  * Present only when the user typed or changed it. `""` clears the key.
  */
@@ -138,7 +138,11 @@ export type ImportToStudioInput = { projectId: string, threadId: string,
  */
 mode: string, targetTabId: string | null, };
 
-export type IngestSettings = { concurrency: number, fetchWebImages: boolean, allowPrivateNetwork: boolean, };
+export type IngestSettings = { concurrency: number, fetchWebImages: boolean, allowPrivateNetwork: boolean, 
+/**
+ * P12: run OCR on imported images, and offer it for scanned PDFs.
+ */
+ocr: boolean, };
 
 export type Job = { id: string, kind: JobKind, status: JobStatus, projectId: string | null, sourceId: string | null, phase: string | null, done: number, total: number, message: string | null, startedAt: string | null, endedAt: string | null, };
 
@@ -201,7 +205,7 @@ export type OcrLine = { text: string, bbox: [number, number, number, number], wo
 
 export type OcrPage = { lines: Array<OcrLine>, widthPx: number, heightPx: number, };
 
-export type OcrWord = { text: string,
+export type OcrWord = { text: string, 
 /**
  * `[x, y, w, h]` as fractions of the page (0..1), resolution-independent.
  */
@@ -260,7 +264,7 @@ export type SearchScope = "global" | "project";
 
 export type Settings = { general: General, language: Language, illustrator: IllustratorSettings, ingest: IngestSettings, sandbox: SandboxSettings, transcription: Transcription, aiBudget: AiBudget, };
 
-export type Source = { id: string, kind: SourceKind, originalName: string, url: string | null, mime: string | null, bytes: number, sha256: string | null, status: SourceStatus, errorCode: string | null, errorMessage: string | null, lang: string | null, pageCount: number | null, durationMs: number | null, summary: string | null, addedAt: string, analyzedAt: string | null,
+export type Source = { id: string, kind: SourceKind, originalName: string, url: string | null, mime: string | null, bytes: number, sha256: string | null, status: SourceStatus, errorCode: string | null, errorMessage: string | null, lang: string | null, pageCount: number | null, durationMs: number | null, summary: string | null, addedAt: string, analyzedAt: string | null, 
 /**
  * P12: `"pending"` when the PDF has page(s) with no text layer awaiting OCR
  * in the Viewer; `"running"` / `"done"` / `"partial"` / `"failed"` after;
@@ -272,13 +276,13 @@ ocrStatus: string | null, };
  * Lightweight source detail for a preview header (name, kind, page count,
  * the reader-view asset URL for web links, etc.).
  */
-export type SourceDetail = { id: string, kind: SourceKind, name: string, url: string | null, pageCount: number | null, status: SourceStatus, mime: string | null, bytes: bigint,
+export type SourceDetail = { id: string, kind: SourceKind, name: string, url: string | null, pageCount: number | null, status: SourceStatus, mime: string | null, bytes: bigint, 
 /**
  * `wakaru-asset://` URL to the primary rendered/original file, if any:
  * the normalised image, saved web reader markdown, or original imported
  * file. The URL is project-scoped and never exposes an absolute path.
  */
-primaryAssetUrl: string | null,
+primaryAssetUrl: string | null, 
 /**
  * P12 OCR state for a scanned PDF (see `Source::ocr_status`).
  */

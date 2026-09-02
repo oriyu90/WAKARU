@@ -271,7 +271,10 @@ fn parse(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput, dd: &Path) -> A
             }
         }
         SourceKind::Image => {
-            let r = image::parse_image(&file(input)?, dd, data_dir_of(ctx.project_dir))?;
+            let ocr_on = crate::services::settings::get(ctx.app_db)
+                .map(|s| s.ingest.ocr)
+                .unwrap_or(true);
+            let r = image::parse_image(&file(input)?, dd, data_dir_of(ctx.project_dir), ocr_on)?;
             Parsed {
                 units: r.units,
                 page_count: Some(1),

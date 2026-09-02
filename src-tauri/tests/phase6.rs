@@ -267,7 +267,10 @@ fn build_document_writes_a_docx_artifact_and_guards_the_path() {
     let out = studio::dispatch_tool(&db, &ws, &tab.thread_id, "build_document", &pdf_args).unwrap();
     let pdf = ws.join("note.pdf");
     let md = ws.join("note.md");
-    assert!(pdf.is_file() || md.is_file(), "pdf request produced nothing: {out}");
+    assert!(
+        pdf.is_file() || md.is_file(),
+        "pdf request produced nothing: {out}"
+    );
     if pdf.is_file() {
         assert_eq!(&std::fs::read(&pdf).unwrap()[..5], b"%PDF-");
     } else {

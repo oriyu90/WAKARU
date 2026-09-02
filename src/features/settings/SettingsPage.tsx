@@ -84,6 +84,15 @@ export function SettingsPage() {
                 onChange={(e) => patch({ general: { checkUpdatesOnStart: e.target.checked } })}
               />
             </div>
+            <div className={styles.switchRow}>
+              <span className={styles.switchLabel}>{t("settings.ocr")}</span>
+              <Switch
+                label={t("settings.ocr")}
+                checked={settings?.ingest.ocr ?? true}
+                onChange={(e) => patch({ ingest: { ocr: e.target.checked } })}
+              />
+            </div>
+            <p className={styles.note}>{t("settings.ocrNote")}</p>
           </div>
         )}
 

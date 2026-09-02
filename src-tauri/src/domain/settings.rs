@@ -57,6 +57,13 @@ pub struct IngestSettings {
     pub concurrency: u32,
     pub fetch_web_images: bool,
     pub allow_private_network: bool,
+    /// P12: run OCR on imported images, and offer it for scanned PDFs.
+    #[serde(default = "default_true")]
+    pub ocr: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ts_rs::TS)]
@@ -112,6 +119,7 @@ impl Default for Settings {
                 concurrency: (num_cpus() / 2).max(1),
                 fetch_web_images: false,
                 allow_private_network: false,
+                ocr: true,
             },
             sandbox: SandboxSettings {
                 command_timeout_sec: 60,

@@ -142,7 +142,9 @@
     "followUi": "跟随界面语言",
     "matchSource": "跟随资料语言",
     "prefetch": "预取下一页",
-    "carryOver": "沿用上一页的对话"
+    "carryOver": "沿用上一页的对话",
+    "ocr": "文字识别（OCR）",
+    "ocrNote": "从导入的图片中读取文字，并为扫描版 PDF 提供 OCR。OCR 模型仅在首次使用时下载。"
   },
   "common": {
     "loading": "加载中",

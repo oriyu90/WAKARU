@@ -144,7 +144,9 @@
     "followUi": "Follow UI language",
     "matchSource": "Match the source language",
     "prefetch": "Prefetch the next page",
-    "carryOver": "Carry over the previous page's conversation"
+    "carryOver": "Carry over the previous page's conversation",
+    "ocr": "Text recognition (OCR)",
+    "ocrNote": "Read text from imported images, and offer OCR for scanned PDFs. The OCR model is downloaded once on first use."
   },
   "common": {
     "loading": "Loading",
