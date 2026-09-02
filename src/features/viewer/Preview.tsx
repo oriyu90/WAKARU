@@ -10,6 +10,7 @@ import { ChevronRightIcon, CloseIcon } from "../../app/Icons";
 import { documentApi } from "../../ipc/viewer";
 import { call } from "../../ipc/client";
 import type { SourceDetail, SourceKind, ViewerTab } from "../../ipc/types.gen";
+import { DocxFilePreview, PdfFilePreview, PptxFilePreview, WorkbookPreview } from "./FilePreviews";
 import styles from "./previews.module.css";
 
 /* ───────────────────────── shared bits ───────────────────────── */
@@ -238,7 +239,7 @@ function PagedPreview({
         </IconButton>
       </Toolbar>
       <div className={styles.body}>
-        <p className={styles.note}>{t("viewer.rasterDeferred")}</p>
+        <p className={styles.note}>{t("viewer.extractedTextFallback")}</p>
         {doc.isLoading ? (
           <LoadingRows />
         ) : doc.isError ? (
@@ -419,8 +420,25 @@ export function Preview({
   if (d.kind === "weblink") {
     return <ReadingPreview projectId={projectId} detail={d} originalUrl={d.url} />;
   }
-  if (d.kind === "pdf" || d.kind === "slides") {
-    return <PagedPreview projectId={projectId} tab={tab} total={d.pageCount ?? 1} onContext={onContext} />;
+  if (d.kind === "pdf" && d.primaryAssetUrl) {
+    const initialPage = typeof (tab.locator as { page?: number })?.page === "number"
+      ? (tab.locator as { page: number }).page
+      : 1;
+    return <PdfFilePreview detail={d} initialPage={initialPage} onPage={(page, total) => {
+      void call("viewer_update_locator", { projectId, tabId: tab.id, locator: { t: "page", page } }).catch(() => {});
+      onContext?.({ sourceId: tab.sourceId, locator: { t: "page", page }, position: `${page} / ${total}` });
+    }} fallback={<PagedPreview projectId={projectId} tab={tab} total={d.pageCount ?? 1} onContext={onContext} />} />;
+  }
+  if (d.kind === "slides") {
+    const fallback = <PagedPreview projectId={projectId} tab={tab} total={d.pageCount ?? 1} onContext={onContext} />;
+    if (!d.primaryAssetUrl || !d.name.toLowerCase().endsWith(".pptx")) return fallback;
+    const initialPage = typeof (tab.locator as { page?: number })?.page === "number"
+      ? (tab.locator as { page: number }).page
+      : 1;
+    return <PptxFilePreview detail={d} initialPage={initialPage} onPage={(page, total) => {
+      void call("viewer_update_locator", { projectId, tabId: tab.id, locator: { t: "page", page } }).catch(() => {});
+      onContext?.({ sourceId: tab.sourceId, locator: { t: "page", page }, position: `${page} / ${total}` });
+    }} fallback={fallback} />;
   }
   if (d.kind === "markdown") {
     return <TextPreview projectId={projectId} tab={tab} markdown />;
@@ -431,12 +449,15 @@ export function Preview({
   if (d.kind === "sheet") {
     return d.name.toLowerCase().match(/\.(csv|tsv)$/)
       ? <SheetPreview projectId={projectId} tab={tab} />
-      : <ReadingPreview projectId={projectId} detail={d} />;
+      : <WorkbookPreview projectId={projectId} detail={d} />;
   }
   if ((d.kind === "audio" || d.kind === "video") && d.primaryAssetUrl) {
     return <AvPreview projectId={projectId} detail={d} />;
   }
-  // doc falls back to the canonical markdown.
+  if (d.kind === "doc" && d.primaryAssetUrl && d.name.toLowerCase().endsWith(".docx")) {
+    return <DocxFilePreview detail={d} fallback={<ReadingPreview projectId={projectId} detail={{ ...d, primaryAssetUrl: null }} />} />;
+  }
+  // Legacy DOC and other non-browser formats fall back to canonical Markdown.
   return <ReadingPreview projectId={projectId} detail={d} />;
 }
 
@@ -451,6 +472,7 @@ function AvPreview({ projectId, detail }: { projectId: string; detail: SourceDet
   const { t } = useTranslation();
   const mediaRef = useRef<HTMLMediaElement>(null);
   const [now, setNow] = useState(0);
+  const [keyframes, setKeyframes] = useState<Array<{ time: number; url: string }>>([]);
   const total = detail.pageCount ?? 1;
 
   const segs = useQuery({
@@ -469,6 +491,46 @@ function AvPreview({ projectId, detail }: { projectId: string; detail: SourceDet
     el.currentTime = sec;
     void el.play();
   };
+
+  useEffect(() => {
+    if (detail.kind !== "video" || !detail.primaryAssetUrl) return;
+    let cancelled = false;
+    const video = document.createElement("video");
+    video.muted = true;
+    video.preload = "auto";
+    video.src = detail.primaryAssetUrl;
+    const wait = (event: "loadedmetadata" | "seeked") =>
+      new Promise<void>((resolve, reject) => {
+      const timeout = window.setTimeout(() => reject(new Error("video-frame-timeout")), 10_000);
+      video.addEventListener(event, () => { window.clearTimeout(timeout); resolve(); }, { once: true });
+      video.addEventListener("error", () => { window.clearTimeout(timeout); reject(new Error("video-frame-error")); }, { once: true });
+      });
+    void (async () => {
+      await wait("loadedmetadata");
+      if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+      const count = Math.min(8, Math.max(2, Math.ceil(video.duration / 120)));
+      const canvas = document.createElement("canvas");
+      const scale = Math.min(1, 320 / Math.max(video.videoWidth, 1));
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) return;
+      const frames: Array<{ time: number; url: string }> = [];
+      for (let index = 0; index < count && !cancelled; index++) {
+        const time = Math.min(video.duration - .05, ((index + .5) / count) * video.duration);
+        video.currentTime = Math.max(0, time);
+        await wait("seeked");
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        frames.push({ time, url: canvas.toDataURL("image/jpeg", .72) });
+      }
+      if (!cancelled) setKeyframes(frames);
+    })().catch(() => {});
+    return () => {
+      cancelled = true;
+      video.removeAttribute("src");
+      video.load();
+    };
+  }, [detail.id, detail.kind, detail.primaryAssetUrl]);
 
   return (
     <div className={styles.av}>
@@ -489,6 +551,17 @@ function AvPreview({ projectId, detail }: { projectId: string; detail: SourceDet
           onTimeUpdate={(e) => setNow(e.currentTarget.currentTime)}
         />
       )}
+
+      {keyframes.length ? (
+        <div className={styles.keyframes} aria-label={t("viewer.keyframes")}>
+          {keyframes.map((frame) => (
+            <button key={frame.time} type="button" onClick={() => seek(frame.time)}>
+              <img src={frame.url} alt="" />
+              <span>{parseTime(frame.time)}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {segs.isLoading ? (
         <LoadingRows />
@@ -601,4 +674,9 @@ function parseDelimited(text: string, delim: string): string[][] {
     rows.push(row);
   }
   return rows.filter((r) => r.some((c) => c.length));
+}
+
+function parseTime(value: number) {
+  const seconds = Math.max(0, Math.floor(value));
+  return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
 }

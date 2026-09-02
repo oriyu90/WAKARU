@@ -1,7 +1,7 @@
 //! Audio / video ingest (docs/04 §2, §6). Decode → VAD → whisper → readable
 //! segments, one `Unit` per merged transcript line with a `time` locator
 //! (AC-5-3/5-8/5-9). Video plays back via the WebView `<video>` + `wakaru-asset://`
-//! — we only pull the audio track here (no keyframe extraction, DECISIONS D-15).
+//! and use embedded Silero VAD before transcription.
 
 use super::Unit;
 use crate::error::AppResult;

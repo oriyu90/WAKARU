@@ -1,8 +1,67 @@
-# WAKARU v0.0.1 — Quality report
+# WAKARU v0.0.2 — Quality report
 
-Generated 2026-09-02 from a clean run of every automated gate, native macOS
-interaction tests against a fixture library and local compatible API, database
-migration verification, log review, and final DMG verification.
+Generated 2026-09-02 from automated gates, responsive browser checks, native
+macOS startup, log review, dependency audit and final DMG verification.
+
+## v0.0.2 release verification — 2026-09-02
+
+- Version metadata is aligned at `0.0.2` in npm, Cargo and Tauri manifests.
+- The Viewer now dispatches original PDF, DOCX, PPTX, XLSX/XLS, CSV/TSV,
+  Markdown, image and media sources to dedicated renderers. Original files stay
+  behind the project-scoped asset protocol; rich-preview failures fall back to
+  extracted text.
+- Former deferrals are resolved by local fastembed search, structured image
+  Vision augmentation, Studio text/tool events, MCP Streamable HTTP, Silero VAD
+  and bounded runtime video thumbnails. D-17 records the exact scope.
+- A strict review found and fixed one design warning: the Studio approval-resume
+  path exceeded the maintained function-argument limit after streaming support
+  was added. Its inputs are now a typed request object; clippy passes with every
+  warning denied.
+
+### v0.0.2 automated gates
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck, lint and design rules | pass |
+| Frontend unit tests | 9 passed, 0 failed |
+| Contrast | pass; dark primary text remains exact white, all checked pairs meet WCAG targets |
+| i18n parity | 339 keys × 3 languages |
+| Production web build | pass; document renderers and bundled PDF worker emitted as production assets |
+| npm audit (all / production) | 0 vulnerabilities |
+| Rust format and clippy (`-D warnings`, all targets/features) | pass |
+| Rust tests | 185 passed, 0 failed; official-network MCP and owner-authorized live AI tests remain ignored by default |
+| cargo-deny licenses, bans and sources | pass |
+| ts-rs binding export | pass; canonical IPC binding updated |
+
+Responsive shell checks passed at 320×900, 600×1200 and 2560×600 with document
+width equal to viewport width and no right/bottom truncation. These supplement
+the v0.0.1 matrix below. The native v0.0.2 development app and the final app
+inside the DMG both reached backend-ready state and remained healthy through
+the startup probe. macOS screen-capture/accessibility permission was unavailable,
+so rich file rendering was verified through production build paths and renderer
+state/error review rather than automated clicks inside the native WebView.
+
+### v0.0.2 bundle
+
+| Gate | Result |
+|---|---|
+| Release build | pass; optimized arm64 `WAKARU.app`, version `0.0.2` |
+| Signature | ad-hoc; `codesign --verify --deep --strict` passes for build output and mounted-DMG app |
+| DMG | `WAKARU_0.0.2_aarch64.dmg`, 21,391,026 bytes; `hdiutil verify` VALID |
+| Mounted-DMG startup | healthy for 6 seconds; clean termination; backend reported version `0.0.2` |
+| Startup secret scan | no API key, authorization header, bearer token or supplied LAN key pattern |
+| SHA-256 | `b46ef031b81578db4bdcccf01da7210f5b9091789c74c92a1704be6a2614a225` |
+
+The size increase from v0.0.1 is expected: v0.0.2 bundles the local embedding
+runtime and document-rendering assets. The embedding model itself is downloaded
+to application data only when first needed and is not inside the DMG.
+
+Known limits are explicit rather than treated as open code defects: no Developer
+ID/notarization, no Windows/Linux release verification, no automatic OCR index
+for scanned PDF pages without a text layer, and no promise to decode encrypted,
+DRM or browser-unsupported legacy formats.
+
+## Previous v0.0.1 verification
 
 ## v0.0.1 release verification — 2026-09-02
 

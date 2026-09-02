@@ -1,5 +1,5 @@
-//! Spreadsheet parsing (docs/04 §6). Phase 1: CSV / TSV only (pure Rust).
-//! xlsx / xls (via `calamine`) land in the follow-up commit.
+//! Delimited-text spreadsheet parsing (docs/04 §6). XLSX/XLS/ODS files are
+//! routed to the Office parser, which uses calamine.
 
 use super::Unit;
 use crate::error::{AppError, AppResult};
@@ -18,7 +18,7 @@ pub fn parse_sheet(path: &Path) -> AppResult<Vec<Unit>> {
         other => Err(AppError::new(
             "SOURCE_UNSUPPORTED_FORMAT",
             "error.source.unsupported",
-            format!("spreadsheet format .{other} not supported yet (xlsx/xls in follow-up)"),
+            format!("unsupported delimited spreadsheet format: .{other}"),
         )),
     }
 }
@@ -62,8 +62,7 @@ fn parse_delimited(path: &Path, delim: u8) -> AppResult<Vec<Unit>> {
         locator: serde_json::json!({ "t": "cell", "sheet": file_stem(path), "range": "A1:A1" }),
     });
 
-    // Body as Markdown tables, 50-row blocks. (Sheets over 500 rows also keep the
-    // full data in derived/tables/ — added in the follow-up commit.)
+    // Body as bounded Markdown tables in 50-row blocks.
     let body_rows = &rows[..];
     let start_row = if header_is_names(header) { 1 } else { 0 };
     let mut ordinal = 2;

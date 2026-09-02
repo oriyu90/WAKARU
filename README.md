@@ -9,10 +9,13 @@ frontend.
 
 ## Status
 
-**v0.0.1 release candidate.** All implementation phases are complete. AI
-connections support OpenAI-compatible and Anthropic-compatible wire formats;
-Studio applies a concise editorial quality policy, and Live Illustrator applies
-plain-language, understanding-oriented teaching guidance on every request.
+**v0.0.2 release candidate.** The Viewer renders PDF, DOCX, PPTX, spreadsheets,
+Markdown, images, audio and video rather than reducing every source to extracted
+text. AI connections support OpenAI-compatible and Anthropic-compatible wire
+formats; local embeddings provide an offline semantic-search fallback. Studio
+streams progress and applies a concise editorial policy, while Live Illustrator
+applies plain-language, understanding-oriented teaching guidance on every request.
+MCP supports both local stdio and policy-checked Streamable HTTP servers.
 
 ## Layout
 

@@ -1,6 +1,6 @@
 [package]
 name = "wakaru"
-version = "0.0.1"
+version = "0.0.2"
 description = "Local-first AI notebook for your own documents"
 authors = ["Yuki Orita"]
 license = "MIT"
@@ -39,13 +39,16 @@ encoding_rs = "0.8"
 chardetng = "0.1"                           # charset sniffing
 csv = "1"
 tiktoken-rs = "0.6"                         # cl100k_base token estimate (docs/04 §10)
-pdf-extract = "0.12"                        # PDF text (pure Rust; rasterisation deferred, D-09)
+pdf-extract = "0.12"                        # PDF text extraction; PDF.js handles visual rendering
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "bmp", "tiff", "webp"] }
 kamadak-exif = "0.5"                        # EXIF orientation
 calamine = "0.36"                           # xlsx / xls
 zip = { version = "2", default-features = false, features = ["deflate"] }
 quick-xml = "0.41"                          # OOXML (pptx / docx)
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "gzip", "brotli", "json", "stream"] }
+url = "2"
+http = "1"
+rustls = { version = "0.23", default-features = false, features = ["std", "ring", "tls12"] }
 scraper = "0.27"                            # HTML -> readable text (web links)
 
 # AI layer (Phase 3)
@@ -53,6 +56,7 @@ keyring = { version = "3", features = ["apple-native", "windows-native", "linux-
 eventsource-stream = "0.2"                  # SSE parsing for chat/completions
 futures-util = "0.3"
 sqlite-vec = "0.1"                          # vec0 virtual table for chunk_vectors
+fastembed = { version = "6.0.2", default-features = false, features = ["ort-download-binaries-rustls-tls", "hf-hub-rustls-tls"] }
 
 # File Modifier (Phase 8)
 printpdf = { version = "0.12.7", default-features = false } # images -> PDF
@@ -67,9 +71,10 @@ thiserror = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
-rmcp = { version = "=3.0.1", default-features = false, features = ["client", "transport-child-process"] }
+rmcp = { version = "=3.0.1", default-features = false, features = ["client", "transport-child-process", "transport-streamable-http-client-reqwest", "reqwest-tls-no-provider"] }
 whisper-rs = { version = "0.14", default-features = false, features = ["metal"] }
 symphonia = { version = "0.5.5", features = ["mp3", "aac", "isomp4", "wav", "flac", "ogg"] }
+silero-vad-crs = "0.4.0"
 
 [dev-dependencies]
 tempfile = "3"

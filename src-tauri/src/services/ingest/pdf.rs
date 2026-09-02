@@ -1,6 +1,5 @@
-//! PDF text extraction (docs/04 §4). Phase 1: text only, one `documents` row per
-//! page. Rasterisation to page images is deferred to Phase 2 (D-09) when the
-//! Viewer needs them.
+//! PDF text extraction (docs/04 §4), one `documents` row per page. The Viewer
+//! renders the original file with PDF.js; this module builds searchable text.
 
 use super::Unit;
 use crate::error::{AppError, AppResult};
@@ -21,17 +20,13 @@ pub fn parse_pdf(path: &Path) -> AppResult<Vec<Unit>> {
     for (i, raw) in pages.into_iter().enumerate() {
         let text = normalize(&raw);
         if text.trim().is_empty() {
-            // Scanned page with no text layer — OCR (Vision / Tesseract) is
-            // Phase 4. Keep a placeholder so the page still has a citation unit.
+            // Scanned page with no text layer. Keep a placeholder so the page
+            // remains a stable citation unit even though it is not searchable.
             units.push(Unit {
                 ordinal: (i + 1) as u32,
                 kind: "page",
                 title: Some(format!("p.{}", i + 1)),
-                text: format!(
-                    "[ページ {} / {}] （テキスト層なし。解析は後で補完されます）",
-                    i + 1,
-                    total
-                ),
+                text: format!("[ページ {} / {}] （テキスト層なし）", i + 1, total),
                 locator: serde_json::json!({ "t": "page", "page": i + 1 }),
             });
             continue;

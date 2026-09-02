@@ -1,7 +1,6 @@
 //! Image normalisation (docs/04 §1). Phase 1: EXIF-rotate, cap the long side at
-//! 2048 px, write a normalised copy to `derived/<sid>/pages/0001.<ext>`. Vision
-//! analysis (OCR / figures / scene) is Phase 4 — until then the search text is
-//! just the file name.
+//! 2048 px, write a normalised copy to `derived/<sid>/pages/0001.<ext>`. A
+//! configured Vision role subsequently adds OCR/layout/diagram analysis.
 
 use super::Unit;
 use crate::error::{AppError, AppResult};
@@ -50,11 +49,7 @@ pub fn parse_image(abs_path: &Path, derived_dir: &Path) -> AppResult<ImageResult
         ordinal: 1,
         kind: "image",
         title: Some(name.clone()),
-        text: format!(
-            "[画像] {name}\n（{}×{}）\n画像の内容解析は後で補完されます。",
-            img.width(),
-            img.height()
-        ),
+        text: format!("[画像] {name}\n（{}×{}）", img.width(), img.height()),
         locator: serde_json::json!({ "t": "region", "bbox": [0.0, 0.0, 1.0, 1.0] }),
     }];
 

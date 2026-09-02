@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 pub struct McpServer {
     pub id: String,
     pub name: String,
-    /// `"stdio"` (supported) or `"http"` (deferred — DECISIONS D-14).
+    /// `"stdio"` or MCP Streamable `"http"`.
     pub transport: String,
     pub command: Option<String>,
     pub args: Vec<String>,

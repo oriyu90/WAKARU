@@ -167,7 +167,7 @@ export type McpConnectResult = { tools: Array<McpTool>, };
 
 export type McpServer = { id: string, name: string, 
 /**
- * `"stdio"` (supported) or `"http"` (deferred — DECISIONS D-14).
+ * `"stdio"` or MCP Streamable `"http"`.
  */
 transport: string, command: string | null, args: Array<string>, url: string | null, 
 /**
@@ -256,10 +256,11 @@ export type Source = { id: string, kind: SourceKind, originalName: string, url: 
  * Lightweight source detail for a preview header (name, kind, page count,
  * the reader-view asset URL for web links, etc.).
  */
-export type SourceDetail = { id: string, kind: SourceKind, name: string, url: string | null, pageCount: number | null, status: SourceStatus, 
+export type SourceDetail = { id: string, kind: SourceKind, name: string, url: string | null, pageCount: number | null, status: SourceStatus, mime: string | null, bytes: bigint,
 /**
  * `wakaru-asset://` URL to the primary rendered/original file, if any:
- * the normalised image, or the saved web reader markdown.
+ * the normalised image, saved web reader markdown, or original imported
+ * file. The URL is project-scoped and never exposes an absolute path.
  */
 primaryAssetUrl: string | null, };
 

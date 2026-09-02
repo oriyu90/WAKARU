@@ -75,20 +75,11 @@ fn deleting_a_server_cascades_its_policies() {
     assert!(mcp::list_servers(&db).unwrap().is_empty());
 }
 
-#[tokio::test]
-async fn http_transport_is_refused_this_release() {
-    // DECISIONS D-14: stdio only for v0.0.0.
-    let row = mcp::McpServerRow {
-        id: "x".into(),
-        name: "Remote".into(),
-        transport: "http".into(),
-        command: None,
-        args: vec![],
-        url: Some("https://example.com/mcp".into()),
-        env: serde_json::Map::new(),
-    };
-    let err = mcp::connect(row, &std::collections::HashMap::new())
-        .await
-        .unwrap_err();
-    assert_eq!(err.code, "MCP_TRANSPORT_UNSUPPORTED");
+#[test]
+fn streamable_http_requires_tls_except_on_private_networks() {
+    assert!(mcp::validate_http_url("https://example.com/mcp").is_ok());
+    assert!(mcp::validate_http_url("http://127.0.0.1:3000/mcp").is_ok());
+    assert!(mcp::validate_http_url("http://192.168.0.5:3000/mcp").is_ok());
+    let err = mcp::validate_http_url("http://example.com/mcp").unwrap_err();
+    assert_eq!(err.code, "MCP_INSECURE_REMOTE_URL");
 }

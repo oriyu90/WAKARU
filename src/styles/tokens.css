@@ -111,6 +111,10 @@
 
   --color-accent: oklch(55% 0.152 40);
   --color-accent-ink: oklch(99% 0.002 70);
+  --color-document-paper: oklch(100% 0 0);
+  --color-document-ink: oklch(18% 0 0);
+  --color-on-dark: oklch(100% 0 0);
+  --color-overlay-dark: oklch(0% 0 0 / 75%);
   --color-accent-weak: oklch(94% 0.030 45);
   --color-focus: oklch(52% 0.150 40);
 

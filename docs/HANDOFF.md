@@ -1,12 +1,12 @@
-# WAKARU v0.0.1 — handoff
+# WAKARU v0.0.2 — handoff
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
-2026-09-02 follow-up: the workbench is responsive across extreme portrait and
-low-landscape viewports, compatible-API profile validation and capability
-probing are stricter, and MCP was upgraded to the 2026-07-28 lifecycle with a
-legacy fallback. See `UI_NETWORK_MCP_REMEDIATION_PLAN.md` and the latest section
-of `QUALITY_REPORT.md`.
+2026-09-02 v0.0.2 follow-up: original files now render in the Viewer, local
+semantic embeddings and image Vision augmentation are available, Studio emits
+live text/tool progress, MCP supports policy-checked Streamable HTTP, and audio
+segmentation uses Silero with a deterministic fallback. See
+`IMPLEMENTATION_PLAN_v0.0.2.md` and `QUALITY_REPORT.md`.
 
 ## What this repo is
 
@@ -21,13 +21,13 @@ a from-scratch Hallmark React frontend.
   never push source there. If you want an off-site backup, add a *private*
   remote deliberately.
 - Author `Yuki Orita` / `Yuki_Orita`, MIT. Bundle id `com.yukiorita.wakaru`.
-- Version `0.0.1`, identical in `package.json`, `src-tauri/Cargo.toml`,
+- Version `0.0.2`, identical in `package.json`, `src-tauri/Cargo.toml`,
   `src-tauri/tauri.conf.json`.
 
 ## Status
 
-**All 12 phases (P0–P11) implemented and committed** (`git log`, `phase(N):`
-prefixes). Working tree clean.
+All original phases are implemented. The v0.0.2 replacement is finalized only
+after the quality gates and release record in `QUALITY_REPORT.md` are green.
 
 | Gate | How | State |
 |---|---|---|
@@ -54,12 +54,12 @@ src-tauri/src/
   commands/              thin #[tauri::command] wrappers only
   domain/                ts-rs types crossing the IPC boundary → src/ipc/types.gen.ts
   services/              all business logic
-    ai/                  one OpenAI-compat client, profiles, capability probe, stream primitive
+    ai/                  OpenAI/Anthropic-compatible clients, embeddings, capability probes
     ingest/              per-format parsers (text/pdf/office/sheet/image/web/av)
     whisper/             model manager + audio decode/VAD + whisper-rs engine
     studio.rs            the agentic tool loop
     sandbox.rs           resolve_in_sandbox + run_command (I-7)
-    mcp.rs               rmcp 3.0.1 stdio client (2026-07-28 + legacy) + connection registry
+    mcp.rs               rmcp 3.0.1 stdio/Streamable HTTP client + connection registry
   storage/               rusqlite, migrations, forward-only runner
   jobs/                  tokio worker pool + job://progress
 migrations/{app,project}/*.sql
@@ -79,17 +79,17 @@ scripts/                 check-{design-rules,contrast,i18n,hardcoded}.mjs
   JSX text not wrapped in `t()`. i18n keys must match across en/ja/zh-Hans.
 - Phase gate before each `phase(N):` commit = the full gate table above.
 
-## Deliberate deferrals (`DECISIONS.md`)
+## v0.0.2 resolution of former deferrals (`DECISIONS.md`, D-17)
 
-| # | Deferred | Why | Substitute |
-|---|---|---|---|
-| D-09 | PDF/slide page-image render | no pure-Rust rasteriser, pdf.js banned | extracted text + note |
-| D-10 | local embeddings | ort/ONNX build risk | remote `/v1/embeddings`, FTS-only degrade |
-| D-11 | ingest-time Vision analysis | depends on D-09 | text-only explanations + banner |
-| D-13 | Studio token streaming | no AC needs it; sync is simpler | request/response `studio_send` |
-| D-14 | MCP Streamable HTTP | feature pulls openssl-sys | stdio transport only |
-| D-15 | Silero VAD / video keyframes / upstream whisper SHA | ONNX risk / no pure-Rust H.264 / no manifest | energy-gate VAD / audio-only + `<video>` / recorded SHA |
-| — | Windows / Linux | unverified | code present, not distributed |
+| # | v0.0.2 state | Implementation |
+|---|---|---|
+| D-09 | completed | bundled PDF.js, DOCX/PPTX browser renderers and spreadsheet tables |
+| D-10 | completed | fastembed multilingual-e5-small, cached locally; FTS fallback on failure |
+| D-11 | completed for image sources | structured Vision OCR/layout/diagram augmentation; PDF text and visual rendering remain separate |
+| D-13 | completed | tab-scoped text delta and tool-state events with cancellation safety |
+| D-14 | completed | stdio + rustls Streamable HTTP with private-LAN plaintext policy |
+| D-15 | completed | embedded Silero VAD with energy fallback; bounded runtime video thumbnails |
+| — | externally unverified | Windows/Linux and Apple notarization are not distributed in v0.0.2 |
 
 ## Build gotcha
 

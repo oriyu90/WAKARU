@@ -1,6 +1,6 @@
 //! Pure audio DSP for transcription (docs/04 §2-1/2-2). Decode any container
 //! Symphonia understands to 16 kHz mono f32 (whisper.cpp's required format),
-//! a light energy-gate VAD in place of Silero (DECISIONS D-15), 30-second
+//! Silero VAD with a deterministic energy fallback, 30-second
 //! splitting at silence valleys, and readable segment merging.
 
 use crate::domain::transcription::TranscriptSegment;
@@ -154,6 +154,41 @@ fn frame_rms(pcm: &[f32], sr: u32) -> Vec<f32> {
 /// almost entirely silent (AC-5-4). Long regions are split under
 /// [`MAX_CHUNK_SEC`] at their quietest interior frame (docs/04 §2-2).
 pub fn speech_regions(pcm: &[f32], sr: u32) -> (Vec<(usize, usize)>, bool) {
+    if pcm.is_empty() {
+        return (Vec::new(), true);
+    }
+    if let Ok(mut vad) = silero_vad_crs::SileroVad::with_sample_rate(sr as usize) {
+        if let Ok(probs) = vad.forward_audio(pcm) {
+            let config = silero_vad_crs::TimestampConfig {
+                sampling_rate: sr as usize,
+                max_speech_duration_s: MAX_CHUNK_SEC,
+                min_silence_duration_ms: 350,
+                speech_pad_ms: 100,
+                window_size_samples: vad.source_window_samples(),
+                ..Default::default()
+            };
+            let timestamps =
+                silero_vad_crs::get_timestamps_from_probs_with_config(&probs, pcm.len(), config);
+            if !timestamps.is_empty() {
+                let voiced: usize = timestamps.iter().map(|item| item.end - item.start).sum();
+                let mostly_silent =
+                    voiced < sr as usize / 2 || (voiced as f32 / pcm.len() as f32) < 0.02;
+                return (
+                    timestamps
+                        .into_iter()
+                        .map(|item| (item.start, item.end))
+                        .collect(),
+                    mostly_silent,
+                );
+            }
+        }
+    }
+    // Embedded-model allocation/inference failure must not make ingest fail.
+    // The fallback also keeps synthetic tones and unusual speech usable.
+    speech_regions_energy(pcm, sr)
+}
+
+fn speech_regions_energy(pcm: &[f32], sr: u32) -> (Vec<(usize, usize)>, bool) {
     let rms = frame_rms(pcm, sr);
     if rms.is_empty() {
         return (Vec::new(), true);

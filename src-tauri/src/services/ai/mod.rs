@@ -11,7 +11,7 @@ use crate::error::{AppError, AppResult};
 use client::AiClient;
 use rusqlite::Connection;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Emitter};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -190,10 +190,86 @@ pub async fn embed(
     texts: &[String],
     is_query: bool,
 ) -> AppResult<Option<(String, Vec<Vec<f32>>)>> {
-    let Some(role) = profiles::resolve(app_db, Role::Embedding)? else {
+    if let Some(role) = profiles::resolve(app_db, Role::Embedding)? {
+        return Ok(Some(embed_with(role, texts, is_query).await?));
+    }
+    let db_path: String = app_db
+        .query_row(
+            "SELECT file FROM pragma_database_list WHERE name = 'main'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or_default();
+    if db_path.is_empty() {
         return Ok(None);
-    };
-    Ok(Some(embed_with(role, texts, is_query).await?))
+    }
+    let data_dir = std::path::Path::new(&db_path)
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."));
+    Ok(Some(embed_local(data_dir, texts, is_query).await?))
+}
+
+const LOCAL_EMBED_MODEL: &str = "local:intfloat/multilingual-e5-small";
+static LOCAL_EMBEDDER: OnceLock<Mutex<fastembed::TextEmbedding>> = OnceLock::new();
+
+/// Offline multilingual fallback used when no remote embedding role is bound.
+/// The model is downloaded once into the WAKARU model cache and then reused.
+pub async fn embed_local(
+    data_dir: &std::path::Path,
+    texts: &[String],
+    is_query: bool,
+) -> AppResult<(String, Vec<Vec<f32>>)> {
+    let cache = data_dir.join("models").join("embeddings");
+    let inputs: Vec<String> = texts
+        .iter()
+        .map(|text| format!("{}{}", e5_prefix(LOCAL_EMBED_MODEL, is_query), text))
+        .collect();
+    tokio::task::spawn_blocking(move || {
+        if LOCAL_EMBEDDER.get().is_none() {
+            std::fs::create_dir_all(&cache)?;
+            let options =
+                fastembed::TextInitOptions::new(fastembed::EmbeddingModel::MultilingualE5Small)
+                    .with_cache_dir(cache)
+                    .with_show_download_progress(false);
+            let model = fastembed::TextEmbedding::try_new(options).map_err(|error| {
+                AppError::new(
+                    "LOCAL_EMBED_INIT",
+                    "error.ai.localEmbedding",
+                    error.to_string(),
+                )
+                .retriable()
+            })?;
+            let _ = LOCAL_EMBEDDER.set(Mutex::new(model));
+        }
+        let mut model = LOCAL_EMBEDDER
+            .get()
+            .ok_or_else(|| AppError::internal("local embedder was not initialized"))?
+            .lock()
+            .map_err(|_| AppError::internal("local embedder mutex poisoned"))?;
+        let vectors = model.embed(inputs, Some(64)).map_err(|error| {
+            AppError::new(
+                "LOCAL_EMBED_FAILED",
+                "error.ai.localEmbedding",
+                error.to_string(),
+            )
+            .retriable()
+        })?;
+        Ok((LOCAL_EMBED_MODEL.to_string(), vectors))
+    })
+    .await
+    .map_err(|error| AppError::internal(format!("local embedding task: {error}")))?
+}
+
+pub async fn embed_resolved_or_local(
+    role: Option<profiles::ResolvedRole>,
+    data_dir: &std::path::Path,
+    texts: &[String],
+    is_query: bool,
+) -> AppResult<(String, Vec<Vec<f32>>)> {
+    match role {
+        Some(role) => embed_with(role, texts, is_query).await,
+        None => embed_local(data_dir, texts, is_query).await,
+    }
 }
 
 /// Same, but with the role already resolved — used where a `Connection` must not

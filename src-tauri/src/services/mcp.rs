@@ -1,6 +1,5 @@
-//! MCP client (docs/05 §6, AC-7-1/3/4/11/12). Only the **stdio** transport is
-//! implemented for v0.0.0; Streamable HTTP is deferred until its remote auth,
-//! approval, and reconnect design is complete (DECISIONS D-14). Connections live in a process-global registry so a
+//! MCP client (docs/05 §6, AC-7-1/3/4/11/12). Supports stdio and the MCP
+//! Streamable HTTP transport. Connections live in a process-global registry so a
 //! Studio tool loop can reach them without threading a handle through every
 //! call. A server that fails to connect or dies isolates to itself (AC-7-11).
 
@@ -219,11 +218,14 @@ pub async fn connect(
     row: McpServerRow,
     policies: &HashMap<String, String>,
 ) -> AppResult<Vec<McpTool>> {
+    if row.transport == "http" {
+        return connect_http(row, policies).await;
+    }
     if row.transport != "stdio" {
         return Err(AppError::new(
             "MCP_TRANSPORT_UNSUPPORTED",
             "error.mcp.transportUnsupported",
-            "only stdio MCP servers are supported in this release",
+            "supported MCP transports are stdio and http",
         ));
     }
     let program = row
@@ -368,6 +370,184 @@ pub async fn connect(
         },
     );
     Ok(out)
+}
+
+async fn connect_http(
+    row: McpServerRow,
+    policies: &HashMap<String, String>,
+) -> AppResult<Vec<McpTool>> {
+    use rmcp::transport::{
+        streamable_http_client::StreamableHttpClientTransportConfig, StreamableHttpClientTransport,
+    };
+
+    // RMCP deliberately does not choose a process-wide rustls provider. WAKARU
+    // uses ring consistently for its Rustls-backed HTTP clients.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let uri = row
+        .url
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| AppError::new("MCP_NO_URL", "error.mcp.noUrl", "HTTP server needs a URL"))?;
+    validate_http_url(uri)?;
+
+    let mut headers = HashMap::new();
+    for (name, stored) in &row.env {
+        let Some(stored) = stored.as_str() else {
+            continue;
+        };
+        let value = resolve_secret(&row.id, stored);
+        if value.is_empty() {
+            continue;
+        }
+        let name = http::HeaderName::from_bytes(name.as_bytes()).map_err(|error| {
+            AppError::new(
+                "MCP_HEADER_INVALID",
+                "error.mcp.badHeader",
+                error.to_string(),
+            )
+        })?;
+        let value = http::HeaderValue::from_str(&value).map_err(|error| {
+            AppError::new(
+                "MCP_HEADER_INVALID",
+                "error.mcp.badHeader",
+                error.to_string(),
+            )
+        })?;
+        headers.insert(name, value);
+    }
+
+    let config =
+        StreamableHttpClientTransportConfig::with_uri(uri.to_string()).custom_headers(headers);
+    let transport = StreamableHttpClientTransport::from_config(config);
+    let service = tokio::time::timeout(
+        CONNECT_TIMEOUT,
+        ().serve_with_lifecycle(
+            transport,
+            ClientLifecycleMode::Auto {
+                preferred_versions: vec![ProtocolVersion::V_2026_07_28],
+                legacy_version: Some(ProtocolVersion::V_2025_11_25),
+            },
+        ),
+    )
+    .await
+    .map_err(|_| {
+        AppError::new(
+            "MCP_HANDSHAKE_TIMEOUT",
+            "error.mcp.handshakeFailed",
+            "MCP handshake timed out",
+        )
+    })?
+    .map_err(|error| {
+        AppError::new(
+            "MCP_HANDSHAKE_FAILED",
+            "error.mcp.handshakeFailed",
+            error.to_string(),
+        )
+    })?;
+
+    let raw = tokio::time::timeout(LIST_TIMEOUT, service.list_all_tools())
+        .await
+        .map_err(|_| {
+            AppError::new(
+                "MCP_LIST_TOOLS_TIMEOUT",
+                "error.mcp.listToolsFailed",
+                "MCP tools/list timed out",
+            )
+        })?
+        .map_err(|error| {
+            AppError::new(
+                "MCP_LIST_TOOLS_FAILED",
+                "error.mcp.listToolsFailed",
+                error.to_string(),
+            )
+        })?;
+    let slug = server_slug(&row.name, &row.id);
+    let tools = decode_tools(raw);
+    let out = tools
+        .iter()
+        .map(|tool| {
+            let qualified = format!("{slug}__{}", tool.alias);
+            McpTool {
+                server_id: row.id.clone(),
+                server_name: row.name.clone(),
+                name: tool.name.clone(),
+                description: tool.description.clone(),
+                policy: policies
+                    .get(&qualified)
+                    .cloned()
+                    .unwrap_or_else(|| "ask".into()),
+                qualified_name: qualified,
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if let Some(mut old) = conns().lock().await.remove(&row.id) {
+        let _ = old.service.close_with_timeout(CLOSE_TIMEOUT).await;
+    }
+    conns().lock().await.insert(
+        row.id,
+        Conn {
+            service,
+            slug,
+            server_name: row.name,
+            tools,
+            stderr: Arc::new(StdMutex::new(Vec::new())),
+        },
+    );
+    Ok(out)
+}
+
+fn resolve_secret(server_id: &str, stored: &str) -> String {
+    stored
+        .strip_prefix("keychain:")
+        .and_then(|reference| {
+            keyring::Entry::new(KEYRING_SERVICE, &format!("mcp_env:{server_id}:{reference}"))
+                .ok()
+                .and_then(|entry| entry.get_password().ok())
+        })
+        .unwrap_or_else(|| stored.to_string())
+}
+
+pub fn validate_http_url(raw: &str) -> AppResult<()> {
+    let parsed = url::Url::parse(raw)
+        .map_err(|error| AppError::new("MCP_URL_INVALID", "error.mcp.badUrl", error.to_string()))?;
+    if parsed.username() != "" || parsed.password().is_some() || parsed.fragment().is_some() {
+        return Err(AppError::new(
+            "MCP_URL_INVALID",
+            "error.mcp.badUrl",
+            "credentials and fragments are not allowed in MCP URLs",
+        ));
+    }
+    if parsed.scheme() == "https" {
+        return Ok(());
+    }
+    if parsed.scheme() != "http" {
+        return Err(AppError::new(
+            "MCP_URL_INVALID",
+            "error.mcp.badUrl",
+            "MCP URL must use https, or http on a private network",
+        ));
+    }
+    let private = match parsed.host() {
+        Some(url::Host::Ipv4(ip)) => ip.is_private() || ip.is_loopback() || ip.is_link_local(),
+        Some(url::Host::Ipv6(ip)) => {
+            ip.is_loopback() || ip.is_unique_local() || ip.is_unicast_link_local()
+        }
+        Some(url::Host::Domain(host)) => {
+            host.eq_ignore_ascii_case("localhost") || host.ends_with(".local")
+        }
+        None => false,
+    };
+    if private {
+        Ok(())
+    } else {
+        Err(AppError::new(
+            "MCP_INSECURE_REMOTE_URL",
+            "error.mcp.insecureUrl",
+            "plain HTTP is limited to localhost and private-network addresses",
+        ))
+    }
 }
 
 pub async fn disconnect(server_id: &str) {

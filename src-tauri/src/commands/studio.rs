@@ -58,6 +58,7 @@ pub fn studio_reorder_tabs(
 
 #[tauri::command]
 pub async fn studio_send(
+    app: AppHandle,
     state: State<'_, AppState>,
     input: StudioSendInput,
     ui_lang: String,
@@ -65,7 +66,7 @@ pub async fn studio_send(
     let reg = state.streams.clone();
     let app_db_path = state.app_db_path.clone();
     let projects_dir = state.projects_dir.clone();
-    studio::send(&reg, &app_db_path, &projects_dir, input, ui_lang).await
+    studio::send_streaming(&app, &reg, &app_db_path, &projects_dir, input, ui_lang).await
 }
 
 #[tauri::command]
@@ -76,6 +77,7 @@ pub fn studio_cancel(state: State<'_, AppState>, tab_id: String) -> AppResult<()
 
 #[tauri::command]
 pub async fn studio_resolve_tool(
+    app: AppHandle,
     state: State<'_, AppState>,
     project_id: String,
     tab_id: String,
@@ -85,14 +87,17 @@ pub async fn studio_resolve_tool(
     let reg = state.streams.clone();
     let app_db_path = state.app_db_path.clone();
     let projects_dir = state.projects_dir.clone();
-    studio::resolve_tool(
+    studio::resolve_tool_streaming(
+        &app,
         &reg,
         &app_db_path,
         &projects_dir,
-        project_id,
-        tab_id,
-        approved,
-        ui_lang,
+        studio::ResolveToolRequest {
+            project_id,
+            tab_id,
+            approved,
+            ui_lang,
+        },
     )
     .await
 }

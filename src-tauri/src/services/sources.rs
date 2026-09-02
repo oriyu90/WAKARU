@@ -423,6 +423,26 @@ fn spawn_ingest(
                 project_dir: &projects::project_dir(&projects_root, &project_id),
             };
             let outcome = ingest::run(&ctx, kind, &input)?;
+            let visual_complete = if kind == SourceKind::Image && outcome.partial {
+                match tauri::async_runtime::block_on(
+                    crate::services::vision::analyze_normalized_image(
+                        &app_db,
+                        &project_db,
+                        &projects::project_dir(&projects_root, &project_id),
+                        &project_id,
+                        &source_id,
+                    ),
+                ) {
+                    Ok(done) => done,
+                    Err(error) => {
+                        tracing::warn!(source = %source_id, error = %error, "visual analysis skipped");
+                        false
+                    }
+                }
+            } else {
+                !outcome.partial
+            };
+            let partial = outcome.partial && !visual_complete;
             project_db.execute(
                 "UPDATE sources
                    SET status=?2, lang=?3, page_count=?4, analyzed_at=?5,
@@ -431,22 +451,14 @@ fn spawn_ingest(
                  WHERE id=?1",
                 params![
                     source_id,
-                    if outcome.partial {
-                        "ready_partial"
-                    } else {
-                        "ready"
-                    },
+                    if partial { "ready_partial" } else { "ready" },
                     outcome.lang,
                     outcome.page_count.map(|v| v as i64),
                     now_iso8601(),
                     outcome.title_override,
                 ],
             )?;
-            let final_status = if outcome.partial {
-                "ready_partial"
-            } else {
-                "ready"
-            };
+            let final_status = if partial { "ready_partial" } else { "ready" };
             set_status(
                 &app,
                 &project_db,

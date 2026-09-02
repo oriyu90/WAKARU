@@ -29,23 +29,28 @@ pub fn mcp_upsert_server(
             "server name is required",
         ));
     }
-    if input.transport != "stdio" {
+    if !matches!(input.transport.as_str(), "stdio" | "http") {
         return Err(AppError::new(
             "MCP_TRANSPORT_UNSUPPORTED",
             "error.mcp.transportUnsupported",
-            "only stdio MCP servers are supported",
+            "supported MCP transports are stdio and http",
         ));
     }
-    if input
-        .command
-        .as_deref()
-        .is_none_or(|command| command.trim().is_empty())
+    if input.transport == "stdio"
+        && input
+            .command
+            .as_deref()
+            .is_none_or(|command| command.trim().is_empty())
     {
         return Err(AppError::new(
             "MCP_NO_COMMAND",
             "error.mcp.noCommand",
             "stdio server needs a command",
         ));
+    }
+    if input.transport == "http" {
+        let url = input.url.as_deref().unwrap_or_default();
+        mcp::validate_http_url(url)?;
     }
     let id = input
         .id

@@ -12,6 +12,7 @@ import { studioApi } from "../../ipc/studio";
 import { pickSaveDir } from "../../ipc/fileModifier";
 import { inTauri } from "../../ipc/client";
 import { useToast } from "../../components/useToast";
+import { listen } from "@tauri-apps/api/event";
 import type {
   Artifact,
   ChatMessage,
@@ -22,6 +23,8 @@ import type {
 import styles from "./Studio.module.css";
 
 type StudioToolCall = { id: string; name: string; arguments: unknown };
+type StudioDelta = { tabId: string; kind: string; text: string };
+type StudioToolEvent = { tabId: string; name: string; state: "running" | "complete" };
 
 export function Studio({
   projectId,
@@ -43,6 +46,8 @@ export function Studio({
   const [scope, setScope] = useState("project");
   const [renaming, setRenaming] = useState<string | null>(null);
   const [title, setTitle] = useState("");
+  const [provisional, setProvisional] = useState("");
+  const [runningTool, setRunningTool] = useState("");
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
 
@@ -101,18 +106,54 @@ export function Studio({
   });
   const send = useMutation({
     mutationFn: (payload: string) => studioApi.send(projectId, activeTabId, payload, scope),
+    onMutate: () => {
+      setProvisional("");
+      setRunningTool("");
+    },
     onSuccess: async () => {
       setText("");
       await Promise.all([refreshTabs(), refreshArtifacts()]);
+      setProvisional("");
+      setRunningTool("");
       composerRef.current?.focus();
     },
     onError: (e) => toast.push({ tone: "error", message: (e as Error).message }),
   });
+
+  useEffect(() => {
+    if (!inTauri || !activeTabId) return;
+    let disposed = false;
+    const cleanups: Array<() => void> = [];
+    void Promise.all([
+      listen<StudioDelta>("studio://delta", ({ payload }) => {
+        if (payload.tabId === activeTabId && payload.kind === "text") {
+          setProvisional((value) => value + payload.text);
+        }
+      }),
+      listen<StudioToolEvent>("studio://tool", ({ payload }) => {
+        if (payload.tabId !== activeTabId) return;
+        setRunningTool(payload.state === "running" ? payload.name : "");
+      }),
+    ]).then((unlisten) => {
+      if (disposed) unlisten.forEach((fn) => fn());
+      else cleanups.push(...unlisten);
+    });
+    return () => {
+      disposed = true;
+      cleanups.forEach((fn) => fn());
+    };
+  }, [activeTabId]);
   const resolveTool = useMutation({
     mutationFn: (approved: boolean) => studioApi.resolveTool(projectId, activeTabId, approved),
-    onSuccess: () => Promise.all([refreshTabs(), refreshArtifacts()]),
+    onMutate: () => { setProvisional(""); setRunningTool(""); },
+    onSuccess: async () => {
+      await Promise.all([refreshTabs(), refreshArtifacts()]);
+      setProvisional("");
+      setRunningTool("");
+    },
     onError: (e) => toast.push({ tone: "error", message: (e as Error).message }),
   });
+  const streaming = send.isPending || resolveTool.isPending;
   const importArtifact = useMutation({
     mutationFn: (id: string) => studioApi.importArtifact(projectId, id),
     onSuccess: async () => {
@@ -248,7 +289,10 @@ export function Studio({
               busy={resolveTool.isPending || send.isPending}
             />
           ))}
-          {send.isPending ? <p className={styles.thinking}>{t("studio.thinking")}</p> : null}
+          {streaming && provisional ? (
+            <div className={styles.streaming} aria-label={t("studio.streaming")}><Markdown>{provisional}</Markdown></div>
+          ) : null}
+          {streaming ? <p className={styles.thinking}>{runningTool ? t("studio.runningTool", { name: runningTool }) : t("studio.thinking")}</p> : null}
         </div>
 
         {/* AC-6-11: the working directory is always on screen, even when the

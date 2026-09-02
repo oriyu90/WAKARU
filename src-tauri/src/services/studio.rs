@@ -1,7 +1,7 @@
 //! Studio (docs/06 §6, FR-T1..T7, AC-6-*). Free chat tabs over a project's
 //! sources, with a small set of built-in tools and a `workspace/` the model can
-//! write into. The agentic loop is request/response, not token-streamed
-//! (DECISIONS D-13): `studio_send` runs the whole loop and returns a summary;
+//! write into. Assistant text and tool state are emitted while the agentic loop
+//! runs; `studio_send` returns the final persisted summary;
 //! `studio_resolve_tool` resumes a loop that paused for a `write_file` approval
 //! or hit the 10-round cap.
 
@@ -18,6 +18,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use tauri::{AppHandle, Emitter};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -754,6 +755,8 @@ fn mime_guess_ext(path: &Path) -> Option<String> {
 // ───────────────────────── send / resume loop ─────────────────────────
 
 struct LoopCtx {
+    app: Option<AppHandle>,
+    tab_id: String,
     projects_root: PathBuf,
     project_id: String,
     thread_id: String,
@@ -777,6 +780,36 @@ struct LoopCtx {
 }
 
 pub async fn send(
+    reg: &crate::services::ai::StreamRegistry,
+    app_db_path: &Path,
+    projects_root: &Path,
+    input: StudioSendInput,
+    ui_lang: String,
+) -> AppResult<StudioSendResult> {
+    send_impl(None, reg, app_db_path, projects_root, input, ui_lang).await
+}
+
+pub async fn send_streaming(
+    app: &AppHandle,
+    reg: &crate::services::ai::StreamRegistry,
+    app_db_path: &Path,
+    projects_root: &Path,
+    input: StudioSendInput,
+    ui_lang: String,
+) -> AppResult<StudioSendResult> {
+    send_impl(
+        Some(app.clone()),
+        reg,
+        app_db_path,
+        projects_root,
+        input,
+        ui_lang,
+    )
+    .await
+}
+
+async fn send_impl(
+    app: Option<AppHandle>,
     reg: &crate::services::ai::StreamRegistry,
     app_db_path: &Path,
     projects_root: &Path,
@@ -882,15 +915,16 @@ pub async fn send(
         let ctx_items = if query_text.is_empty() {
             Vec::new()
         } else {
-            let qvec = match embed_role.clone() {
-                Some(role) => {
-                    crate::services::ai::embed_with(role, std::slice::from_ref(&query_text), true)
-                        .await
-                        .ok()
-                        .and_then(|(_, mut v)| v.pop())
-                }
-                None => None,
-            };
+            let data_dir = app_db_path.parent().unwrap_or_else(|| Path::new("."));
+            let qvec = crate::services::ai::embed_resolved_or_local(
+                embed_role.clone(),
+                data_dir,
+                std::slice::from_ref(&query_text),
+                true,
+            )
+            .await
+            .ok()
+            .and_then(|(_, mut vectors)| vectors.pop());
             let db2 = projects::open_db(projects_root, &project_id)?;
             let hits = retrieval::hybrid_search(
                 &db2,
@@ -935,6 +969,8 @@ pub async fn send(
             resolved.clone(),
             embed_role,
             LoopCtx {
+                app: app.clone(),
+                tab_id: tab_id.clone(),
                 projects_root: projects_root.to_path_buf(),
                 project_id: project_id.clone(),
                 thread_id,
@@ -982,6 +1018,45 @@ pub async fn resolve_tool(
     approved: bool,
     ui_lang: String,
 ) -> AppResult<StudioSendResult> {
+    let request = ResolveToolRequest {
+        project_id,
+        tab_id,
+        approved,
+        ui_lang,
+    };
+    resolve_tool_impl(None, reg, app_db_path, projects_root, request).await
+}
+
+pub struct ResolveToolRequest {
+    pub project_id: String,
+    pub tab_id: String,
+    pub approved: bool,
+    pub ui_lang: String,
+}
+
+pub async fn resolve_tool_streaming(
+    app: &AppHandle,
+    reg: &crate::services::ai::StreamRegistry,
+    app_db_path: &Path,
+    projects_root: &Path,
+    request: ResolveToolRequest,
+) -> AppResult<StudioSendResult> {
+    resolve_tool_impl(Some(app.clone()), reg, app_db_path, projects_root, request).await
+}
+
+async fn resolve_tool_impl(
+    app: Option<AppHandle>,
+    reg: &crate::services::ai::StreamRegistry,
+    app_db_path: &Path,
+    projects_root: &Path,
+    request: ResolveToolRequest,
+) -> AppResult<StudioSendResult> {
+    let ResolveToolRequest {
+        project_id,
+        tab_id,
+        approved,
+        ui_lang,
+    } = request;
     let (resolved, mut ctx) = {
         let app_db = crate::storage::open(app_db_path)?;
         let resolved = profiles::resolve(&app_db, Role::Chat)?.ok_or_else(|| {
@@ -1041,15 +1116,16 @@ pub async fn resolve_tool(
         let ctx_items = if query_text.is_empty() {
             Vec::new()
         } else {
-            let qvec = match embed_role {
-                Some(role) => {
-                    crate::services::ai::embed_with(role, std::slice::from_ref(&query_text), true)
-                        .await
-                        .ok()
-                        .and_then(|(_, mut v)| v.pop())
-                }
-                None => None,
-            };
+            let data_dir = app_db_path.parent().unwrap_or_else(|| Path::new("."));
+            let qvec = crate::services::ai::embed_resolved_or_local(
+                embed_role,
+                data_dir,
+                std::slice::from_ref(&query_text),
+                true,
+            )
+            .await
+            .ok()
+            .and_then(|(_, mut vectors)| vectors.pop());
             let db2 = projects::open_db(projects_root, &project_id)?;
             let hits = retrieval::hybrid_search(
                 &db2,
@@ -1074,6 +1150,8 @@ pub async fn resolve_tool(
         (
             resolved.clone(),
             LoopCtx {
+                app: app.clone(),
+                tab_id: tab_id.clone(),
                 projects_root: projects_root.to_path_buf(),
                 project_id: project_id.clone(),
                 thread_id,
@@ -1208,10 +1286,18 @@ async fn run_loop(
         params["tool_choice"] = json!("auto");
 
         let acc = std::sync::Mutex::new(String::new());
+        let event_app = ctx.app.clone();
+        let event_tab = ctx.tab_id.clone();
         let (usage, truncated, calls) = client
             .chat_stream(&ctx.model, json!(messages), &params, token, |kind, t| {
                 if kind == "text" {
                     acc.lock().unwrap_or_else(|e| e.into_inner()).push_str(t);
+                }
+                if let Some(app) = &event_app {
+                    let _ = app.emit(
+                        "studio://delta",
+                        json!({ "tabId": event_tab, "kind": kind, "text": t }),
+                    );
                 }
             })
             .await?;
@@ -1263,7 +1349,19 @@ async fn run_loop(
         // run/skip each, append results.
         persist_assistant(ctx, &text, &calls_json, "complete", usage.as_ref())?;
         for (c, appr) in calls.iter().zip(&approvals) {
+            if let Some(app) = &ctx.app {
+                let _ = app.emit(
+                    "studio://tool",
+                    json!({ "tabId": ctx.tab_id, "name": c.name, "state": "running" }),
+                );
+            }
             let out = execute_call(ctx, &c.name, &c.arguments, *appr != Approval::Deny).await;
+            if let Some(app) = &ctx.app {
+                let _ = app.emit(
+                    "studio://tool",
+                    json!({ "tabId": ctx.tab_id, "name": c.name, "state": "complete" }),
+                );
+            }
             let db = projects::open_db(&ctx.projects_root, &ctx.project_id)?;
             db.execute(
                 "INSERT INTO messages (id, thread_id, role, content, tool_call_id, status, created_at)

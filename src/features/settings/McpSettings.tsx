@@ -16,18 +16,22 @@ import styles from "./McpSettings.module.css";
 type Draft = {
   id?: string;
   name: string;
+  transport: "stdio" | "http";
   command: string;
+  url: string;
   args: string;
   env: string;
 };
 
-const BLANK: Draft = { name: "", command: "", args: "", env: "" };
+const BLANK: Draft = { name: "", transport: "stdio", command: "", url: "", args: "", env: "" };
 
 function toDraft(s: McpServer): Draft {
   return {
     id: s.id,
     name: s.name,
+    transport: s.transport === "http" ? "http" : "stdio",
     command: s.command ?? "",
+    url: s.url ?? "",
     args: s.args.join(" "),
     env: s.envKeys.map((k) => `${k}=`).join("\n"),
   };
@@ -57,10 +61,10 @@ export function McpSettings() {
       return mcpApi.upsert({
         id: d.id ?? null,
         name: d.name.trim(),
-        transport: "stdio",
-        command: d.command.trim() || null,
-        args: d.args.trim() ? d.args.trim().split(/\s+/) : [],
-        url: null,
+        transport: d.transport,
+        command: d.transport === "stdio" ? d.command.trim() || null : null,
+        args: d.transport === "stdio" && d.args.trim() ? d.args.trim().split(/\s+/) : [],
+        url: d.transport === "http" ? d.url.trim() || null : null,
         env,
       });
     },
@@ -111,7 +115,7 @@ export function McpSettings() {
 
   return (
     <div className={styles.wrap}>
-      <p className={styles.note}>{t("mcp.stdioOnly")}</p>
+      <p className={styles.note}>{t("mcp.transportSupport")}</p>
 
       {rows.length === 0 ? (
         <EmptyState title={t("mcp.empty")} body={t("mcp.emptyBody")} />
@@ -143,7 +147,7 @@ export function McpSettings() {
                 </div>
               </div>
               <code className={styles.cmd}>
-                {s.command} {s.args.join(" ")}
+                {s.transport === "http" ? s.url : `${s.command ?? ""} ${s.args.join(" ")}`}
               </code>
 
               {(tools[s.id] ?? []).length > 0 ? (
@@ -187,7 +191,7 @@ export function McpSettings() {
             <Button
               variant="primary"
               loading={save.isPending}
-              disabled={!editing?.name.trim() || !editing?.command.trim()}
+              disabled={!editing?.name.trim() || (editing.transport === "stdio" ? !editing.command.trim() : !editing.url.trim())}
               onClick={() => editing && save.mutate(editing)}
             >
               {t("common.save")}
@@ -206,7 +210,15 @@ export function McpSettings() {
                 />
               )}
             </Field>
-            <Field label={t("mcp.command")} hint={t("mcp.commandHint")}>
+            <Field label={t("mcp.transport")}>
+              {({ id }) => (
+                <Select id={id} value={editing.transport} onChange={(e) => setEditing({ ...editing, transport: e.target.value as Draft["transport"] })}>
+                  <option value="stdio">{t("mcp.transportStdio")}</option>
+                  <option value="http">{t("mcp.transportHttp")}</option>
+                </Select>
+              )}
+            </Field>
+            {editing.transport === "stdio" ? <><Field label={t("mcp.command")} hint={t("mcp.commandHint")}>
               {({ id }) => (
                 <Input
                   id={id}
@@ -224,8 +236,10 @@ export function McpSettings() {
                   onChange={(e) => setEditing({ ...editing, args: e.target.value })}
                 />
               )}
-            </Field>
-            <Field label={t("mcp.env")} hint={t("mcp.envHint")}>
+            </Field></> : <Field label={t("mcp.url")} hint={t("mcp.urlHint")}>
+              {({ id }) => <Input id={id} value={editing.url} onChange={(e) => setEditing({ ...editing, url: e.target.value })} placeholder="https://example.com/mcp" />}
+            </Field>}
+            <Field label={editing.transport === "http" ? t("mcp.headers") : t("mcp.env")} hint={editing.transport === "http" ? t("mcp.headersHint") : t("mcp.envHint")}>
               {({ id }) => (
                 <textarea
                   id={id}

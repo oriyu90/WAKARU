@@ -142,6 +142,118 @@ mark.hitActive {
   font-size: var(--fs-sm);
 }
 
+/* Native file renderers */
+.filePreview {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.fileToolbar,
+.fileControls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.fileToolbar {
+  flex: none;
+  min-width: 0;
+  min-height: var(--toolbar-height);
+  padding: var(--space-2xs) var(--space-md);
+  border-bottom: var(--rule-1) solid var(--color-rule);
+  overflow-x: auto;
+}
+.canvasViewport,
+.officeViewport,
+.slideViewport {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--color-paper-3);
+}
+.canvasViewport {
+  display: grid;
+  justify-items: center;
+  align-items: start;
+  padding: clamp(var(--space-sm), 3vw, var(--space-xl));
+}
+.pdfCanvas {
+  display: block;
+  max-width: none;
+  background: var(--color-document-paper);
+  box-shadow: var(--shadow-overlay);
+}
+.officeViewport {
+  padding: clamp(var(--space-xs), 2vw, var(--space-lg));
+}
+.officeViewport :global(.docx-wrapper) {
+  padding: clamp(var(--space-xs), 2vw, var(--space-xl));
+  background: transparent;
+}
+.officeViewport :global(.docx) {
+  max-width: 100%;
+  color: var(--color-document-ink);
+  background: var(--color-document-paper);
+  box-shadow: var(--shadow-overlay);
+}
+.slideViewport {
+  display: grid;
+  place-items: center;
+  padding: clamp(var(--space-sm), 3vw, var(--space-xl));
+}
+.slideHost {
+  width: min(100%, 75rem);
+  min-width: 16rem;
+}
+.slideHost > :global(svg) {
+  display: block;
+  width: 100%;
+  height: auto;
+  box-shadow: var(--shadow-overlay);
+}
+.previewFallback {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+}
+.previewFallback > p {
+  margin: var(--space-md);
+  color: var(--color-muted);
+}
+.sheetPicker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-muted);
+  font-size: var(--fs-xs);
+}
+.sheetPicker select {
+  max-width: min(24rem, 65vw);
+  color: var(--color-ink-strong);
+  background: var(--color-paper-2);
+  border: var(--rule-1) solid var(--color-rule-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2xs) var(--space-xs);
+}
+
+@media (max-width: 40rem) {
+  .fileToolbar {
+    padding-inline: var(--space-xs);
+  }
+  .officeViewport,
+  .slideViewport,
+  .canvasViewport {
+    padding: var(--space-xs);
+  }
+  .officeViewport :global(.docx-wrapper) {
+    padding: 0;
+  }
+}
+
 /* ─ Find bar ─ */
 .findBar {
   position: absolute;
@@ -190,6 +302,38 @@ mark.hitActive {
 }
 .avAudio {
   width: 100%;
+}
+.keyframes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr));
+  gap: var(--space-xs);
+}
+.keyframes button {
+  position: relative;
+  min-width: 0;
+  padding: 0;
+  border: var(--rule-1) solid var(--color-rule);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-paper-3);
+  cursor: pointer;
+}
+.keyframes img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+.keyframes span {
+  position: absolute;
+  inset-inline-end: var(--space-2xs);
+  inset-block-end: var(--space-2xs);
+  padding: var(--space-3xs) var(--space-2xs);
+  border-radius: var(--radius-xs);
+  color: var(--color-on-dark);
+  background: var(--color-overlay-dark);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
 }
 .transcript {
   list-style: none;

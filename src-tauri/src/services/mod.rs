@@ -15,4 +15,5 @@ pub mod settings;
 pub mod sources;
 pub mod studio;
 pub mod viewer;
+pub mod vision;
 pub mod whisper;

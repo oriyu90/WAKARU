@@ -1,8 +1,7 @@
-//! Ingest pipeline (docs/04). Phase 1 covers the AI-free static formats:
-//! text / markdown / json / jsonl / code, csv / tsv, PDF text, images
-//! (normalise + EXIF), pptx / docx / xlsx (no office engine), and web links
-//! (fetch + SSRF guard + readable text). Audio / video are Phase 5; PDF/slide
-//! rasterisation is Phase 2 (D-09); Vision analysis of pages/images is Phase 4.
+//! Ingest pipeline (docs/04): text / markdown / JSON / code, spreadsheets,
+//! searchable PDF text, normalized images, Office documents, web links and
+//! audio/video metadata/transcripts. Visual rendering is handled by the Viewer;
+//! configured Vision analysis augments normalized image sources.
 
 mod av;
 mod image;

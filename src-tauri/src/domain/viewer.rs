@@ -55,7 +55,10 @@ pub struct SourceDetail {
     pub url: Option<String>,
     pub page_count: Option<u32>,
     pub status: super::source::SourceStatus,
+    pub mime: Option<String>,
+    pub bytes: u64,
     /// `wakaru-asset://` URL to the primary rendered/original file, if any:
-    /// the normalised image, or the saved web reader markdown.
+    /// the normalised image, saved web reader markdown, or original imported
+    /// file. The URL is project-scoped and never exposes an absolute path.
     pub primary_asset_url: Option<String>,
 }

@@ -108,12 +108,18 @@ async fn project_scoped(
     };
 
     // ── await: embed the query (no Connection held) ──
-    let query_vec = match embed_role {
-        Some(role) => ai::embed_with(role, std::slice::from_ref(&q.q), true)
-            .await
-            .ok()
-            .and_then(|(_, mut v)| v.pop()),
-        None => None,
+    let query_vec = if want_vec {
+        ai::embed_resolved_or_local(
+            embed_role,
+            app_db_path.parent().unwrap_or_else(|| Path::new(".")),
+            std::slice::from_ref(&q.q),
+            true,
+        )
+        .await
+        .ok()
+        .and_then(|(_, mut v)| v.pop())
+    } else {
+        None
     };
     let semantic = query_vec.is_some();
 
