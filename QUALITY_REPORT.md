@@ -206,4 +206,4 @@ signature were then independently verified.
 
 These broader fixture/API-dependent checks remain release-candidate follow-up
 work. No reproducible crash, data-loss defect, high-severity security defect,
-or automated regression remains open; v0.0.1 is published as a pre-release.
+or automated regression remains open; v0.0.1 is published as a stable release.

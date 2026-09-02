@@ -1,7 +1,7 @@
 # WAKARU v0.0.1
 
 A reliability and responsive-layout update to the fully redeveloped WAKARU app
-on Tauri v2, Rust, and React. It supersedes the v0.0.0 pre-release while
+on Tauri v2, Rust, and React. It supersedes the v0.0.0 release while
 preserving existing projects and settings.
 
 macOS (Apple Silicon) only for this release, ad-hoc signed and **not
