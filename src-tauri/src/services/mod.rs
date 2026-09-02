@@ -1,6 +1,7 @@
 pub mod ai;
 pub mod assets;
 pub mod chunk;
+pub mod doc_builder;
 pub mod embed;
 pub mod export;
 pub mod file_modifier;
@@ -8,6 +9,7 @@ pub mod illustrator;
 pub mod ingest;
 pub mod mcp;
 pub mod ocr;
+pub mod pdf_text;
 pub mod projects;
 pub mod retrieval;
 pub mod sandbox;

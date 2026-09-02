@@ -201,6 +201,11 @@
     "ocr": {
       "unavailable": "Text recognition is unavailable. Check your connection so the OCR model can download, then try again.",
       "image": "This image could not be read for text recognition."
+    },
+    "doc": {
+      "invalid": "The document request was incomplete.",
+      "build": "Building the document failed.",
+      "pdfUnavailable": "PDF output is not available in this build; a Markdown version was saved instead."
     }
   },
   "viewer": {

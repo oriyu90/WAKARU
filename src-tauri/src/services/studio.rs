@@ -12,7 +12,7 @@ use crate::error::{AppError, AppResult};
 use crate::services::ai::client::AiClient;
 use crate::services::ai::profiles::{self, ResolvedRole};
 use crate::services::illustrator::{build_rag_block, resolve_citations};
-use crate::services::{mcp, projects, retrieval, sandbox};
+use crate::services::{doc_builder, mcp, projects, retrieval, sandbox};
 use crate::storage::migrate::now_iso8601;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
@@ -89,7 +89,7 @@ fn classify_call(ctx: &LoopCtx, name: &str, arguments: &str) -> Approval {
         // Always requires approval (docs/05 §5.3) — it can run arbitrary
         // programs and reach the network.
         "run_command" => Approval::Ask,
-        "write_file" => {
+        "write_file" | "build_document" => {
             let path = serde_json::from_str::<Value>(arguments)
                 .ok()
                 .and_then(|v| v.get("path").and_then(|p| p.as_str()).map(str::to_string))
@@ -530,8 +530,28 @@ fn tool_defs() -> Value {
         f("list_files", "List files in this tab's workspace/.", json!({}), json!([])),
         f("read_file", "Read a file from this tab's workspace/.",
           json!({ "path": { "type": "string" } }), json!(["path"])),
-        f("write_file", "You MUST call this when the reader asks to create, draft, save, export, or update a document or file. Supply the complete final content. Writes into this tab's workspace/ and may need approval.",
+        f("write_file", "Write a plain file (code, config, a short note, or content you will format yourself). Supply the complete final content. Writes into this tab's workspace/ and may need approval. For a formatted document prefer build_document.",
           json!({ "path": { "type": "string" }, "content": { "type": "string" } }), json!(["path", "content"])),
+        f("build_document", "Build a formatted document (.md, .docx or .pdf) from a title and sections. Use this whenever the reader asks for a report, memo, spec, guide or similar. Do NOT format the whole document yourself — pass each section's heading and its body as Markdown (paragraphs, -/1. lists, `| tables |`, **bold**, *italic*, `code`). Layout, page breaks and the table of contents are handled for you. Writes into workspace/ and may need approval.",
+          json!({
+            "path": { "type": "string", "description": "workspace-relative output path, e.g. report.docx" },
+            "format": { "type": "string", "enum": ["md", "docx", "pdf"] },
+            "title": { "type": "string" },
+            "toc": { "type": "boolean" },
+            "sections": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "level": { "type": "integer", "minimum": 1, "maximum": 4 },
+                  "heading": { "type": "string" },
+                  "body": { "type": "string" }
+                },
+                "required": ["body"]
+              }
+            }
+          }),
+          json!(["path", "format", "title", "sections"])),
         f("run_command",
           "Run a program inside workspace/ (no shell). Always needs the reader's approval; it can reach the network.",
           json!({ "command": { "type": "string" }, "args": { "type": "array", "items": { "type": "string" } } }),
@@ -678,32 +698,55 @@ pub fn dispatch_tool(
         "write_file" => {
             let path = s("path").ok_or_else(|| tool_arg("path"))?;
             let content = s("content").unwrap_or_default();
-            let abs = sandbox::resolve_in_sandbox(workspace, &path)?;
-            sandbox::reject_symlink(&abs)?;
-            sandbox::check_write_size(workspace, &abs, content.len() as u64)?;
-            if let Some(parent) = abs.parent() {
-                std::fs::create_dir_all(parent)?;
+            write_artifact(db, workspace, thread_id, &path, content.as_bytes())
+        }
+        "build_document" => {
+            let path = s("path").ok_or_else(|| tool_arg("path"))?;
+            let format = s("format").unwrap_or_else(|| "md".into());
+            let title = s("title").unwrap_or_default();
+            let toc = args.get("toc").and_then(Value::as_bool).unwrap_or(false);
+            let sections: Vec<doc_builder::DocSection> = args
+                .get("sections")
+                .and_then(Value::as_array)
+                .map(|arr| {
+                    arr.iter()
+                        .map(|v| doc_builder::DocSection {
+                            level: v
+                                .get("level")
+                                .and_then(Value::as_u64)
+                                .unwrap_or(1)
+                                .clamp(1, 4) as u8,
+                            heading: v
+                                .get("heading")
+                                .and_then(Value::as_str)
+                                .filter(|s| !s.trim().is_empty())
+                                .map(str::to_string),
+                            body: v
+                                .get("body")
+                                .and_then(Value::as_str)
+                                .unwrap_or_default()
+                                .to_string(),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            let req = doc_builder::DocRequest {
+                title: &title,
+                toc,
+                sections: &sections,
+            };
+            match doc_builder::render(&format, &req) {
+                Ok(bytes) => write_artifact(db, workspace, thread_id, &path, &bytes),
+                // A `pdf` request with PDF output unavailable: write the Markdown
+                // version instead and tell the model why, so it can inform the reader.
+                Err(e) if e.code == "DOC_BUILD_PDF_UNAVAILABLE" && format == "pdf" => {
+                    let md_path = swap_ext(&path, "md");
+                    let md = doc_builder::render("md", &req)?;
+                    let done = write_artifact(db, workspace, thread_id, &md_path, &md)?;
+                    Ok(format!("{done}\n(note: {})", doc_builder::pdf_note()))
+                }
+                Err(e) => Err(e),
             }
-            std::fs::write(&abs, content.as_bytes())?;
-            let bytes = content.len() as i64;
-            let rel_path = format!("workspace/{}", path.trim_start_matches("./"));
-            let mime = mime_guess_ext(&abs);
-            db.execute(
-                "INSERT INTO artifacts (id, thread_id, rel_path, bytes, mime, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-                 ON CONFLICT(rel_path) DO UPDATE SET
-                   bytes = excluded.bytes, mime = excluded.mime,
-                   thread_id = excluded.thread_id, created_at = excluded.created_at",
-                params![
-                    Uuid::now_v7().to_string(),
-                    thread_id,
-                    rel_path,
-                    bytes,
-                    mime,
-                    now_iso8601()
-                ],
-            )?;
-            Ok(format!("wrote {rel_path} ({bytes} bytes)"))
         }
         other => Err(AppError::new(
             "STUDIO_UNKNOWN_TOOL",
@@ -719,6 +762,50 @@ fn tool_arg(name: &str) -> AppError {
         "error.studio.toolArg",
         format!("missing argument: {name}"),
     )
+}
+
+/// Write `bytes` to `path` inside the tab's `workspace/` (sandboxed) and upsert
+/// the `artifacts` row. Shared by `write_file` and `build_document`.
+fn write_artifact(
+    db: &Connection,
+    workspace: &Path,
+    thread_id: &str,
+    path: &str,
+    bytes: &[u8],
+) -> AppResult<String> {
+    let abs = sandbox::resolve_in_sandbox(workspace, path)?;
+    sandbox::reject_symlink(&abs)?;
+    sandbox::check_write_size(workspace, &abs, bytes.len() as u64)?;
+    if let Some(parent) = abs.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&abs, bytes)?;
+    let rel_path = format!("workspace/{}", path.trim_start_matches("./"));
+    let mime = mime_guess_ext(&abs);
+    db.execute(
+        "INSERT INTO artifacts (id, thread_id, rel_path, bytes, mime, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(rel_path) DO UPDATE SET
+           bytes = excluded.bytes, mime = excluded.mime,
+           thread_id = excluded.thread_id, created_at = excluded.created_at",
+        params![
+            Uuid::now_v7().to_string(),
+            thread_id,
+            rel_path,
+            bytes.len() as i64,
+            mime,
+            now_iso8601()
+        ],
+    )?;
+    Ok(format!("wrote {rel_path} ({} bytes)", bytes.len()))
+}
+
+/// `report.pdf` -> `report.md` (keeps any directory prefix).
+fn swap_ext(path: &str, new_ext: &str) -> String {
+    match path.rsplit_once('.') {
+        Some((stem, _)) => format!("{stem}.{new_ext}"),
+        None => format!("{path}.{new_ext}"),
+    }
 }
 
 fn walk_workspace(root: &Path, dir: &Path, out: &mut Vec<String>) {
@@ -1569,18 +1656,33 @@ mod tests {
     #[test]
     fn tool_schema_guides_small_models_to_write_complete_files() {
         let tools = tool_defs();
-        let write = tools
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|t| t["function"]["name"] == "write_file")
-            .unwrap();
+        let tools = tools.as_array().unwrap();
+        let by_name = |n: &str| {
+            tools
+                .iter()
+                .find(|t| t["function"]["name"] == n)
+                .unwrap_or_else(|| panic!("no tool {n}"))
+        };
+
+        // write_file: supply the complete content, strict schema.
+        let write = by_name("write_file");
         assert!(write["function"]["description"]
             .as_str()
             .unwrap()
-            .contains("MUST"));
+            .contains("complete final content"));
         assert_eq!(
             write["function"]["parameters"]["additionalProperties"],
+            false
+        );
+
+        // build_document: the model passes structure, not a formatted document.
+        let build = by_name("build_document");
+        let desc = build["function"]["description"].as_str().unwrap();
+        assert!(desc.contains("format the whole document yourself"));
+        let props = &build["function"]["parameters"]["properties"];
+        assert!(props["sections"].is_object() && props["format"].is_object());
+        assert_eq!(
+            build["function"]["parameters"]["additionalProperties"],
             false
         );
     }

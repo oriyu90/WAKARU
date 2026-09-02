@@ -207,3 +207,66 @@ fn read_tab_lets_one_conversation_read_another() {
     .unwrap();
     assert!(dump.contains("the market doubled"));
 }
+
+#[test]
+fn build_document_writes_a_docx_artifact_and_guards_the_path() {
+    let (_tmp, root, app_db) = env();
+    let pid = projects::create(
+        &app_db,
+        &root,
+        CreateProjectInput {
+            name: "p".into(),
+            description: None,
+            color: None,
+        },
+    )
+    .unwrap()
+    .id;
+    let db = projects::open_db(&root, &pid).unwrap();
+    let ws = projects::project_dir(&root, &pid).join("workspace");
+    let tab = studio::create_tab(&db, None).unwrap();
+
+    let args = serde_json::json!({
+        "path": "report.docx",
+        "format": "docx",
+        "title": "四半期レポート",
+        "toc": true,
+        "sections": [
+            { "level": 1, "heading": "概要", "body": "本文です。**重要**。\n\n- 項目A\n- 項目B" },
+            { "level": 2, "heading": "詳細", "body": "| 名前 | 値 |\n| - | - |\n| x | 1 |" }
+        ]
+    })
+    .to_string();
+
+    let out = studio::dispatch_tool(&db, &ws, &tab.thread_id, "build_document", &args).unwrap();
+    assert!(out.contains("report.docx"), "{out}");
+
+    let file = ws.join("report.docx");
+    let bytes = std::fs::read(&file).unwrap();
+    assert_eq!(&bytes[..2], b"PK", "docx must be a zip");
+    assert_eq!(studio::list_artifacts(&db).unwrap().len(), 1);
+
+    // path guard still applies to build_document
+    let err = studio::dispatch_tool(
+        &db,
+        &ws,
+        &tab.thread_id,
+        "build_document",
+        r#"{ "path": "../evil.md", "format": "md", "title": "T", "sections": [{ "body": "b" }] }"#,
+    )
+    .unwrap_err();
+    assert_eq!(err.code, "SANDBOX_PATH_DENIED");
+
+    // a pdf request falls back to markdown (PDF output not in this build)
+    let pdf_args = serde_json::json!({
+        "path": "note.pdf", "format": "pdf", "title": "T",
+        "sections": [{ "body": "hello" }]
+    })
+    .to_string();
+    let out = studio::dispatch_tool(&db, &ws, &tab.thread_id, "build_document", &pdf_args).unwrap();
+    assert!(
+        out.contains("note.md"),
+        "pdf should fall back to .md: {out}"
+    );
+    assert!(ws.join("note.md").is_file());
+}

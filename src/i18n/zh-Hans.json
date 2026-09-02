@@ -199,6 +199,11 @@
     "ocr": {
       "unavailable": "文字识别不可用。请检查网络连接以便下载 OCR 模型，然后重试。",
       "image": "无法读取该图片进行文字识别。"
+    },
+    "doc": {
+      "invalid": "文档请求不完整。",
+      "build": "生成文档失败。",
+      "pdfUnavailable": "此版本暂不支持 PDF 输出，已改为保存 Markdown 版本。"
     }
   },
   "viewer": {
