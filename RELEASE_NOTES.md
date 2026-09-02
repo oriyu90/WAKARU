@@ -1,97 +1,55 @@
-# WAKARU v0.0.1
+# WAKARU v0.0.2
 
-A reliability and responsive-layout update to the fully redeveloped WAKARU app
-on Tauri v2, Rust, and React. It supersedes the v0.0.0 release while
-preserving existing projects and settings.
+WAKARU v0.0.2 completes the document-viewing path and closes the main deliberate
+deferrals from v0.0.0/v0.0.1. Existing projects and settings remain compatible.
 
-macOS (Apple Silicon) only for this release, ad-hoc signed and **not
-notarized** — on first launch, right-click the app and choose *Open* to get
-past Gatekeeper.
+This release is for macOS Apple Silicon. It is ad-hoc signed and **not
+notarized**; on first launch, right-click WAKARU and choose **Open**.
 
-## What's in it
+## Highlights
 
-The v0.0.0 line repaired
-legacy-database imports, production Markdown/CSV previews, the collapsed search
-field, keyword-only embedding fallback, and newly disclosed PDF/XML denial-of-
-service risks. v0.0.1 adds the responsive, compatible-API, and MCP hardening
-described below. Existing project data is migrated in place.
+- **Real file rendering** — PDF pages render with bundled PDF.js; DOCX and PPTX
+  render their document/slide structure; XLSX/XLS/CSV/TSV show bounded sheet
+  tables; Markdown, images, audio, video, text, JSON, code and web reader views
+  retain their dedicated previews. Failed rich previews fall back to searchable
+  extracted text instead of leaving a blank screen.
+- **Safe document boundary** — original files are served only through the
+  project-scoped `wakaru-asset://` protocol. Office-rendered DOM is scrubbed of
+  executable elements, event handlers and unsafe links. Interactive previews
+  are size-bounded and cancellable.
+- **Offline semantic search** — a locally cached multilingual-e5-small model is
+  used when no remote embedding role is available. Model initialization or
+  download failure degrades cleanly to full-text search.
+- **Image understanding** — when a Vision role is configured, normalized image
+  sources receive structured OCR, layout, diagram and uncertainty analysis. The
+  result augments, rather than replaces, the original source and is searchable.
+- **More responsive Studio** — text deltas and active tool state appear while a
+  response is running. Existing tool approval, cancellation, context limits and
+  completed-message persistence remain in place.
+- **MCP over stdio or HTTP** — local child-process servers and MCP Streamable
+  HTTP servers share the same discovery, timeout, approval and result-isolation
+  behavior. HTTPS is accepted globally; plaintext HTTP is restricted to local
+  and private-network destinations. HTTP secrets are stored in the OS keychain.
+- **Stronger media processing** — Silero VAD detects speech before Whisper, with
+  a deterministic energy fallback. Video previews generate bounded, clickable
+  runtime thumbnails without requiring an ffmpeg sidecar.
+- **Compatibility and UI** — OpenAI-compatible and Anthropic-compatible APIs,
+  LAN endpoints, source-grounded teaching prompts, exact-white primary text in
+  dark mode, and layouts for narrow portrait and low landscape windows remain
+  supported.
+- **Dependency refresh** — frontend and Rust dependency audits are clean; the
+  bundled third-party license inventory is regenerated for this build.
 
-This release also hardens document work for smaller models. Source
-text, retrieved excerpts, file contents, and tab transcripts are now separated
-from system instructions and explicitly treated as untrusted data. Studio uses
-a short verify-before-writing workflow and must create a workspace file when a
-document is requested. The text organiser blocks Markdown saving when its output
-falls below 70% of the source, and primary dark-theme text is now exact white.
+## Compatibility and limits
 
-- **Two API formats** — choose OpenAI-compatible or Anthropic-compatible per
-  connection. The Anthropic adapter supports native authentication, top-level
-  system instructions, image blocks, tool definitions/results, structured
-  output mapping, text/thinking/tool SSE events, usage, and provider errors.
-- **Built-in response quality** — Studio continuously avoids canned AI prose,
-  filler, repetition, and unnecessary structure. Live Illustrator combines a
-  plain-language first explanation with examples, misconception handling, and
-  an optional short understanding check. No external Skill source is bundled.
-- **Safer document workflows** — page text and RAG excerpts are passed as
-  bounded user data rather than system instructions; Studio file requests use
-  the complete `write_file` path, and suspiciously shortened organiser output
-  cannot be saved as Markdown.
-- **Reliability hardening** — validated endpoint URLs, safe database migration
-  for existing profiles, incomplete-stream and output-limit detection, no
-  caching of truncated explanations, recoverable poisoned locks, safe corrupt-ZIP errors, and
-  visible failures when saving AI settings.
+- macOS 12 or later on Apple Silicon; Windows/Linux builds are not distributed
+  or verified in this release.
+- The app is ad-hoc signed and not Apple-notarized.
+- Legacy binary DOC/PPT, encrypted or corrupt documents, and browser-unsupported
+  media codecs may use textual fallback or show a recoverable unsupported error.
+- PDFs with a text layer are searchable and every PDF is visually rendered.
+  Scanned PDFs without a text layer are not automatically OCR-indexed in v0.0.2.
+- Vision and remote AI features require a compatible configured endpoint. File
+  viewing, full-text search and local embedding fallback remain local-first.
 
-- **Projects & ingestion** — self-contained project folders; add PDFs, images,
-  audio, video, spreadsheets, text/Markdown/JSON/code, and web links (with an
-  SSRF guard). PDF text, Office formats, and CJK bi-gram full-text search.
-- **Viewer** — tabbed panes, previews for every format, in-preview find,
-  reader view for web links.
-- **RAG + AI** — one protocol-neutral client (no vendor SDK); connection
-  profiles with keys in the macOS keychain; hybrid FTS + vector search (RRF)
-  with a keyword-only fallback when offline.
-- **Live Illustrator** — on-demand, cached page explanations with citations
-  resolved on the Rust side (the model never invents page numbers).
-- **Audio / video** — local transcription with whisper.cpp (Metal). Download a
-  model in Settings; transcripts are time-stamped and clickable to seek.
-- **Studio** — free chat tabs over a project's sources, with built-in tools
-  (`search_sources`, `read_document`, `read_file`, `write_file`, `run_command`,
-  …), `@`-mention of other tabs, a `workspace/` folder, and artifact cards you
-  can add back as sources or download.
-- **MCP** — connect local stdio MCP servers; per-tool approval policy
-  (ask / always allow / deny), revocable from Settings. The client prefers MCP
-  2026-07-28 discovery and falls back to legacy initialization, bounds every
-  network/process wait, refreshes tool catalogs, and preserves standard tool
-  result content without expanding binary base64 into the model context.
-- **Responsive workbench** — settings, Studio, Viewer drawers, source rows and
-  file tools adapt down to narrow portrait and low landscape windows instead
-  of losing the right or bottom half of the interface.
-- **Safer compatible-API setup** — LAN HTTP endpoints remain supported; base
-  URLs, custom headers and timeouts are validated, while capability tests now
-  verify real tool calls and valid structured JSON instead of transport success alone.
-- **Sandbox** — everything `write_file` / `run_command` touch is confined to
-  `workspace/`: no shell, scrubbed environment, path-traversal and symlink
-  escapes rejected, output capped, timeouts kill the whole process group.
-- **File Modifier** — images → PDF, and paste → organised Markdown/TXT.
-- **Settings & i18n** — English / 日本語 / 简体中文 on every screen; light /
-  dark / system themes; monochrome mode; six display sizes; first-run wizard.
-- **Export / import / archive** — portable `.wakaru.zip` with a schema version
-  and a four-case compatibility policy.
-
-## Known limitations
-
-Documented in `docs/DECISIONS.md`:
-
-- **D-09** PDF / slide page-image rendering — the Viewer shows extracted text.
-- **D-10** Local embeddings — remote `/v1/embeddings` only; FTS-only degrade
-  when no search model is set.
-- **D-11** Ingest-time Vision analysis of pages/images.
-- **D-13** Studio chat is request/response, not token-streamed.
-- **D-14** MCP — stdio transport only; Streamable HTTP is deferred.
-- **D-15** Transcription uses an energy-gate VAD (not Silero); video keyframe
-  extraction is not included (audio is still transcribed; the player handles
-  video). Whisper model files are integrity-checked by a recorded SHA-256
-  rather than an upstream-pinned hash.
-- Windows / Linux builds are unverified and not distributed.
-
-## Verification
-
-`QUALITY_REPORT.md` records the gate results for the build.
+See `QUALITY_REPORT.md` for the final verification record and artifact checksum.
