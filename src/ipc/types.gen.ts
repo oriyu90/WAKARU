@@ -197,6 +197,16 @@ export type McpUpsertInput = { id: string | null, name: string, transport: strin
  */
 env: Record<string, string>, };
 
+export type OcrLine = { text: string, bbox: [number, number, number, number], words: Array<OcrWord>, };
+
+export type OcrPage = { lines: Array<OcrLine>, widthPx: number, heightPx: number, };
+
+export type OcrWord = { text: string,
+/**
+ * `[x, y, w, h]` as fractions of the page (0..1), resolution-independent.
+ */
+bbox: [number, number, number, number], };
+
 export type OpenTabInput = { projectId: string, sourceId: string, locator: unknown | null, };
 
 export type Project = { id: string, name: string, description: string, color: ProjectColor, schemaVersion: string, createdAt: string, updatedAt: string, openedAt: string | null, archivedAt: string | null, sortOrder: number, };

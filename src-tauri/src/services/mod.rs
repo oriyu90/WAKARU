@@ -7,6 +7,7 @@ pub mod file_modifier;
 pub mod illustrator;
 pub mod ingest;
 pub mod mcp;
+pub mod ocr;
 pub mod projects;
 pub mod retrieval;
 pub mod sandbox;

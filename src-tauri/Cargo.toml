@@ -58,9 +58,14 @@ futures-util = "0.3"
 sqlite-vec = "0.1"                          # vec0 virtual table for chunk_vectors
 fastembed = { version = "6.0.2", default-features = false, features = ["ort-download-binaries-rustls-tls", "hf-hub-rustls-tls"] }
 
-# File Modifier (Phase 8)
-printpdf = { version = "0.12.7", default-features = false } # images -> PDF
+# File Modifier (Phase 8) + document builder (Phase 12)
+printpdf = { version = "0.12.7", default-features = false } # images -> PDF, sandwich PDF, build_document pdf
 base64 = "0.22"                             # small image previews
+docx-rs = "0.4"                             # build_document docx output
+
+# OCR (Phase 12) — pure-Rust, no ONNX/C deps; models downloaded on first use
+ocrs = { version = "0.13", default-features = false, features = ["rten"] }
+rten = "0.26"
 
 # async + jobs
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "process", "fs"] }
