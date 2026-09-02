@@ -424,7 +424,7 @@ export function Preview({
     const initialPage = typeof (tab.locator as { page?: number })?.page === "number"
       ? (tab.locator as { page: number }).page
       : 1;
-    return <PdfFilePreview detail={d} initialPage={initialPage} onPage={(page, total) => {
+    return <PdfFilePreview detail={d} projectId={projectId} initialPage={initialPage} onPage={(page, total) => {
       void call("viewer_update_locator", { projectId, tabId: tab.id, locator: { t: "page", page } }).catch(() => {});
       onContext?.({ sourceId: tab.sourceId, locator: { t: "page", page }, position: `${page} / ${total}` });
     }} fallback={<PagedPreview projectId={projectId} tab={tab} total={d.pageCount ?? 1} onContext={onContext} />} />;

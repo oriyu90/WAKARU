@@ -228,7 +228,10 @@
     "illustrator": "ライブ解説",
     "illustratorHandle": "ライブ解説を開く",
     "noTranscript": "文字起こしがありません。",
-    "keyframes": "動画のキーフレーム"
+    "keyframes": "動画のキーフレーム",
+    "ocrRun": "テキストを認識",
+    "ocrProgress": "認識中… {{done}} / {{total}}",
+    "ocrDone": "文字認識が完了しました。これらのページを検索できます。"
   },
   "ai": {
     "connections": "接続先",

@@ -83,6 +83,8 @@ pub fn run() {
             commands::source_get_document,
             commands::source_detail,
             commands::source_asset_url,
+            commands::ocr_page,
+            commands::ocr_finalize,
             commands::viewer_get_tabs,
             commands::viewer_open_tab,
             commands::viewer_close_tab,

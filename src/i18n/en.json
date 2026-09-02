@@ -230,7 +230,10 @@
     "illustrator": "Live Illustrator",
     "illustratorHandle": "Open Live Illustrator",
     "noTranscript": "No transcript.",
-    "keyframes": "Video keyframes"
+    "keyframes": "Video keyframes",
+    "ocrRun": "Recognise text",
+    "ocrProgress": "Recognising… {{done}} / {{total}}",
+    "ocrDone": "Text recognition finished. The pages are now searchable."
   },
   "ai": {
     "connections": "Connections",

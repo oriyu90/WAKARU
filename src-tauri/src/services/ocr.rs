@@ -17,7 +17,7 @@ const REC_FILE: &str = "text-recognition.rten";
 /// Reject inputs above this so a pathological image can't exhaust memory.
 const MAX_PIXELS: u64 = 30_000_000;
 
-#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize, ts_rs::TS)]
 #[ts(export, export_to = "types.gen.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct OcrWord {
@@ -26,7 +26,7 @@ pub struct OcrWord {
     pub bbox: [f32; 4],
 }
 
-#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize, ts_rs::TS)]
 #[ts(export, export_to = "types.gen.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct OcrLine {
@@ -35,7 +35,7 @@ pub struct OcrLine {
     pub words: Vec<OcrWord>,
 }
 
-#[derive(Debug, Clone, Serialize, ts_rs::TS)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize, ts_rs::TS)]
 #[ts(export, export_to = "types.gen.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct OcrPage {
@@ -232,6 +232,182 @@ pub fn ocr_image_bytes(data_dir: &Path, encoded: &[u8]) -> AppResult<OcrPage> {
 /// tensor/decode errors, not network bodies).
 fn run_err(e: impl std::fmt::Display) -> AppError {
     AppError::new("OCR_RUN", "errors.ocr.unavailable", e.to_string())
+}
+
+// ───────────────── scanned-PDF page OCR (Viewer-driven, P12/4) ─────────────────
+
+use rusqlite::{params, Connection, OptionalExtension};
+
+fn ocr_dir(project_dir: &Path, source_id: &str) -> PathBuf {
+    crate::services::ingest::derived_dir(project_dir, source_id).join("ocr")
+}
+
+/// OCR one rasterised PDF page (PNG bytes) and fold the text into search:
+/// replace the page's `documents.text`, rebuild that document's chunks and its
+/// `global_index` row, and cache `ocr/pNNNN.{png,json}` for the sandwich PDF.
+/// Best-effort — a page with no readable text is left as-is, not an error.
+#[allow(clippy::too_many_arguments)]
+pub fn apply_pdf_page(
+    project_db: &Connection,
+    app_db: &Connection,
+    data_dir: &Path,
+    project_dir: &Path,
+    project_id: &str,
+    source_id: &str,
+    source_name: &str,
+    page: u32,
+    total: u32,
+    png: &[u8],
+) -> AppResult<OcrPage> {
+    let dir = ocr_dir(project_dir, source_id);
+    std::fs::create_dir_all(&dir)?;
+    let _ = std::fs::write(dir.join(format!("p{page:04}.png")), png);
+
+    let ocr_page = ocr_image_bytes(data_dir, png)?;
+    let _ = std::fs::write(
+        dir.join(format!("p{page:04}.json")),
+        serde_json::to_vec(&ocr_page).unwrap_or_default(),
+    );
+    if !ocr_page.looks_like_text() {
+        return Ok(ocr_page); // nothing usable — leave the placeholder text
+    }
+
+    let ocr_text = ocr_page.plain_text();
+    let new_text = format!("[ページ {page} / {total}]\n{ocr_text}");
+
+    let row: Option<(String, String)> = project_db
+        .query_row(
+            "SELECT id, text FROM documents WHERE source_id = ?1 AND ordinal = ?2",
+            params![source_id, page],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()?;
+    let Some((doc_id, existing)) = row else {
+        return Ok(ocr_page);
+    };
+    // Only replace a page that has no real text layer (the ingest placeholder).
+    // Never overwrite a page whose text came from the PDF itself.
+    if !existing.contains("（テキスト層なし）") {
+        return Ok(ocr_page);
+    }
+
+    project_db.execute(
+        "UPDATE documents SET text = ?2 WHERE id = ?1",
+        params![doc_id, new_text],
+    )?;
+    project_db.execute("DELETE FROM chunks WHERE document_id = ?1", [&doc_id])?;
+
+    let header = format!("《{source_name} / page {page}》");
+    let now = crate::storage::migrate::now_iso8601();
+    for (i, piece) in crate::services::chunk::split(&new_text)
+        .into_iter()
+        .enumerate()
+    {
+        let body = format!("{header}\n{}", piece.text);
+        project_db.execute(
+            "INSERT INTO chunks
+               (id, source_id, document_id, ordinal, text, text_bigram, tokens, locator, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                uuid::Uuid::now_v7().to_string(),
+                source_id,
+                doc_id,
+                i as i64,
+                body,
+                crate::services::retrieval::cjk_bigram(&body),
+                piece.tokens as i64,
+                serde_json::json!({ "t": "page", "page": page }).to_string(),
+                now
+            ],
+        )?;
+    }
+
+    // Refresh the cross-project mirror row for this page.
+    let ref_id = format!("{source_id}#{page}");
+    app_db.execute(
+        "DELETE FROM global_index WHERE source_id = ?1 AND kind = 'chunk' AND ref_id = ?2",
+        params![source_id, ref_id],
+    )?;
+    app_db.execute(
+        "INSERT INTO global_index (project_id, source_id, kind, ref_id, title, body, body_raw)
+         VALUES (?1, ?2, 'chunk', ?3, ?4, ?5, ?6)",
+        params![
+            project_id,
+            source_id,
+            ref_id,
+            format!("p.{page}"),
+            crate::services::retrieval::cjk_bigram(&new_text),
+            new_text
+        ],
+    )?;
+
+    Ok(ocr_page)
+}
+
+/// After every text-less page is OCR'd: set `ocr_status`, and (best-effort) build
+/// `derived/<sid>/searchable.pdf` from the cached page rasters + boxes.
+pub fn finalize_pdf(
+    project_db: &Connection,
+    project_dir: &Path,
+    source_id: &str,
+    all_ok: bool,
+) -> AppResult<Option<String>> {
+    let status = if all_ok { "done" } else { "partial" };
+    project_db.execute(
+        "UPDATE sources SET ocr_status = ?2 WHERE id = ?1",
+        params![source_id, status],
+    )?;
+
+    let dir = ocr_dir(project_dir, source_id);
+    let mut nums: Vec<u32> = std::fs::read_dir(&dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| {
+            e.file_name()
+                .to_str()?
+                .strip_prefix('p')?
+                .strip_suffix(".png")?
+                .parse()
+                .ok()
+        })
+        .collect();
+    nums.sort_unstable();
+    if nums.is_empty() {
+        return Ok(None);
+    }
+
+    let mut pages = Vec::new();
+    for n in nums {
+        let png = match std::fs::read(dir.join(format!("p{n:04}.png"))) {
+            Ok(b) => b,
+            Err(_) => continue,
+        };
+        let (w, h) = image::load_from_memory(&png)
+            .map(|i| (i.width() as f32 * 0.75, i.height() as f32 * 0.75)) // ~96dpi px -> pt
+            .unwrap_or((595.0, 842.0));
+        let lines: Vec<(String, [f32; 4])> = std::fs::read(dir.join(format!("p{n:04}.json")))
+            .ok()
+            .and_then(|b| serde_json::from_slice::<OcrPage>(&b).ok())
+            .map(|p| p.lines.into_iter().map(|l| (l.text, l.bbox)).collect())
+            .unwrap_or_default();
+        pages.push(crate::services::pdf_text::SandwichPage {
+            image: png,
+            width_pt: w,
+            height_pt: h,
+            lines,
+        });
+    }
+
+    match crate::services::pdf_text::render_sandwich(&pages) {
+        Ok(bytes) => {
+            let out =
+                crate::services::ingest::derived_dir(project_dir, source_id).join("searchable.pdf");
+            std::fs::write(&out, bytes)?;
+            Ok(Some(format!("derived/{source_id}/searchable.pdf")))
+        }
+        Err(_) => Ok(None), // no CJK font etc. — the Viewer overlay still works
+    }
 }
 
 #[cfg(test)]

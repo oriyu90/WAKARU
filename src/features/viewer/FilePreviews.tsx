@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "../../components/Button";
 import { ErrorState } from "../../components/ErrorState";
 import { IconButton } from "../../components/IconButton";
 import { ChevronRightIcon } from "../../app/Icons";
 import { documentApi } from "../../ipc/viewer";
+import { ocrApi } from "../../ipc/ocr";
+import { useToast } from "../../components/useToast";
 import type { DocumentPayload, SourceDetail } from "../../ipc/types.gen";
 import styles from "./previews.module.css";
 
@@ -70,11 +72,13 @@ function PageControls({ page, total, onPage }: { page: number; total: number; on
 
 export function PdfFilePreview({
   detail,
+  projectId,
   initialPage,
   onPage,
   fallback,
 }: {
   detail: SourceDetail;
+  projectId: string;
   initialPage: number;
   onPage: (page: number, total: number) => void;
   fallback: React.ReactNode;
@@ -139,6 +143,43 @@ export function PdfFilePreview({
     };
   }, [page, pdf, zoom]);
 
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [ocr, setOcr] = useState<{ done: number; total: number } | null>(null);
+
+  async function runOcr() {
+    if (!pdf || ocr) return;
+    const total = pdf.numPages;
+    setOcr({ done: 0, total });
+    let allOk = true;
+    try {
+      const off = document.createElement("canvas");
+      const ctx = off.getContext("2d", { alpha: false });
+      for (let p = 1; p <= total; p += 1) {
+        const pdfPage = await pdf.getPage(p);
+        const vp = pdfPage.getViewport({ scale: 2 });
+        off.width = Math.floor(vp.width);
+        off.height = Math.floor(vp.height);
+        if (!ctx) throw new Error("canvas-context-unavailable");
+        await pdfPage.render({ canvas: off, canvasContext: ctx, viewport: vp }).promise;
+        const b64 = off.toDataURL("image/png").split(",")[1] ?? "";
+        try {
+          await ocrApi.page({ projectId, sourceId: detail.id, page: p, total, pngBase64: b64 });
+        } catch {
+          allOk = false;
+        }
+        setOcr({ done: p, total });
+      }
+      await ocrApi.finalize({ projectId, sourceId: detail.id, allOk });
+      await qc.invalidateQueries({ queryKey: ["source-detail", projectId, detail.id] });
+      toast.push({ tone: allOk ? "success" : "error", message: t("viewer.ocrDone") });
+    } catch {
+      toast.push({ tone: "error", message: t("errors.ocr.unavailable") });
+    } finally {
+      setOcr(null);
+    }
+  }
+
   if (detail.bytes > MAX_INTERACTIVE_BYTES) return <FileLimit detail={detail} fallback={fallback} />;
   if (asset.isError || error) return <div className={styles.previewFallback}><ErrorState error={asset.error ?? error} onRetry={() => { setError(null); void asset.refetch(); }} />{fallback}</div>;
 
@@ -147,6 +188,13 @@ export function PdfFilePreview({
       <div className={styles.fileToolbar}>
         <PageControls page={page} total={pdf?.numPages ?? detail.pageCount ?? 1} onPage={setPage} />
         <span className={styles.toolbarSpacer} />
+        {ocr ? (
+          <span className={styles.pageLabel}>{t("viewer.ocrProgress", { done: ocr.done, total: ocr.total })}</span>
+        ) : detail.ocrStatus === "pending" || detail.ocrStatus === "partial" ? (
+          <Button size="sm" variant="quiet" onClick={() => void runOcr()} disabled={!pdf}>
+            {t("viewer.ocrRun")}
+          </Button>
+        ) : null}
         <Button size="sm" variant="quiet" onClick={() => setZoom((value) => Math.max(.5, value - .25))}>−</Button>
         <span className={styles.pageLabel}>{Math.round(zoom * 100)}%</span>
         <Button size="sm" variant="quiet" onClick={() => setZoom((value) => Math.min(3, value + .25))}>+</Button>
