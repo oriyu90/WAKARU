@@ -1,4 +1,99 @@
-# WAKARU v0.0.2 — Quality report
+# WAKARU — Quality report
+
+Cumulative; newest release first.
+
+## v0.0.3 release verification — 2026-09-03
+
+Scope: local-network AI connection fix, responsive/centred layout, dark-theme
+contrast, and a macOS-native visual register — on the existing Tauri v2 + Rust +
+React codebase. No database, migration or IPC-contract change; v0.0.0–v0.0.2
+projects and settings open unchanged. From this release the application source is
+public (MIT); see `docs/DECISIONS.md` D-21.
+
+### What changed
+
+- **LAN AI connections** — the `AiClient` reqwest client is built with
+  `.no_proxy()`, so a user-configured endpoint on the LAN or loopback is reached
+  directly instead of through a system/`*_PROXY` proxy that cannot route to a
+  private address (D-18). `src-tauri/Info.plist` now declares
+  `NSLocalNetworkUsageDescription` (JA + EN), so modern macOS can prompt for and
+  grant Local Network access (D-19). Confirmed present in the built and
+  DMG-mounted `Contents/Info.plist`.
+- **Connection diagnostics** — `probe::probe` classifies a transport failure
+  (refused / timeout / DNS / TLS), returns a secret-free actionable note, and
+  no longer runs the retry back-off on a dead endpoint. `AiSettings` shows a
+  localized hint (ja/en/zh-Hans). +2 Rust regression tests.
+- **Responsive layout** — Home, Settings, Search and File Modifier centre within
+  a window-fluid `--page-max`; Studio uses a centred `--conversation-max` reading
+  column with sunk, visibly separated side rails; layout breakpoints stay in
+  `rem` so they track the display scale.
+- **Dark contrast** — dark `--color-rule` 32→40 %, `--color-rule-strong` 55→61 %,
+  `--color-muted` 73→80 %, `--color-neutral` 62→68 %, wider paper steps, body
+  weight 350→400. `design.md` re-synced with `tokens.css` (exact-white ink).
+  `check-contrast.mjs` extended with 6 stricter pairs.
+- **macOS-native register (D-20)** — `-apple-system` (San Francisco) primary UI
+  face with the bundled Geist fallback intact (I-2); overlay title bar
+  (`titleBarStyle: "Overlay"`) with a draggable unified toolbar and a
+  traffic-light inset applied only inside the shell; control height 2 rem, radii
+  6/10/12, 3 px accent focus ring; stronger sidebar vibrancy; NSSegmentedControl-
+  style segmented control. Hallmark identity (warm paper, single ≤3 % accent, 8
+  states, monochrome, i18n, WCAG AA, rem) unchanged.
+
+### Automated gates
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck | pass |
+| Frontend lint (eslint + design-rules + hardcoded-strings) | pass |
+| Frontend unit tests (vitest incl. axe) | 9 passed, 0 failed |
+| Contrast (`check-contrast.mjs`) | pass; dark primary text exact white; all 34 checked pairs meet WCAG targets |
+| i18n parity | 341 keys × 3 languages (ja / en / zh-Hans) |
+| Production web build | pass |
+| ts-rs binding export | no contract change; drift 0 |
+| Rust `cargo fmt --check` | pass |
+| Rust `cargo clippy --all-targets -- -D warnings` | pass |
+| Rust tests | 149 lib + 38 integration passed, 0 failed (official-network MCP and owner-authorized live-AI tests remain `#[ignore]`) |
+| `cargo deny check licenses bans sources` | pass |
+
+### Responsive / theme checks
+
+Verified in a real browser against the dev build at 1440×900, 1280×820 and
+390×844, at light and dark, plus the v0.0.1/v0.0.2 matrices below. Home,
+Settings and AI settings centre their content with no right-edge void; the
+narrow layout collapses the settings rail to a horizontal scroller with no
+content clipping. Studio's centred-column layout and the overlay title bar are
+exercised only in the packaged app (no Tauri APIs in a plain browser).
+
+### Bundle
+
+| Item | Value |
+|---|---|
+| App | `src-tauri/target/release/bundle/macos/WAKARU.app`, optimized arm64, version `0.0.3` |
+| Signature | ad-hoc (`identity "-"`); `codesign --verify --deep --strict` passes for the build output and for the app inside the mounted DMG; `spctl` rejects (expected — not notarized) |
+| `Info.plist` | `NSLocalNetworkUsageDescription` present; `CFBundleShortVersionString` 0.0.3; `LSMinimumSystemVersion` 12.0 |
+| DMG | `WAKARU_0.0.3_aarch64.dmg`, 22,340,233 bytes; `hdiutil verify` VALID; built from the signed `.app` + Applications symlink via `hdiutil` |
+| SHA-256 | `06a8c55753f0867ebb46d82c4fa9ce8ce5f6c34495ca0fa48851c36cdb0a0408` (recorded as basename in `WAKARU_0.0.3_aarch64.dmg.sha256`) |
+| Startup probe | native app reached `WAKARU backend ready version="0.0.3"` and stayed healthy > 7 s; startup log free of secret patterns |
+| Platform | macOS 12+, Apple Silicon; Windows/Linux not built or verified |
+
+### Owner-side verification (pre-release)
+
+- The owner ran `npm run tauri build` and confirmed the LAN AI connection
+  (`http://192.168.0.165:1234/v1` + key) succeeds from the packaged app after
+  granting macOS Local Network access — the defect this release targets.
+
+### Not exercised in this run
+
+- [ ] `docs/09 §8` 11-step manual GUI smoke test (interactive).
+- [ ] Studio centred-column and overlay-title-bar visual pass inside the packaged app.
+- [ ] Live Illustrator against a non-mock remote model (prompt policy is unit tested in three languages).
+
+No reproducible crash, data-loss defect, high-severity security defect or open
+automated regression remains.
+
+---
+
+# WAKARU v0.0.2 — Quality report (historical)
 
 Generated 2026-09-02 from automated gates, responsive browser checks, native
 macOS startup, log review, dependency audit and final DMG verification.

@@ -1,4 +1,6 @@
 .page {
+  max-inline-size: var(--page-max);
+  margin-inline: auto;
   padding: var(--space-xl) var(--space-xl) var(--space-2xl);
 }
 .head {

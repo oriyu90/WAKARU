@@ -20,15 +20,18 @@
   --space-2xl: 4rem;
   --space-3xl: 6rem;
 
-  /* ─── Density ────────────────────────────────────────────────────────── */
+  /* ─── Density · macOS-native control metrics ─────────────────────────── */
   --pad-control: var(--space-xs) var(--space-sm);
   --gap-tight: var(--space-2xs);
   --gap-default: var(--space-xs);
-  --control-h: 2.25rem;
-  --row-height: 2rem;
-  --tab-height: 2.25rem;
-  --toolbar-height: 2.75rem;
+  --control-h: 2rem; /* 32px @100% — standard macOS control height */
+  --row-height: 1.875rem;
+  --tab-height: 2rem;
+  --toolbar-height: 2.75rem; /* unified toolbar — clears the traffic lights */
   --hit-min: 2.75rem;
+  /* Left inset so the toolbar wordmark clears the macOS traffic lights.
+   * Only applied inside the Tauri shell (see base.css [data-tauri]). */
+  --titlebar-inset-start: var(--space-xs);
 
   /* ─── Measures ───────────────────────────────────────────────────────── */
   --sidebar-width: 17rem;
@@ -38,13 +41,21 @@
   --spinner-size: 1rem;
   --spinner-rule: 0.125rem;
 
-  /* ─── Rules, radii, rings ────────────────────────────────────────────── */
+  /* Page/layout measures — window-width fluid. `rem` still scales with the
+   * display size; the `vw` term makes wide content centre instead of pinning
+   * to one edge and lets side rails shrink before the centre does. */
+  --page-max: 66rem; /* single-column page content cap; pages centre within it */
+  --conversation-max: 48rem; /* Studio / chat reading column (Claude-app shape) */
+  --rail-w: clamp(10.5rem, 15vw, 14rem); /* index / conversation rails */
+  --panel-w: clamp(11rem, 21vw, 17rem); /* Studio workspace / side panels */
+
+  /* ─── Rules, radii, rings · macOS geometry (6 / 10 / 12) ─────────────── */
   --rule-1: 1px;
-  --focus-ring: 2px;
+  --focus-ring: 3px; /* macOS-weight accent ring */
   --focus-offset: 2px;
-  --radius-sm: 3px;
-  --radius-md: 5px;
-  --radius-lg: 9px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
   --radius-pill: 999px;
 
   /* ─── Elevation · one shadow, never stacked ──────────────────────────── */
@@ -70,7 +81,10 @@
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
   /* ─── Typography · 2 + 1 ─────────────────────────────────────────────── */
-  --font-ui: "Geist Variable", "Hiragino Kaku Gothic ProN", "Yu Gothic UI",
+  /* macOS-native first: San Francisco via -apple-system. "Geist Variable" stays
+   * bundled as the offline fallback for other platforms (invariant I-2). */
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Geist Variable", "Hiragino Kaku Gothic ProN", "Yu Gothic UI",
     "Noto Sans JP", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --font-read: "Spectral", "Hiragino Mincho ProN", "Yu Mincho",
     "Noto Serif JP", "Songti SC", Georgia, serif;
@@ -100,10 +114,10 @@
 :root,
 :root[data-theme="light"] {
   --color-paper: oklch(98.6% 0.006 70);
-  --color-paper-2: oklch(96.6% 0.008 70);
-  --color-paper-3: oklch(93.8% 0.010 68);
-  --color-rule: oklch(88% 0.012 66);
-  --color-rule-strong: oklch(61% 0.016 64);
+  --color-paper-2: oklch(96.4% 0.008 70);
+  --color-paper-3: oklch(93.2% 0.011 68);
+  --color-rule: oklch(85.5% 0.014 66);
+  --color-rule-strong: oklch(58% 0.017 64);
   --color-neutral: oklch(56% 0.014 62);
   --color-muted: oklch(45% 0.014 60);
   --color-ink: oklch(32% 0.018 58);
@@ -138,12 +152,12 @@
 /* ─── Dark · hue fixed; only L and C move ─────────────────────────────── */
 :root[data-theme="dark"] {
   --color-paper: oklch(17% 0.014 66);
-  --color-paper-2: oklch(20.5% 0.015 66);
-  --color-paper-3: oklch(24% 0.016 66);
-  --color-rule: oklch(32% 0.014 66);
-  --color-rule-strong: oklch(55% 0.017 66);
-  --color-neutral: oklch(62% 0.012 64);
-  --color-muted: oklch(73% 0.010 62);
+  --color-paper-2: oklch(21.5% 0.015 66);
+  --color-paper-3: oklch(25.5% 0.016 66);
+  --color-rule: oklch(40% 0.016 66);
+  --color-rule-strong: oklch(61% 0.018 66);
+  --color-neutral: oklch(68% 0.013 64);
+  --color-muted: oklch(80% 0.011 62);
   --color-ink: oklch(100% 0 0);
   --color-ink-strong: oklch(100% 0 0);
 
@@ -157,14 +171,15 @@
   --color-danger: oklch(70% 0.150 25);
 
   --overlay-scrim: oklch(10% 0.012 66 / 0.55);
-  --overlay-panel: oklch(20.5% 0.015 66 / 0.90);
+  --overlay-panel: oklch(21.5% 0.015 66 / 0.92);
   --topbar: oklch(13% 0.014 66);
   --topbar-ink: oklch(100% 0 0);
   --shadow-whisper: 0 1px 2px oklch(0% 0 0 / 0.40);
   --shadow-overlay: 0 10px 30px oklch(0% 0 0 / 0.55);
 }
 :root[data-theme="dark"] body {
-  font-weight: 350;
+  /* Geist at full weight — white-on-dark reads worse when thinned (was 350). */
+  font-weight: 400;
 }
 
 /* ─── Display size — one root size scales everything (rem) ─────────────── */

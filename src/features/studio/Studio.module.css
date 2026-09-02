@@ -1,10 +1,13 @@
+/* Claude-app shape: quiet sunk rails, a centred conversation column at the
+ * lightest paper. Rail/panel widths are window-width fluid (design.md). */
 .studio {
   flex: 1;
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr) minmax(12rem, 16rem);
+  grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--panel-w);
   overflow: hidden;
+  background: var(--color-paper-2);
 }
 .emptyPane {
   flex: 1;
@@ -20,7 +23,8 @@
   gap: var(--space-xs);
   min-height: 0;
   padding: var(--space-sm);
-  border-right: var(--rule-1) solid var(--color-rule);
+  background: var(--color-paper-2);
+  border-right: var(--rule-1) solid var(--color-rule-strong);
   overflow-y: auto;
 }
 .railList {
@@ -75,6 +79,7 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  background: var(--color-paper);
 }
 .messages {
   flex: 1;
@@ -83,7 +88,13 @@
   padding: var(--space-md);
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: var(--space-md);
+}
+/* centred reading column — every turn shares one measure (Claude-app shape) */
+.messages > * {
+  width: 100%;
+  max-inline-size: var(--conversation-max);
 }
 .message {
   display: flex;
@@ -117,7 +128,6 @@
   font-size: var(--fs-sm);
 }
 .streaming {
-  max-width: 52rem;
   padding-inline-start: var(--space-sm);
   border-inline-start: 2px solid var(--color-accent);
   color: var(--color-ink-strong);
@@ -189,7 +199,9 @@
 
 .wsBanner {
   flex: none;
-  margin: 0;
+  width: 100%;
+  max-inline-size: var(--conversation-max);
+  margin-inline: auto;
   padding: var(--space-2xs) var(--space-md);
   border-top: var(--rule-1) solid var(--color-rule);
   font-size: var(--fs-2xs);
@@ -202,6 +214,9 @@
 /* ── composer ──────────────────────────────────────────────────── */
 .composer {
   flex: none;
+  width: 100%;
+  max-inline-size: var(--conversation-max);
+  margin-inline: auto;
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
@@ -264,7 +279,8 @@
   gap: var(--space-xs);
   min-height: 0;
   padding: var(--space-sm);
-  border-left: var(--rule-1) solid var(--color-rule);
+  background: var(--color-paper-2);
+  border-left: var(--rule-1) solid var(--color-rule-strong);
   overflow-y: auto;
 }
 .wsHead {
@@ -320,7 +336,7 @@
 
 @media (max-width: 60rem) {
   .studio {
-    grid-template-columns: 11rem 1fr;
+    grid-template-columns: var(--rail-w) minmax(0, 1fr);
   }
   .workspace {
     display: none;

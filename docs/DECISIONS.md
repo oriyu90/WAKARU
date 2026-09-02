@@ -199,3 +199,45 @@
 - **MCP**: rmcp 3.0.1のstdioとStreamable HTTPをrustls/ring構成で提供する。HTTPSを既定とし、平文HTTPはlocalhost・private/link-local・`.local`だけ許可する。URL資格情報とfragmentを拒否し、追加ヘッダー値はOSキーチェーンへ保存する。
 - **音声/動画**: `silero-vad-crs`の埋め込みモデルで発話区間を検出し、モデル失敗時だけ既存の決定的エネルギー方式へ縮退する。動画キーフレームはWebViewが再生できる動画から最大8枚を実行時生成し、クリックでシークする。派生ファイルとして永続化しない。
 - **互換性**: DBスキーマを破壊せずv0.0.0/v0.0.1データをそのまま開く。Windows/Linux、Developer ID署名・公証、暗号化文書、旧式/DRMコーデックは外部条件として別管理する。
+
+## D-18 · ユーザー設定の AI エンドポイントはプロキシを経由しない
+
+- **日付**: 2026-09-02（v0.0.3）
+- **論点**: `AiClient` の reqwest クライアントがシステム／`*_PROXY` 環境プロキシを継承していた。ユーザーが明示登録した LAN・loopback の推論サーバ（例 `http://192.168.0.165:1234/v1`）宛のリクエストがプロキシへ回され、プロキシが private アドレスへ到達できず「endpoint unreachable」になっていた。所要 ~3.3 秒は `retry()` の 1s+2s バックオフと一致。
+- **採用**: `AiClient::new` の builder に `.no_proxy()` を付ける。対象は AI クライアントのみ。資料URL取り込み（`services/ingest/web.rs`、SSRF ガード付き）は無変更。
+- **理由**: 接続先はユーザーが URL を直接入力する信頼済みエンドポイントであり、企業／VPN／キャプチャプロキシを挟むと LAN・localhost へ到達できなくなる事故が多い。プロキシ利用が必要な場合は OS 側ではなくエンドポイント URL 自体で表現できる。
+- **影響**: `services/ai/client.rs`。シグネチャ不変。`no_proxy()` は無条件で失敗しない。
+- **差し戻し条件**: プロキシ経由のクラウド API 利用が必要になったら、プロファイル単位の「プロキシを使う」オプトインを追加する。
+
+## D-19 · macOS ローカルネットワーク使用目的を Info.plist に宣言する
+
+- **日付**: 2026-09-02（v0.0.3）
+- **論点**: バンドル版に `NSLocalNetworkUsageDescription` が無く、近年の macOS がバンドルアプリからの private アドレスへの TCP 接続を無告知で拒否していた。`npm run dev`（Vite）や旧 macOS では顕在化しなかった。
+- **採用**: `src-tauri/Info.plist` を追加し、Tauri のバンドル時マージで `NSLocalNetworkUsageDescription`（日本語＋英語併記）を宣言する。直接 IP 接続が対象のため `NSBonjourServices`（mDNS 用）は追加しない。
+- **理由**: 目的文字列が無いと許可ダイアログが出ず接続が静かに失敗する。文字列はダイアログにそのまま表示されるため二言語併記にした。
+- **影響**: `src-tauri/Info.plist`（新規）。`tauri.conf.json` は無変更（`minimumSystemVersion` は whisper.cpp 制約で 12.0 のまま）。
+- **併せて**: `probe::probe` が到達不能時に実際の失敗理由（connection refused / timeout / DNS / TLS）と、プロキシ・ローカルネットワーク許可の確認手順を `TestResult.note` へ入れるよう変更（秘密は `sanitise` 済み、`retry` を挟まず即時）。
+- **差し戻し条件**: なし（宣言のみ）。将来 mDNS でサーバ探索を実装する場合は `NSBonjourServices` を追加する。
+
+## D-20 · UI を macOS ネイティブ register に寄せる（React/Tauri 維持）
+
+- **日付**: 2026-09-02（v0.0.3）
+- **論点**: オーナー要望は「SwiftUI で書き換え」だが、作業環境に SwiftUI/macOS ネイティブ向けスキルが無く、全面ネイティブ化は Windows/Linux 対応の破棄と数週間規模の別プロジェクトになる。
+- **採用**: React/Tauri を維持したまま、UI を macOS ネイティブに見えるよう調整する register を `design.md` に追加。
+  - フォント: `-apple-system`（San Francisco）を先頭に。`Geist Variable` は bundled fallback のまま（invariant I-2 維持）。
+  - ウィンドウ: `titleBarStyle: "Overlay"` + `hiddenTitle`。トップバーを unified toolbar 化（`-webkit-app-region: drag`、操作要素は `no-drag`、`--titlebar-inset-start` でトラフィックライトを回避。ブラウザ時は既定インセット）。
+  - ジオメトリ: `--control-h` 2rem、radii 6/10/12、focus ring 3px。
+  - マテリアル: サイドバー vibrancy を強化（`blur(30px) saturate(180%)`、`@supports` fallback あり）。
+- **理由**: Hallmark の同一性（暖色ペーパー・単一 ember アクセント・8 状態・WCAG AA・i18n・モノクロ・rem）を壊さずに「Mac アプリらしさ」を最短で得られる。クロスプラットフォームのコードパスを失わない。
+- **影響**: `design.md`（register 追記）、`src/styles/tokens.css` / `src/styles/base.css` / `src/main.tsx`、`src/app/AppShell.*`、`src-tauri/tauri.conf.json`。全 FE/BE ゲート緑を維持。
+- **差し戻し条件**: 真のネイティブ体験が必須になったら、Rust コアを UniFFI で切り出し SwiftUI シェルを別ターゲットとして追加（Tauri 版は据え置き）。
+
+## D-21 · アプリ本体ソースを公開する（非公開方針の撤回）
+
+- **日付**: 2026-09-02（v0.0.3）
+- **論点**: `docs/最後にやって欲しいことと守って欲しいこと.md` と過去の `WAKARU.md` は「`oriyu90/WAKARU` はドキュメント専用、アプリ本体ソースは非公開、dev repo は remote 無し」と定めていた。
+- **採用**: **オーナー判断でこの方針を撤回**。`oriyu90/WAKARU` を **フルソース + Git 履歴**で公開（ライセンスは MIT 維持）。dev repo に remote `origin` を設定し `main` を force-push で置き換える。
+- **前提確認（実施済み）**: 全履歴の秘密情報スキャンはクリーン（API キー・トークン・鍵・`.env` なし）。作者メールは全コミットを `yukiorita0911.official@gmail.com` に rewrite。`docs/最後にやって欲しいことと守って欲しいこと.md` はリポジトリから削除（履歴には残す）。現公開リポジトリ（ドキュメント専用）は force-push 前にローカルへ mirror clone。v0.0.0〜v0.0.2 の Release/タグは維持。
+- **理由**: オーナーの明示的な意思決定。
+- **影響**: 公開範囲、`README.md` / 各種文書、`common-rules-document/WAKARU.md`（方針記述の全面改訂）、`RELEASE_DRAFT.md`、メモリ。
+- **差し戻し条件**: 撤回は難しい（既に公開済みになる）。以後は「ソース公開前提」で運用する。

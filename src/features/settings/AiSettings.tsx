@@ -41,9 +41,9 @@ export function AiSettings() {
     onSuccess: (res, id) => {
       setTested((m) => ({ ...m, [id]: res }));
       void qc.invalidateQueries({ queryKey: ["ai-profiles"] });
-      if (!res.ok) toast.push({ tone: "error", message: res.note ?? t("ai.unreachable") });
+      if (!res.ok) toast.push({ tone: "error", message: t("ai.testFailed") });
     },
-    onError: () => toast.push({ tone: "error", message: t("ai.unreachable") }),
+    onError: () => toast.push({ tone: "error", message: t("ai.testFailed") }),
   });
 
   const setBinding = useMutation({
@@ -83,6 +83,12 @@ export function AiSettings() {
                     {(r?.supportsEmbed ?? p.supportsEmbed) ? <span className={styles.cap}>embed</span> : null}
                     {r ? <span className={styles.latency}>{r.latencyMs} ms · {r.models.length} models</span> : null}
                   </span>
+                  {r && !r.ok ? (
+                    <p className={styles.testError}>
+                      {t("ai.unreachableHint")}
+                      {r.note ? <> <code>{r.note}</code></> : null}
+                    </p>
+                  ) : null}
                 </div>
                 <div className={styles.profileActions}>
                   <Button size="sm" variant="quiet" loading={test.isPending && test.variables === p.id} onClick={() => test.mutate(p.id)}>

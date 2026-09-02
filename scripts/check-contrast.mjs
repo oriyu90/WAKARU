@@ -52,12 +52,17 @@ const dark = parseBlock(':root[data-theme="dark"]');
 const PAIRS = [
   ["color-ink", "color-paper", 4.5],
   ["color-ink", "color-paper-2", 4.5],
+  ["color-ink", "color-paper-3", 4.5], // Studio sinks its rails one paper step
   ["color-ink-strong", "color-paper", 4.5],
   ["color-muted", "color-paper", 4.5],
+  ["color-muted", "color-paper-2", 4.5], // helper text on a panel
   ["color-muted", "color-paper-3", 4.5],
+  ["color-neutral", "color-paper", 3.0], // icons / quiet meta — UI-component floor
+  ["color-neutral", "color-paper-2", 3.0],
   ["color-accent", "color-paper", 4.5], // links / primary CTA text
   ["color-accent-ink", "color-accent", 4.5], // text on an accent fill
   ["color-rule-strong", "color-paper", 3.0], // control boundary
+  ["color-rule-strong", "color-paper-2", 3.0],
   ["color-rule-strong", "color-paper-3", 3.0],
   ["color-focus", "color-paper", 3.0], // focus ring vs page
   ["color-danger", "color-paper", 4.5],

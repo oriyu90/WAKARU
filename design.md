@@ -27,6 +27,26 @@ layouts — those are re-derived here.
   a primary action. Target ≤ 3 % of any viewport.
 - **Axes** · warm near-white paper / roman grotesque display / ember accent.
 
+## macOS-native register (v0.0.3)
+
+The Hallmark identity is unchanged — warm paper, one ember accent (≤ 3 %), the 8-state
+contract, `rem` everywhere, monochrome safety, WCAG AA, full JA/EN/zh i18n. On top of it
+the app now reads as a native macOS application:
+
+- **Type** · San Francisco via `-apple-system` as the primary UI face; `Geist Variable`
+  stays bundled as the cross-platform / offline fallback (invariant I-2 intact).
+- **Window** · overlay (hidden-inset) title bar (`titleBarStyle: "Overlay"`). The top bar is
+  a **unified toolbar**: `-webkit-app-region: drag`, interactive controls `no-drag`, and a
+  `--titlebar-inset-start` (4.75rem inside the shell, `--space-xs` in a browser) that clears
+  the traffic lights.
+- **Geometry** · control height 2rem (32px); radii 6 / 10 / 12; focus ring 3px accent.
+- **Materials** · the overlay sidebar uses a stronger vibrancy (`blur(30px) saturate(180%)`)
+  with an opaque `@supports` fallback.
+- **Controls** · segmented control reads as `NSSegmentedControl` (pill-in-track, selected
+  chip at paper with the whisper shadow); list rows read as Finder/Mail rows.
+- Everything else in this file still governs; the register only tunes face, chrome and
+  geometry.
+
 ## Tokens (canonical — `src/styles/tokens.css` is the source of truth)
 
 ```css
@@ -36,20 +56,29 @@ layouts — those are re-derived here.
   --space-sm: 0.75rem;   --space-md: 1rem;     --space-lg: 1.5rem;
   --space-xl: 2.5rem;     --space-2xl: 4rem;   --space-3xl: 6rem;
 
-  /* Density — a document tool is dense on purpose (docs/09 §6) */
-  --control-h: 2.25rem;      /* every input, select AND button share one height */
-  --row-height: 2rem;        /* one list row */
-  --tab-height: 2.25rem;
-  --toolbar-height: 2.75rem;
+  /* Density — macOS-native control metrics (a document tool is dense on purpose) */
+  --control-h: 2rem;         /* 32px @100% — standard macOS control height */
+  --row-height: 1.875rem;    /* one list row */
+  --tab-height: 2rem;
+  --toolbar-height: 2.75rem; /* unified overlay toolbar — clears the traffic lights */
   --hit-min: 2.75rem;        /* hit-target floor; smaller controls expand via ::before */
+  --titlebar-inset-start: var(--space-xs); /* → 4.75rem inside the Tauri shell (base.css) */
   --sidebar-width: 17rem;
   --content-measure: 66ch;
 
-  /* Rules, radii, rings — drawn with a ruler */
+  /* Window-width fluid layout measures. `rem` keeps display-size scaling; the
+     `vw` terms let wide pages centre (not pin to an edge) and let side rails
+     collapse before the centre column. Breakpoints stay in `rem`. */
+  --page-max: 66rem;          /* single-column page content cap — pages centre within it */
+  --conversation-max: 48rem;  /* Studio / chat reading column (Claude-app shape) */
+  --rail-w:  clamp(10.5rem, 15vw, 14rem);
+  --panel-w: clamp(11rem, 21vw, 17rem);
+
+  /* Rules, radii, rings — macOS geometry (6 / 10 / 12) */
   --rule-1: 1px;
-  --radius-sm: 3px; --radius-md: 5px;  /* controls */ --radius-lg: 9px; /* panels, dialogs */
+  --radius-sm: 4px; --radius-md: 6px;  /* controls */ --radius-lg: 10px; /* panels, dialogs */
   --radius-pill: 999px;                /* chips only, never buttons */
-  --focus-ring: 2px; --focus-offset: 2px;
+  --focus-ring: 3px; --focus-offset: 2px;  /* macOS-weight accent ring */
 
   /* Elevation · one shadow, never stacked; only floating layers get it */
   --shadow-whisper: 0 1px 2px oklch(28% 0.02 70 / 0.06);
@@ -65,8 +94,10 @@ layouts — those are re-derived here.
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
-  /* Typography · 2 + 1. Latin bundled (WOFF2), CJK from the platform. */
-  --font-ui:   "Geist Variable", "Hiragino Kaku Gothic ProN", "Yu Gothic UI",
+  /* Typography · 2 + 1. macOS-native first (San Francisco via -apple-system);
+     "Geist Variable" stays bundled as the offline fallback (invariant I-2). */
+  --font-ui:   -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+               "Geist Variable", "Hiragino Kaku Gothic ProN", "Yu Gothic UI",
                "Noto Sans JP", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --font-read: "Spectral", "Hiragino Mincho ProN", "Yu Mincho",
                "Noto Serif JP", "Songti SC", Georgia, serif;
@@ -81,10 +112,10 @@ layouts — those are re-derived here.
 /* Light — anchor hue 70 (warm oat). Not #fff, not flat grey. */
 :root, :root[data-theme="light"] {
   --color-paper:        oklch(98.6% 0.006 70);
-  --color-paper-2:      oklch(96.6% 0.008 70);   /* panels, sidebar */
-  --color-paper-3:      oklch(93.8% 0.010 68);   /* sunken: inputs, rails */
-  --color-rule:         oklch(88%   0.012 66);   /* decorative divider */
-  --color-rule-strong:  oklch(61%   0.016 64);   /* control boundary — clears 3:1 */
+  --color-paper-2:      oklch(96.4% 0.008 70);   /* panels, sidebar */
+  --color-paper-3:      oklch(93.2% 0.011 68);   /* sunken: inputs, rails */
+  --color-rule:         oklch(85.5% 0.014 66);   /* decorative divider — visible */
+  --color-rule-strong:  oklch(58%   0.017 64);   /* control boundary — clears 3:1 */
   --color-neutral:      oklch(56%   0.014 62);   /* icons, disabled text */
   --color-muted:        oklch(45%   0.014 60);   /* helper text — clears 4.5:1 */
   --color-ink:          oklch(32%   0.018 58);   /* body */
@@ -105,17 +136,19 @@ layouts — those are re-derived here.
   --topbar-ink:         oklch(96%   0.006 70);
 }
 
-/* Dark — hue never moves; only lightness and chroma. */
+/* Dark — hue never moves; only lightness and chroma.
+   ink / ink-strong / topbar-ink are EXACT white (checked by check:contrast);
+   rules and muted text are lifted so panels and helper text stay legible. */
 :root[data-theme="dark"] {
   --color-paper:        oklch(17%   0.014 66);
-  --color-paper-2:      oklch(20.5% 0.015 66);   /* higher surface = lighter */
-  --color-paper-3:      oklch(24%   0.016 66);
-  --color-rule:         oklch(32%   0.014 66);
-  --color-rule-strong:  oklch(52%   0.016 66);
-  --color-neutral:      oklch(62%   0.012 64);
-  --color-muted:        oklch(73%   0.010 62);
-  --color-ink:          oklch(91%   0.010 66);
-  --color-ink-strong:   oklch(97%   0.006 66);
+  --color-paper-2:      oklch(21.5% 0.015 66);   /* higher surface = lighter */
+  --color-paper-3:      oklch(25.5% 0.016 66);
+  --color-rule:         oklch(40%   0.016 66);   /* visible divider on 17% paper */
+  --color-rule-strong:  oklch(61%   0.018 66);
+  --color-neutral:      oklch(68%   0.013 64);
+  --color-muted:        oklch(80%   0.011 62);
+  --color-ink:          oklch(100%  0 0);
+  --color-ink-strong:   oklch(100%  0 0);
 
   --color-accent:       oklch(72%   0.125 42);   /* +L, -C for dark */
   --color-accent-ink:   oklch(18%   0.02 60);
@@ -127,13 +160,13 @@ layouts — those are re-derived here.
   --color-danger:       oklch(70%   0.150 25);
 
   --overlay-scrim:      oklch(10%   0.012 66 / 0.55);
-  --overlay-panel:      oklch(20.5% 0.015 66 / 0.90);
+  --overlay-panel:      oklch(21.5% 0.015 66 / 0.92);
   --topbar:             oklch(13%   0.014 66);
-  --topbar-ink:         oklch(93%   0.010 66);
+  --topbar-ink:         oklch(100%  0 0);
   --shadow-whisper: 0 1px 2px oklch(0% 0 0 / 0.40);
   --shadow-overlay: 0 10px 30px oklch(0% 0 0 / 0.55);
 }
-:root[data-theme="dark"] body { font-weight: 350; }
+:root[data-theme="dark"] body { font-weight: 400; }
 ```
 
 ## Type

@@ -8,18 +8,27 @@
   background: var(--color-paper);
 }
 
-/* ─── Top bar — the dark origin of the eye ─────────────────────────────── */
+/* ─── Unified toolbar — draggable, clears the macOS traffic lights ─────── */
 .topBar {
   flex: none;
   height: var(--toolbar-height);
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding-inline: var(--space-xs) var(--space-sm);
+  padding-inline: var(--titlebar-inset-start) var(--space-sm);
   background: var(--topbar);
   color: var(--topbar-ink);
   border-bottom: var(--rule-1) solid oklch(0% 0 0 / 0.2);
   min-width: 0;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+/* Interactive toolbar controls must not be swallowed by the drag region. */
+.topBar :global(button),
+.topBar :global(a),
+.topBar .kbd {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 .topBar .wordmark {
   font-weight: var(--weight-strong);
@@ -91,7 +100,7 @@
   display: flex;
   flex-direction: column;
   background: var(--overlay-panel);
-  backdrop-filter: blur(16px) saturate(1.1);
+  backdrop-filter: blur(30px) saturate(180%);
   border-inline-end: var(--rule-1) solid var(--color-rule);
   transform: translateX(-100%);
   transition: transform var(--dur-long) var(--ease-out);

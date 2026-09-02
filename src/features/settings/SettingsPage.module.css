@@ -32,6 +32,7 @@
   padding: var(--space-xl);
   width: 100%;
   max-width: 46rem;
+  margin-inline: auto;
   min-width: 0;
   overflow-y: auto;
 }

@@ -1,49 +1,72 @@
-# WAKARU — source
+# WAKARU
 
-Local-first AI notebook for your own documents. Tauri v2 + Rust backend + React 19 / TS
-frontend.
+**Local-first AI notebook for your own documents.** Tauri v2 + Rust backend, React 19 /
+TypeScript frontend. Author: **Yuki_Orita**. License: **MIT**.
 
-> This is the **development** repository. It is not pushed to `oriyu90/wakaru` — that
-> public repo carries only `README` / `LICENSE` / release notes / website (project
-> policy). See `common-rules-document/WAKARU.md`.
+WAKARU imports your sources, renders them properly (PDF, DOCX, PPTX, spreadsheets,
+Markdown, images, audio, video, web), and lets you ask questions grounded in them —
+through any OpenAI-compatible or Anthropic-compatible endpoint, including local model
+servers on your machine or LAN. Search, Live Illustrator explanations and the Studio
+agent all run against your own material; file viewing and full-text search work fully
+offline.
 
-## Status
+## Download
 
-**v0.0.2 release candidate.** The Viewer renders PDF, DOCX, PPTX, spreadsheets,
-Markdown, images, audio and video rather than reducing every source to extracted
-text. AI connections support OpenAI-compatible and Anthropic-compatible wire
-formats; local embeddings provide an offline semantic-search fallback. Studio
-streams progress and applies a concise editorial policy, while Live Illustrator
-applies plain-language, understanding-oriented teaching guidance on every request.
-MCP supports both local stdio and policy-checked Streamable HTTP servers.
+Prebuilt macOS (Apple Silicon) builds are on the
+[Releases page](https://github.com/oriyu90/WAKARU/releases/latest). Verify the
+`.dmg` against its `.sha256`, open it, and drag **WAKARU** to Applications. The build
+is ad-hoc signed and not Apple-notarized, so on first launch right-click WAKARU →
+**Open**.
 
-## Layout
+## Highlights
+
+- **Bring your own model** — per-connection OpenAI-compatible (`/chat/completions`,
+  Bearer) or Anthropic-compatible (`/messages`, `x-api-key`) wire format. Cloud APIs,
+  LM Studio, Ollama, a local MLX server, or a model host on your LAN.
+- **Real rendering** — PDF via bundled PDF.js, DOCX/PPTX structure, bounded sheet
+  tables, Markdown, images, audio/video with transcripts; rich previews fall back to
+  searchable extracted text, never a blank screen.
+- **Hybrid search** — FTS + optional vector search, with a locally cached
+  multilingual embedding model as an offline fallback.
+- **Live Illustrator** — plain-language, understanding-oriented explanations of the
+  source you are viewing, with citations.
+- **Studio** — an agentic loop over your sources and a sandboxed workspace, with tool
+  approval, iteration limits and artifact export.
+- **MCP** — local stdio servers and policy-checked Streamable HTTP servers.
+- **Private by default** — API keys in the OS keychain; original files served only
+  through a project-scoped `wakaru-asset://` protocol; no telemetry.
+- Japanese / English / Simplified Chinese UI, light / dark / monochrome, WCAG AA.
+
+## Build from source
+
+```bash
+npm install
+npm run tauri dev          # develop
+npm run tauri build        # package (macOS: add -- --bundles app for an app-only build)
+```
+
+Requirements: Node 20+, a stable Rust toolchain (see `src-tauri/Cargo.toml`
+`rust-version`), and Xcode command-line tools on macOS.
+
+## Repository layout
 
 | path | what |
 |---|---|
 | `design.md` | the locked design system — read before touching any `*.module.css` |
-| `docs/` | authoritative product spec (00–09), `DECISIONS.md`, `GLOSSARY.md`, `ipc-contract.md` |
+| `docs/` | product spec (`00`–`09`), `DECISIONS.md`, `GLOSSARY.md`, `ipc-contract.md`, `HANDOFF.md` |
 | `src/` | frontend — `app/` shell + routing, `components/` primitives, `features/` screens, `ipc/` wrappers, `i18n/`, `stores/` |
-| `src-tauri/src/` | backend — `commands/` (thin), `domain/` (ts-rs types), `storage/`, `jobs/` |
-| `src-tauri/migrations/` | `app/` and (P1+) `project/` SQL migrations |
-| `scripts/` | `check-design-rules` · `check-contrast` · `check-i18n` (run from `npm run lint` etc.) |
+| `src-tauri/src/` | backend — `commands/` (thin), `domain/` (ts-rs types), `services/`, `storage/`, `jobs/` |
+| `src-tauri/migrations/` | `app/` and `project/` SQL migrations |
+| `scripts/` | `check-design-rules` · `check-contrast` · `check-i18n` · `check-hardcoded` · `gen-licenses` |
 
-## Develop
-
-```bash
-npm install
-npm run tauri dev
-```
-
-## Gate (every phase end)
+## Verification gate
 
 ```bash
-npm run typecheck && npm run lint && npm test && npm run check:contrast && npm run check:i18n
-cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
+npm run typecheck && npm run lint && npm test && npm run check:contrast && npm run check:i18n && npm run build
+cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test && cargo deny check
 ```
-
-Commits are prefixed `phase(N):`.
 
 ## License
 
-MIT © 2026 Yuki Orita
+MIT © 2026 Yuki_Orita. See [LICENSE](LICENSE). Third-party components:
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

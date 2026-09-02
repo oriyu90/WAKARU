@@ -34,9 +34,14 @@ impl AiClient {
         extra_headers: Vec<(String, String)>,
         timeout_ms: u32,
     ) -> AppResult<Self> {
+        // The user configures these endpoints explicitly (often a model server on
+        // the LAN or loopback). Honouring the system / `*_PROXY` proxy here just
+        // routes those direct requests through a proxy that usually cannot reach a
+        // private address — the most common "endpoint unreachable" cause. Opt out.
         let http = reqwest::Client::builder()
             .timeout(Duration::from_millis(timeout_ms.max(1000) as u64))
             .connect_timeout(Duration::from_secs(15))
+            .no_proxy()
             .build()
             .map_err(|e| AppError::internal(format!("http client: {e}")))?;
         Ok(Self {

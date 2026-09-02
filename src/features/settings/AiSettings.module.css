@@ -71,6 +71,15 @@
   font-size: var(--fs-2xs);
   color: var(--color-neutral);
 }
+.testError {
+  font-size: var(--fs-2xs);
+  color: var(--color-danger);
+  max-width: 34rem;
+}
+.testError code {
+  font-family: var(--font-mono);
+  color: var(--color-muted);
+}
 .profileActions {
   display: flex;
   gap: var(--space-2xs);

@@ -42,6 +42,13 @@ body {
   overflow: hidden;
 }
 
+/* Inside the Tauri shell the window uses an overlay (hidden-inset) title bar,
+ * so the unified toolbar must leave room for the macOS traffic lights. In a
+ * plain browser there are none, so the inset stays at the default. */
+:root[data-tauri="true"] {
+  --titlebar-inset-start: 4.75rem;
+}
+
 html,
 body {
   overflow-x: clip;

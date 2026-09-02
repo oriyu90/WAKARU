@@ -13,7 +13,26 @@ const TINY_PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4
 
 pub async fn probe(client: &AiClient, model: &str) -> AppResult<TestResult> {
     let start = Instant::now();
-    let models = client.list_models().await.unwrap_or_default();
+
+    // Distinguish a transport failure (nothing answered — wrong host/port, a proxy
+    // in the way, or macOS local-network permission) from an HTTP response we can
+    // read (the endpoint is up; `/models` just isn't usable here). Only the first
+    // means "unreachable", and it must report *why* instead of a bare string.
+    let mut soft_note: Option<String> = None;
+    let models = match client.list_models().await {
+        Ok(models) => models,
+        Err(err) if err.code == "AI_NETWORK" => {
+            let mut result = empty_result(start);
+            result.note = Some(transport_hint(&err.message));
+            return Ok(result);
+        }
+        Err(err) => {
+            // e.g. 404 (no `/models` route) or 401 (key rejected for listing).
+            soft_note = Some(err.message.clone());
+            Vec::new()
+        }
+    };
+
     let reachable = !models.is_empty() || model_ping(client, model).await;
 
     let mut result = TestResult {
@@ -27,7 +46,11 @@ pub async fn probe(client: &AiClient, model: &str) -> AppResult<TestResult> {
         note: None,
     };
     if !reachable {
-        result.note = Some("endpoint unreachable".into());
+        result.note = Some(
+            soft_note
+                .map(|m| format!("endpoint unreachable: {m}"))
+                .unwrap_or_else(|| "endpoint unreachable".into()),
+        );
         return Ok(result);
     }
 
@@ -40,6 +63,41 @@ pub async fn probe(client: &AiClient, model: &str) -> AppResult<TestResult> {
         .is_ok();
 
     Ok(result)
+}
+
+fn empty_result(start: Instant) -> TestResult {
+    TestResult {
+        ok: false,
+        models: Vec::new(),
+        latency_ms: start.elapsed().as_millis() as u32,
+        supports_vision: false,
+        supports_tools: false,
+        supports_embed: false,
+        json_schema: false,
+        note: None,
+    }
+}
+
+/// Turn a raw reqwest transport error into a short, actionable line. `raw` is
+/// already secret-free (it is a connection-level error, not a response body).
+fn transport_hint(raw: &str) -> String {
+    let lower = raw.to_ascii_lowercase();
+    let cause = if lower.contains("dns") || lower.contains("resolve") {
+        "host name did not resolve"
+    } else if lower.contains("timed out") || lower.contains("timeout") {
+        "no response before the timeout"
+    } else if lower.contains("refused") {
+        "connection refused"
+    } else if lower.contains("certificate") || lower.contains("tls") {
+        "TLS handshake failed"
+    } else {
+        "could not connect"
+    };
+    format!(
+        "{cause}. Check the base URL and port, that the server is running, that no HTTP proxy \
+         is intercepting LAN traffic, and — on macOS — that WAKARU is allowed under \
+         System Settings › Privacy & Security › Local Network."
+    )
 }
 
 async fn model_ping(client: &AiClient, model: &str) -> bool {
@@ -134,4 +192,63 @@ async fn probe_json_schema(client: &AiClient, model: &str) -> bool {
             .ok()
             .and_then(|v| v.get("ok").and_then(serde_json::Value::as_bool))
             == Some(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::ai::ApiProtocol;
+    use std::net::TcpListener;
+    use std::time::Duration;
+
+    #[test]
+    fn transport_hint_is_specific_and_actionable() {
+        assert!(
+            transport_hint("tcp connect error: Connection refused (os error 61)")
+                .starts_with("connection refused")
+        );
+        assert!(transport_hint("error trying to connect: dns error")
+            .starts_with("host name did not resolve"));
+        for raw in [
+            "operation timed out",
+            "request or response body error",
+            "invalid peer certificate",
+        ] {
+            let hint = transport_hint(raw);
+            assert!(
+                hint.contains("Local Network"),
+                "no LAN guidance in {hint:?}"
+            );
+            assert!(hint.contains("proxy"), "no proxy guidance in {hint:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn probe_reports_the_transport_reason_without_retrying() {
+        // Bind then drop so the port is closed -> connection refused, fast.
+        let addr = {
+            let l = TcpListener::bind("127.0.0.1:0").unwrap();
+            l.local_addr().unwrap()
+        };
+        let client = AiClient::new(
+            ApiProtocol::Openai,
+            &format!("http://{addr}/v1"),
+            Some("secret-test-key".into()),
+            Vec::new(),
+            2_000,
+        )
+        .unwrap();
+
+        let started = Instant::now();
+        let result = probe(&client, "any-model").await.unwrap();
+        assert!(!result.ok);
+        let note = result.note.unwrap_or_default();
+        assert!(note.contains("Local Network"), "note was {note:?}");
+        assert!(
+            !note.contains("secret-test-key"),
+            "note leaked the key: {note:?}"
+        );
+        // No 1s+2s retry back-off on a dead endpoint.
+        assert!(started.elapsed() < Duration::from_secs(2), "probe retried");
+    }
 }

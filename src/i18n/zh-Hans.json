@@ -245,6 +245,8 @@
     "optional": "可选",
     "keyStored": "已保存——仅在更改时输入",
     "unreachable": "无法连接端点。",
+  "testFailed": "连接测试失败。",
+  "unreachableHint": "请检查 Base URL 和端口（通常以 /v1 结尾）、服务器是否正在运行、是否有 HTTP 代理拦截了局域网流量，以及在 macOS 上是否已在“系统设置 › 隐私与安全性 › 本地网络”中允许 WAKARU。",
     "saveFailed": "无法保存 AI 连接。请检查名称和 Base URL。",
     "deleteFailed": "无法删除 AI 连接。",
     "bindingFailed": "无法更新模型分配。",

@@ -1,28 +1,37 @@
-# WAKARU v0.0.2 — handoff
+# WAKARU handoff
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
-2026-09-02 v0.0.2 follow-up: original files now render in the Viewer, local
-semantic embeddings and image Vision augmentation are available, Studio emits
-live text/tool progress, MCP supports policy-checked Streamable HTTP, and audio
-segmentation uses Silero with a deterministic fallback. See
-`IMPLEMENTATION_PLAN_v0.0.2.md` and `QUALITY_REPORT.md`.
+**2026-09-03 · v0.0.3** — LAN AI connection fix (`.no_proxy()` on the AI client,
+`NSLocalNetworkUsageDescription` in `src-tauri/Info.plist`, real connection-test
+diagnostics), responsive/centred layout, dark-theme contrast, and a macOS-native
+visual register (San Francisco face, overlay title bar / unified toolbar, macOS
+control geometry). **The application source is now public at `oriyu90/WAKARU`
+(MIT) with full history** — the earlier "docs-only / never push source" policy
+was reversed by the owner (`DECISIONS.md` D-21). Commit author was rewritten to
+`Yuki Orita <yukiorita0911.official@gmail.com>` across history. See
+`IMPLEMENTATION_PLAN_v0.0.3.md` §8 and `QUALITY_REPORT.md`.
+
+2026-09-02 v0.0.2: original files render in the Viewer, local semantic embeddings
+and image Vision augmentation, Studio live text/tool progress, policy-checked
+Streamable HTTP MCP, Silero VAD with a deterministic fallback. See
+`IMPLEMENTATION_PLAN_v0.0.2.md`.
 
 ## What this repo is
 
-A **full re-development** of WAKARU. v0.1.0's application source was lost (not on
-GitHub — that repo is docs-only by policy — and gone from the machine). This is a
-clean re-implementation from `docs/00–09`, `DECISIONS.md`, and the 55-command IPC
-contract extracted from the v0.1.0 minified bundle. Tauri v2 + Rust backend +
-a from-scratch Hallmark React frontend.
+A **full re-development** of WAKARU. v0.1.0's application source was lost (the
+GitHub repo held only docs at the time, and the working tree was gone from the
+machine). This is a clean re-implementation from `docs/00–09`, `DECISIONS.md`,
+and the 55-command IPC contract extracted from the v0.1.0 minified bundle.
+Tauri v2 + Rust backend + a from-scratch Hallmark React frontend. Since v0.0.3
+the source is public on `oriyu90/WAKARU`.
 
-- **Local git only. No remote, by design.** `oriyu90/WAKARU` on GitHub is
-  public and holds README / LICENSE / release assets / site pointers only —
-  never push source there. If you want an off-site backup, add a *private*
-  remote deliberately.
-- Author `Yuki Orita` / `Yuki_Orita`, MIT. Bundle id `com.yukiorita.wakaru`.
-- Version `0.0.2`, identical in `package.json`, `src-tauri/Cargo.toml`,
-  `src-tauri/tauri.conf.json`.
+- **`oriyu90/WAKARU` on GitHub is now the public source repository** (MIT, full
+  history). `main` is authoritative. Releases carry the macOS DMG + `.sha256`.
+- Author `Yuki_Orita` <yukiorita0911.official@gmail.com>, MIT. Bundle id
+  `com.yukiorita.wakaru`.
+- Version must match in `package.json` / `package-lock.json` /
+  `src-tauri/Cargo.toml` / `src-tauri/Cargo.lock` / `src-tauri/tauri.conf.json`.
 
 ## Status
 
