@@ -56,6 +56,12 @@ The size increase from v0.0.1 is expected: v0.0.2 bundles the local embedding
 runtime and document-rendering assets. The embedding model itself is downloaded
 to application data only when first needed and is not inside the DMG.
 
+The first post-publication download check found that the checksum manifest named
+the DMG with its build-directory path. The digest itself matched, but a user
+could not run `shasum -c` directly beside the downloaded files. The manifest was
+replaced with the basename-only form and downloaded again; direct verification
+then returned `WAKARU_0.0.2_aarch64.dmg: OK`. The DMG was unchanged.
+
 Known limits are explicit rather than treated as open code defects: no Developer
 ID/notarization, no Windows/Linux release verification, no automatic OCR index
 for scanned PDF pages without a text layer, and no promise to decode encrypted,
