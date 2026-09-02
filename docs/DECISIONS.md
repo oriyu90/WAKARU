@@ -241,3 +241,37 @@
 - **理由**: オーナーの明示的な意思決定。
 - **影響**: 公開範囲、`README.md` / 各種文書、`common-rules-document/WAKARU.md`（方針記述の全面改訂）、`RELEASE_DRAFT.md`、メモリ。
 - **差し戻し条件**: 撤回は難しい（既に公開済みになる）。以後は「ソース公開前提」で運用する。
+
+## D-22 · スキャンPDF/画像の OCR（純Rust `ocrs`、フロント補助ラスタ化）
+
+- **日付**: 2026-09-03（v0.0.4）
+- **論点**: D-09/D-17 で見送っていた「テキスト層のない PDF ページの自動 OCR 索引化」を実装する。純 Rust ラスタライザは無く（D-09）、ONNX ランタイムは持ち込まない方針（D-10/D-15）。
+- **採用**: OCR エンジンは `ocrs` + `rten`（純 Rust、C 依存なし、MIT/Apache）。モデルは初回に `<data_dir>/models/ocr/` へ DL（fastembed/whisper と同方式）。PDF ページのラスタ化は**フロントの PDF.js**（既に同梱）で行い、canvas→PNG→`ocr_page` コマンドへ渡す。画像は取り込み時に正規化 PNG を直接 OCR。
+- **保存**: 画像＝検索可能 `ocr` unit ＋ `derived/<sid>/ocr.txt`（裏txt）＋ `ocr.json`。PDF＝`documents.text` をプレースホルダのページのみ置換し chunk/FTS/埋め込み/global_index を再構築、`derived/<sid>/ocr/pNNNN.json`。OCR の幻覚は `OcrPage::looks_like_text()`（最小長・英数字比率・文字種数）で除外。
+- **安全性**: プロセス全体ロック（whisper と同様）、30MP 入力上限、モデル欠如・失敗・オフラインは縮退（panic しない）。テキスト層のあるページは上書きしない（プレースホルダ文字列で判定＋フロントも `getTextContent` で skip）。
+- **影響**: 依存 `ocrs`/`rten`、`services/ocr.rs`、`commands/ocr.rs`（`ocr_page`/`ocr_finalize`）、`ingest/{image,pdf,mod}.rs`、`migrations/project/003_ocr.sql`（`sources.ocr_status`、schemaVersion 据え置き＝D-09の慣例）、`Source`/`SourceDetail`、Viewer の PDF プレビュー。
+- **差し戻し条件**: pdfium 同梱でバックエンド完結ラスタ化にしたくなったら `pdfium-render` へ。
+
+## D-23 · サンドイッチ PDF は「ページ画像＋不可視テキスト層」を新規生成
+
+- **日付**: 2026-09-03（v0.0.4）
+- **採用**: 元 PDF を改変せず、`printpdf` で新規 PDF を組み立てる。各ページ＝ラスタ画像を全面配置し、OCR の行ボックス位置に `TextRenderingMode::Invisible` でテキストを重ねる。`derived/<sid>/searchable.pdf`。CJK フォントが取れないときはファイル生成を省略（Viewer オーバーレイ＋検索索引で目的は達成）。
+- **理由**: 任意の入力 PDF に対する低レベル手術（`lopdf` + CID フォント手組み）より、画像ベース再生成の方が決定論的で壊れにくい。スキャン PDF はどのみちベクタテキストが無い。
+- **差し戻し条件**: ベクタ内容を保持したい要件が出たら `lopdf` で元ページへ不可視レイヤーを注入する方式へ。
+
+## D-24 · CJK PDF のフォントは同梱せず OS のシステムフォントを使う
+
+- **日付**: 2026-09-03（v0.0.4）
+- **論点**: `build_document` の PDF 出力とサンドイッチ PDF には CJK グリフを持つ埋め込みフォントが要る。オーナーは 10〜16MB の同梱を許容したが、macOS（配布対象）には必ず CJK フォントがある。
+- **採用**: `fontdb` でシステムフォントを列挙し、`漢`・`あ` のグリフを持つ sans face（Hiragino / PingFang / Noto CJK / Yu Gothic / YaHei …）を選び、`printpdf` がサブセット埋め込みする。同梱ゼロ＝リポジトリ肥大なし。CJK face が見つからなければ `build_document` の `pdf` 要求は `.md` にフォールバック。
+- **影響**: 依存 `fontdb`（MPL-2.0、`deny.toml` 許可済み）+ `ttf-parser`（グリフ判定）。`services/pdf_text.rs`。
+- **付随**: Hiragino のサブセット埋め込みは大きめ（数MB/PDF）。`RELEASE_NOTES` に明記。NFR-7（CJK 非同梱）は満たしたまま。
+- **差し戻し条件**: Windows/Linux を配布対象にして CJK フォント不在を許容できないなら、その時に Noto Sans CJK を同梱する。
+
+## D-25 · Studio `build_document` は構造だけを受け取り決定論的に整形する
+
+- **日付**: 2026-09-03（v0.0.4）
+- **論点**: `write_file` は「モデルが本文を全部書く」ため、弱いモデルで体裁が崩れコンテキストも食う。
+- **採用**: 組み込みツール `build_document({ path, format: md|docx|pdf, title, toc, sections:[{level,heading,body}] })`。`body` は小さな Markdown 部分集合（段落・`-`/`1.` リスト・`| 表 |`・`**太字**`・`*斜体*`・`` `コード` ``、未対応記法はエスケープ素通し）。整形・改ページ・目次は Rust 側で決定論的に行う。承認・サンドボックスは `write_file` と共有。短い「文書スキル」プロンプトを 3 言語で常時付与（外部 Skill 非同梱・名称も出さない＝D-16 遵守）。
+- **影響**: 依存 `docx-rs`（MIT）。`services/doc_builder.rs`、`services/studio.rs`、`prompts/studio.{en,ja,zh-Hans}.md`。
+- **差し戻し条件**: Markdown 部分集合が足りなければ、pulldown-cmark 等の本格パーサへ差し替え（ブロック/インライン parser の境界は既に分離済み）。

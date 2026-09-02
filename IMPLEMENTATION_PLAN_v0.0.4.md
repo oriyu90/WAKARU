@@ -159,6 +159,10 @@
 `ocrs`/`rten` のモデルはバイナリに含めず初回 DL（fastembed / whisper と同方針）。
 アプリ/DMG は増える（22MB → 推定 35〜45MB）。`RELEASE_NOTES` に明記。
 
+## 実施状況（2026-09-03 完了）
+
+1〜7 全 Phase 実装・gated・push 済み。Phase 8 静的レビューで PNG キャッシュ削除・テキスト層ページ skip を追加。v0.0.4 DMG ビルド・検証済み。詳細は QUALITY_REPORT.md。
+
 ## 4. 実装順
 
 1. **依存追加 + `services/ocr.rs`**（エンジン・モデル DL・縮退・上限）＋ 純ヘルパの単体テスト。→ BE ゲート。

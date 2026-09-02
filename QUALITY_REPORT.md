@@ -2,6 +2,99 @@
 
 Cumulative; newest release first.
 
+## v0.0.4 release verification — 2026-09-03
+
+Scope: OCR for scanned PDFs and images, and a `build_document` Studio tool
+(Markdown / DOCX / PDF). Additive only — `project.db` gains one nullable
+`sources.ocr_status` column (`PROJECT_SCHEMA_VERSION` unchanged); v0.0.0–v0.0.3
+projects and settings open unchanged and a round-trip preserves the column.
+
+### What changed
+
+- **OCR engine** — `services/ocr.rs`: `ocrs` + `rten` (pure Rust, no ONNX/C
+  deps). Detection + recognition models download once into
+  `<data_dir>/models/ocr/` (the local-embedding pattern), behind a process-wide
+  lock, with a 30 MP input cap. Missing model / offline / decode failure all
+  degrade — never a panic. `OcrPage::looks_like_text()` (min length, ≥ 55 %
+  alphanumeric, ≥ 3 distinct chars) rejects OCR hallucination from noise.
+- **Image OCR** (`ingest/image.rs`) — an imported image with text gets a
+  searchable `ocr` document unit plus `derived/<sid>/ocr.txt` and `ocr.json`
+  sidecars. Gated by the new `ocr.enabled` setting (default on).
+- **Scanned-PDF OCR** — `ingest/pdf.rs` marks a PDF with any text-less page as
+  `ocr_status = "pending"`. `commands/ocr.rs` (`ocr_page` / `ocr_finalize`) +
+  `services/ocr.rs::apply_pdf_page` OCR a page raster from the Viewer, and
+  **only when the page carries the ingest "no text layer" placeholder** replace
+  `documents.text`, rebuild that document's chunks and its `global_index` row
+  (so scanned pages become searchable — closes D-09). `finalize_pdf` sets
+  `ocr_status` and builds `derived/<sid>/searchable.pdf` (page raster + invisible
+  OCR text layer via `pdf_text::render_sandwich`), then drops the page rasters.
+- **Viewer** — `PdfFilePreview` shows a "Recognise text" button when
+  `ocrStatus` is `pending`/`partial`; it rasterises each text-less page with the
+  existing PDF.js pipeline (skipping pages that already have > 100 chars of text
+  layer), feeds `ocr_page`, shows N/M progress, then `ocr_finalize`.
+- **`build_document`** — `services/doc_builder.rs`: deterministic assembly from
+  `{ title, toc, sections:[{level, heading, body}] }` where `body` is a small
+  Markdown subset (paragraphs, `-`/`1.` lists, `| tables |`, `**bold**`,
+  `*italic*`, `` `code` ``; unhandled syntax is escaped through). Markdown +
+  DOCX (`docx-rs`) + PDF (`pdf_text`, `printpdf` with a CJK-capable **system**
+  font found via `fontdb` — no font bundled; falls back to `.md` when none is
+  found). Wired into Studio's `tool_defs` / `dispatch_tool`, sharing
+  `write_artifact` and the sandbox path guard + approval with `write_file`. A
+  compact "document skill" was added to `prompts/studio.{en,ja,zh-Hans}.md`.
+- **New deps** — `ocrs` / `rten` (MIT), `docx-rs` (MIT), `fontdb` (MPL-2.0,
+  in the `deny.toml` allowlist), `ttf-parser` (MIT). `cargo deny` green.
+
+### Automated gates
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck | pass |
+| Frontend lint (eslint + design-rules + hardcoded-strings) | pass |
+| Frontend unit tests (vitest incl. axe) | 9 passed |
+| Contrast | pass |
+| i18n parity | 351 keys × 3 languages |
+| Production web build | pass |
+| ts-rs binding export | drift 0 |
+| Rust `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings` | pass |
+| Rust tests | 163 lib + 38 integration passed (incl. new `services::ocr`, `services::doc_builder`, `services::pdf_text`, `storage` 003_ocr round-trip, `phase6::build_document`); official-network + live-AI tests remain `#[ignore]` |
+| `cargo deny check licenses bans sources` | pass |
+
+### Functional verification (local)
+
+- `services::ocr` ran end-to-end in the integration environment — models
+  downloaded and inference executed; the `looks_like_text` guard rejects a
+  text-free gradient image.
+- `build_document` produced a valid `.docx` (zip with `word/document.xml`) and,
+  on this machine, a valid multi-page `%PDF-` with an embedded font subset and
+  correct pagination for mixed JP + EN + lists + code.
+- `003_ocr` migration: fresh DB gets the column + ledger row; a DB that already
+  has the column adopts `003_ocr` without re-`ALTER`ing.
+
+### Bundle
+
+| Item | Value |
+|---|---|
+| App | arm64 `WAKARU.app`, version `0.0.4`; ad-hoc signed; `codesign --verify --deep --strict` passes for the build output and the app inside the mounted DMG; `spctl` rejects (expected — not notarized) |
+| `Info.plist` | `NSLocalNetworkUsageDescription` present; `CFBundleShortVersionString` 0.0.4; `LSMinimumSystemVersion` 12.0 |
+| DMG | `WAKARU_0.0.4_aarch64.dmg`, 24,040,500 bytes; `hdiutil verify` VALID |
+| SHA-256 | `8e359f20ca3250352cfc4a1eae507596c2f4a83ff8523da926edb9e629e25bd1` (basename in `WAKARU_0.0.4_aarch64.dmg.sha256`) |
+| Startup probe | reached `WAKARU backend ready version="0.0.4"`; startup log free of secret patterns |
+| Repository | `oriyu90/WAKARU` is **private** for this release cycle — the DMG on the Releases page is collaborator-only |
+
+### Not exercised in this run
+
+- [ ] Live click-through of the Viewer "Recognise text" flow inside the packaged
+      app against a real scanned PDF (the `ocr_page` command path and the
+      OCR engine are covered by tests; the PDF.js raster loop is not).
+- [ ] `build_document` `pdf` on a machine with no CJK system font (the fallback
+      to `.md` is covered by `phase6`).
+
+No reproducible crash, data-loss defect, high-severity security defect or open
+automated regression remains.
+
+---
+
+
 ## v0.0.3 release verification — 2026-09-03
 
 Scope: local-network AI connection fix, responsive/centred layout, dark-theme

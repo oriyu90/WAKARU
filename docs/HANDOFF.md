@@ -2,6 +2,14 @@
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
+**2026-09-03 · v0.0.4** — OCR for scanned PDFs and images (`ocrs`+`rten`, pure
+Rust, models downloaded on first use; `commands/ocr.rs`, `services/ocr.rs`,
+`migrations/project/003_ocr.sql` → `sources.ocr_status`), a `build_document`
+Studio tool (Markdown/DOCX/PDF; `services/doc_builder.rs` + `services/pdf_text.rs`
+using a **system** CJK font via `fontdb`, no font bundled), and an `ocr.enabled`
+setting. See `IMPLEMENTATION_PLAN_v0.0.4.md` and `docs/DECISIONS.md` D-22–D-25.
+**The repository is PRIVATE for this cycle** — Release assets are collaborator-only.
+
 **2026-09-03 · v0.0.3** — LAN AI connection fix (`.no_proxy()` on the AI client,
 `NSLocalNetworkUsageDescription` in `src-tauri/Info.plist`, real connection-test
 diagnostics), responsive/centred layout, dark-theme contrast, and a macOS-native

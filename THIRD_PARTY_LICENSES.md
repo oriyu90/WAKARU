@@ -156,6 +156,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | dlopen2 | 0.8.2 | MIT |
 | dlopen2_derive | 0.4.3 | MIT |
 | document-features | 0.2.12 | MIT OR Apache-2.0 |
+| docx-rs | 0.4.22 | MIT |
 | dom_query | 0.27.0 | MIT |
 | dpi | 0.1.2 | Apache-2.0 AND MIT |
 | dtoa | 1.0.11 | MIT OR Apache-2.0 |
@@ -194,9 +195,11 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | fdeflate | 0.3.7 | MIT OR Apache-2.0 |
 | field-offset | 0.3.6 | MIT OR Apache-2.0 |
 | find-msvc-tools | 0.1.11 | MIT OR Apache-2.0 |
+| flatbuffers | 24.12.23 | Apache-2.0 |
 | flate2 | 1.1.10 | MIT OR Apache-2.0 |
 | fnv | 1.0.7 | Apache-2.0 / MIT |
 | foldhash | 0.2.0 | Zlib |
+| fontdb | 0.24.0 | MIT |
 | foreign-types | 0.5.0 | MIT/Apache-2.0 |
 | foreign-types-macros | 0.2.4 | MIT/Apache-2.0 |
 | foreign-types-shared | 0.3.1 | MIT/Apache-2.0 |
@@ -333,6 +336,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | md-5 | 0.10.6 | MIT OR Apache-2.0 |
 | md-5 | 0.11.0 | MIT OR Apache-2.0 |
 | memchr | 2.8.3 | Unlicense OR MIT |
+| memmap2 | 0.9.11 | MIT OR Apache-2.0 |
 | memoffset | 0.9.1 | MIT |
 | mime | 0.3.17 | MIT OR Apache-2.0 |
 | minimal-lexical | 0.2.1 | MIT/Apache-2.0 |
@@ -352,6 +356,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | nom | 7.1.3 | MIT |
 | nom | 8.0.0 | MIT |
 | nu-ansi-term | 0.50.3 | MIT |
+| num_cpus | 1.17.0 | MIT OR Apache-2.0 |
 | num_enum | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
 | num_enum_derive | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
 | num-complex | 0.4.6 | MIT OR Apache-2.0 |
@@ -375,6 +380,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | objc2-ui-kit | 0.3.2 | Zlib OR Apache-2.0 OR MIT |
 | objc2-user-notifications | 0.3.2 | Zlib OR Apache-2.0 OR MIT |
 | objc2-web-kit | 0.3.2 | Zlib OR Apache-2.0 OR MIT |
+| ocrs | 0.13.0 | MIT OR Apache-2.0 |
 | once_cell | 1.21.4 | MIT OR Apache-2.0 |
 | onig | 6.5.3 | MIT |
 | onig_sys | 69.9.3 | MIT |
@@ -460,6 +466,17 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | rfd | 0.16.0 | MIT |
 | ring | 0.17.14 | Apache-2.0 AND ISC |
 | rmcp | 3.0.1 | Apache-2.0 |
+| rten | 0.26.0 | MIT OR Apache-2.0 |
+| rten-base | 0.26.0 | MIT OR Apache-2.0 |
+| rten-gemm | 0.26.0 | MIT OR Apache-2.0 |
+| rten-imageproc | 0.26.0 | MIT OR Apache-2.0 |
+| rten-model-file | 0.26.0 | MIT OR Apache-2.0 |
+| rten-onnx | 0.26.0 | MIT OR Apache-2.0 |
+| rten-parallel | 0.26.0 | MIT OR Apache-2.0 |
+| rten-shape-inference | 0.26.0 | MIT OR Apache-2.0 |
+| rten-simd | 0.26.0 | MIT OR Apache-2.0 |
+| rten-tensor | 0.26.0 | MIT OR Apache-2.0 |
+| rten-vecmath | 0.26.0 | MIT OR Apache-2.0 |
 | rusqlite | 0.32.1 | MIT |
 | rustc_version | 0.4.1 | MIT OR Apache-2.0 |
 | rustc-hash | 1.1.0 | Apache-2.0/MIT |
@@ -515,6 +532,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | simdutf8 | 0.1.5 | MIT OR Apache-2.0 |
 | siphasher | 1.0.3 | MIT/Apache-2.0 |
 | slab | 0.4.12 | MIT |
+| slotmap | 1.1.1 | Zlib |
 | smallvec | 1.15.2 | MIT OR Apache-2.0 |
 | socket2 | 0.6.5 | MIT OR Apache-2.0 |
 | socks | 0.3.4 | MIT/Apache-2.0 |
@@ -770,4 +788,4 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | zvariant_derive | 5.15.0 | MIT |
 | zvariant_utils | 4.2.0 | MIT |
 
-Total: 758 crates.
+Total: 776 crates.

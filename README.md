@@ -13,10 +13,11 @@ offline.
 ## Download
 
 Prebuilt macOS (Apple Silicon) builds are on the
-[Releases page](https://github.com/oriyu90/WAKARU/releases/latest). Verify the
-`.dmg` against its `.sha256`, open it, and drag **WAKARU** to Applications. The build
-is ad-hoc signed and not Apple-notarized, so on first launch right-click WAKARU →
-**Open**.
+[Releases page](https://github.com/oriyu90/WAKARU/releases/latest) (this
+repository is currently private, so release assets are available to
+collaborators). Verify the `.dmg` against its `.sha256`, open it, and drag
+**WAKARU** to Applications. The build is ad-hoc signed and not Apple-notarized,
+so on first launch right-click WAKARU → **Open**.
 
 ## Highlights
 
@@ -26,6 +27,11 @@ is ad-hoc signed and not Apple-notarized, so on first launch right-click WAKARU 
 - **Real rendering** — PDF via bundled PDF.js, DOCX/PPTX structure, bounded sheet
   tables, Markdown, images, audio/video with transcripts; rich previews fall back to
   searchable extracted text, never a blank screen.
+- **OCR** — scanned PDFs and images with text are recognised (pure-Rust `ocrs`,
+  models fetched once) and folded into search; a scanned PDF also gets a
+  `searchable.pdf` with an invisible, position-matched text layer.
+- **Studio `build_document`** — the agent assembles a formatted Markdown, Word or
+  PDF document from a title and sections; the model supplies structure, not layout.
 - **Hybrid search** — FTS + optional vector search, with a locally cached
   multilingual embedding model as an offline fallback.
 - **Live Illustrator** — plain-language, understanding-oriented explanations of the

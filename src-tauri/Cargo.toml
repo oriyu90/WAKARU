@@ -1,6 +1,6 @@
 [package]
 name = "wakaru"
-version = "0.0.3"
+version = "0.0.4"
 description = "Local-first AI notebook for your own documents"
 authors = ["Yuki Orita"]
 license = "MIT"
