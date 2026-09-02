@@ -80,6 +80,8 @@ rmcp = { version = "=3.0.1", default-features = false, features = ["client", "tr
 whisper-rs = { version = "0.14", default-features = false, features = ["metal"] }
 symphonia = { version = "0.5.5", features = ["mp3", "aac", "isomp4", "wav", "flac", "ogg"] }
 silero-vad-crs = "0.4.0"
+fontdb = { version = "0.24.0", default-features = false, features = ["fs", "memmap", "std"] }
+ttf-parser = { version = "0.25.1", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 tempfile = "3"

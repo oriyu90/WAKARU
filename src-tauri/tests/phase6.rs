@@ -257,16 +257,20 @@ fn build_document_writes_a_docx_artifact_and_guards_the_path() {
     .unwrap_err();
     assert_eq!(err.code, "SANDBOX_PATH_DENIED");
 
-    // a pdf request falls back to markdown (PDF output not in this build)
+    // a pdf request produces a real PDF, or falls back to markdown when this
+    // machine has no CJK-capable system font.
     let pdf_args = serde_json::json!({
         "path": "note.pdf", "format": "pdf", "title": "T",
         "sections": [{ "body": "hello" }]
     })
     .to_string();
     let out = studio::dispatch_tool(&db, &ws, &tab.thread_id, "build_document", &pdf_args).unwrap();
-    assert!(
-        out.contains("note.md"),
-        "pdf should fall back to .md: {out}"
-    );
-    assert!(ws.join("note.md").is_file());
+    let pdf = ws.join("note.pdf");
+    let md = ws.join("note.md");
+    assert!(pdf.is_file() || md.is_file(), "pdf request produced nothing: {out}");
+    if pdf.is_file() {
+        assert_eq!(&std::fs::read(&pdf).unwrap()[..5], b"%PDF-");
+    } else {
+        assert!(out.contains("note.md"), "{out}");
+    }
 }
