@@ -271,7 +271,8 @@ fn image_ingest_normalises_and_writes_a_derived_page() {
     buf.save(&p).unwrap();
 
     let (sid, docs, chunks) = env.add_and_ingest(&id, &p, SourceKind::Image).unwrap();
-    assert_eq!(docs, 1);
+    // 1 image unit, plus an `ocr` unit if OCR (best-effort) finds readable text.
+    assert!((1..=2).contains(&docs), "unexpected document count: {docs}");
     assert!(chunks >= 1);
     let derived = env
         .projects_dir

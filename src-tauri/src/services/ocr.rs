@@ -55,6 +55,28 @@ impl OcrPage {
     pub fn has_text(&self) -> bool {
         self.lines.iter().any(|l| !l.text.trim().is_empty())
     }
+
+    /// Guard against OCR hallucinating "text" from noise/patterns in an image
+    /// that has none: require a minimum length, a majority of alphanumeric
+    /// characters (letters/digits/CJK), and some character variety.
+    pub fn looks_like_text(&self) -> bool {
+        let joined: String = self
+            .lines
+            .iter()
+            .flat_map(|l| l.text.trim().chars())
+            .collect();
+        let total = joined.chars().count();
+        if total < 6 {
+            return false;
+        }
+        let alnum = joined.chars().filter(|c| c.is_alphanumeric()).count();
+        let distinct = joined
+            .chars()
+            .filter(|c| !c.is_whitespace())
+            .collect::<std::collections::BTreeSet<_>>()
+            .len();
+        (alnum as f32 / total as f32) >= 0.55 && distinct >= 3
+    }
 }
 
 static ENGINE: OnceLock<Mutex<OcrEngine>> = OnceLock::new();
@@ -228,6 +250,27 @@ mod tests {
                 .collect(),
             width_px: 1000,
             height_px: 1400,
+        }
+    }
+
+    #[test]
+    fn looks_like_text_rejects_noise_and_accepts_real_text() {
+        let real = page(&[
+            ("The quarterly report is attached.", [0.1, 0.1, 0.6, 0.02]),
+            ("見積書 2026年 合計 12,300円", [0.1, 0.2, 0.5, 0.02]),
+        ]);
+        assert!(real.looks_like_text());
+
+        for junk in [
+            "//..--//", // punctuation soup
+            "a a a",    // too short + no variety
+            "|| || ||", // symbols
+            "x",        // trivial
+        ] {
+            assert!(
+                !page(&[(junk, [0.0, 0.0, 0.1, 0.1])]).looks_like_text(),
+                "should reject {junk:?}"
+            );
         }
     }
 

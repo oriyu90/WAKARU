@@ -197,6 +197,10 @@
     },
     "fm": {
       "badImage": "Couldn't read the image."
+    },
+    "ocr": {
+      "unavailable": "Text recognition is unavailable. Check your connection so the OCR model can download, then try again.",
+      "image": "This image could not be read for text recognition."
     }
   },
   "viewer": {
@@ -247,8 +251,8 @@
     "optional": "Optional",
     "keyStored": "Stored — type only to change it",
     "unreachable": "Couldn't reach the endpoint.",
-  "testFailed": "Connection test failed.",
-  "unreachableHint": "Check the Base URL and port (usually ending in /v1), that the server is running, that no HTTP proxy is intercepting LAN traffic, and — on macOS — that WAKARU is allowed under System Settings › Privacy & Security › Local Network.",
+    "testFailed": "Connection test failed.",
+    "unreachableHint": "Check the Base URL and port (usually ending in /v1), that the server is running, that no HTTP proxy is intercepting LAN traffic, and — on macOS — that WAKARU is allowed under System Settings › Privacy & Security › Local Network.",
     "saveFailed": "Couldn't save this AI connection. Check the name and Base URL.",
     "deleteFailed": "Couldn't remove this AI connection.",
     "bindingFailed": "Couldn't update the model assignment.",

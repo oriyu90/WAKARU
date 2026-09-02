@@ -263,13 +263,13 @@ fn parse(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput, dd: &Path) -> A
             }
         }
         SourceKind::Image => {
-            let r = image::parse_image(&file(input)?, dd)?;
+            let r = image::parse_image(&file(input)?, dd, data_dir_of(ctx.project_dir))?;
             Parsed {
                 units: r.units,
                 page_count: Some(1),
                 first_image_rel: Some(r.derived_rel),
                 title_override: None,
-                partial: true, // no Vision analysis until Phase 4
+                partial: true, // Vision layout analysis still runs post-ingest
             }
         }
         SourceKind::Weblink => {

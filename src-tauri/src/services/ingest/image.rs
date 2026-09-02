@@ -1,9 +1,12 @@
-//! Image normalisation (docs/04 §1). Phase 1: EXIF-rotate, cap the long side at
-//! 2048 px, write a normalised copy to `derived/<sid>/pages/0001.<ext>`. A
-//! configured Vision role subsequently adds OCR/layout/diagram analysis.
+//! Image normalisation (docs/04 §1): EXIF-rotate, cap the long side at 2048 px,
+//! write a normalised copy to `derived/<sid>/pages/0001.png`. When the image
+//! carries text, OCR (`services::ocr`) adds a searchable `ocr` unit plus
+//! `derived/<sid>/ocr.txt` and `derived/<sid>/ocr.json` sidecars. A configured
+//! Vision role adds layout/diagram analysis separately.
 
 use super::Unit;
 use crate::error::{AppError, AppResult};
+use crate::services::ocr;
 use image::imageops::FilterType;
 use std::io::BufReader;
 use std::path::Path;
@@ -16,7 +19,7 @@ pub struct ImageResult {
     pub derived_rel: String,
 }
 
-pub fn parse_image(abs_path: &Path, derived_dir: &Path) -> AppResult<ImageResult> {
+pub fn parse_image(abs_path: &Path, derived_dir: &Path, data_dir: &Path) -> AppResult<ImageResult> {
     let img = image::open(abs_path).map_err(|e| {
         AppError::new(
             "SOURCE_PARSE",
@@ -45,7 +48,7 @@ pub fn parse_image(abs_path: &Path, derived_dir: &Path) -> AppResult<ImageResult
         .unwrap_or("image")
         .to_string();
 
-    let units = vec![Unit {
+    let mut units = vec![Unit {
         ordinal: 1,
         kind: "image",
         title: Some(name.clone()),
@@ -53,9 +56,38 @@ pub fn parse_image(abs_path: &Path, derived_dir: &Path) -> AppResult<ImageResult
         locator: serde_json::json!({ "t": "region", "bbox": [0.0, 0.0, 1.0, 1.0] }),
     }];
 
+    // Best-effort OCR of the normalised copy. Failure (offline, model download,
+    // decode) is non-fatal — the image is still viewable, just not text-searchable.
+    if let Some(unit) = run_ocr(&out, derived_dir, data_dir) {
+        units.push(unit);
+    }
+
     Ok(ImageResult {
         units,
         derived_rel: "pages/0001.png".into(),
+    })
+}
+
+/// OCR `png_path`; on success with readable text, write the `ocr.txt` / `ocr.json`
+/// sidecars and return a searchable `ocr` unit. Returns `None` on no-text or any
+/// error.
+fn run_ocr(png_path: &Path, derived_dir: &Path, data_dir: &Path) -> Option<Unit> {
+    let bytes = std::fs::read(png_path).ok()?;
+    let page = match ocr::ocr_image_bytes(data_dir, &bytes) {
+        Ok(p) if p.looks_like_text() => p,
+        _ => return None,
+    };
+    let text = page.plain_text();
+    let _ = std::fs::write(derived_dir.join("ocr.txt"), &text);
+    if let Ok(json) = serde_json::to_vec(&page) {
+        let _ = std::fs::write(derived_dir.join("ocr.json"), json);
+    }
+    Some(Unit {
+        ordinal: 2,
+        kind: "ocr",
+        title: Some("OCR".into()),
+        text,
+        locator: serde_json::json!({ "t": "region", "bbox": [0.0, 0.0, 1.0, 1.0] }),
     })
 }
 
