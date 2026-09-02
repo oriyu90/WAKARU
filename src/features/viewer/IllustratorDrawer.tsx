@@ -138,7 +138,7 @@ export function IllustratorDrawer({
         </p>
       ) : null}
 
-      <div className={styles.body}>
+      <div className={styles.body} aria-live="polite">
         {genErr ? (
           <p className={styles.error}>
             <AlertIcon size={14} /> {genErr}

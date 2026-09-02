@@ -118,13 +118,52 @@ rather than a manual click-through:
 - **Hit targets** — `--control-h` 2rem with the `.iconBtn::before` negative-inset
   expansion still yields the 2.75rem `--hit-min` floor.
 
-### Not exercised in this run
+### `docs/09 §8` 11-step smoke — static pass (replaces the interactive run)
 
-- [ ] `docs/09 §8` fixture import / restart-restore / native file-dialog
-      round-trip (covered at the unit + integration level by the 38 integration
-      tests; not clicked through in a live WebView).
-- [ ] Live Illustrator against a non-mock remote model (prompt policy is unit
-      tested in three languages).
+Each step mapped to its code path + a passing integration test, and checked for
+v0.0.3 interaction. v0.0.3's only functional change is `AiClient::new` gaining
+`.no_proxy()` (unconditional, non-failing); everything else is CSS / a bundle
+plist / a boot-time attribute.
+
+| Step | Static evidence |
+|---|---|
+| 1 · cold start | startup probe: `WAKARU backend ready version="0.0.3"`, healthy > 7 s, no crash |
+| 2 · create project | `phase1::create_project`, `ac_1_1_create_makes_a_self_contained_folder` |
+| 3 · import PDF/image/mp4/xlsx at once | `phase1::add_and_ingest`, `ac_1_3`, `image_ingest_normalises…`, `phase5::decodes_a_wav…`; `services/ingest/*` unchanged |
+| 4 · page-flip / search during analysis (no freeze) | ingest runs on `tokio::spawn` jobs; Viewer + Search are independent reads; `ac_1_11…work_offline`; no shared lock; CSS-only v0.0.3 change |
+| 5 · open PDF, Live Illustrator ×3 + ask | `phase4::ac_4_5…persist`, `fr_l6_import_to_studio`; `AiClient` `.no_proxy()` is non-failing and the owner confirmed live AI from the packaged app; drawer gained `aria-live="polite"` only |
+| 6 · restart → tabs + conversations restored | `phase2::ac_2_6_tabs_persist_across_reopen`, `phase4::ac_4_5…`, `phase6::ac_6_1…`; `project.db` persistence unchanged |
+| 7 · Studio summary → add to source | `phase6::ac_6_10…keeps_its_workspace_files_and_artifacts`; `studio.rs` `import_artifact_as_source` unchanged |
+| 8 · monochrome ON + 150 % + Chinese | `:root[data-monochrome="true"] #app{filter:grayscale(1)}` intact and cascades to `<video>`/`<img>` (no `isolation`, no competing `filter`); `[data-scale="150"]` intact; all dims are `rem`/`clamp`; v0.0.3 breakpoints kept in `rem` so panels auto-collapse before the 960-wide min window overflows at 150 %; `check-i18n` 341 × 3 + `check-hardcoded` pass |
+| 9 · network off — view / search / export | `ac_1_11_ingest_and_search_work_offline`; local `embed_local` fallback; export is a local zip; unchanged |
+| 10 · export → delete → import → intact | `phase10::ac_10_1_export_import_restores…`, `ac_10_3_a_future_major_schema_is_rejected`, `phase1::ac_1_10_delete_removes…` |
+| 11 · logs — no secrets | `logging.rs` + `sanitise()`; startup log scanned (0 patterns); `probe::probe`'s `transport_hint` uses only connection-level error text, asserted secret-free by `probe_reports_the_transport_reason_without_retrying` |
+
+Security AC-7-5 (all 10 path-traversal cases) + AC-7-6 symlink: `sandbox::
+resolve_in_sandbox` unit tests + `phase6::write_file_rejects_paths_outside_the_workspace`
++ `phase7` — all green, unchanged in v0.0.3.
+
+### §6 / §7 checklist spot-checks (static)
+
+- No `position: fixed` in `src/` (comment only); `check-design-rules` enforces it.
+- No raw `#000` / `#fff` / black-or-white `rgb()` in any component CSS.
+- No italic headings (`base.css` sets `h1–h6 { font-style: normal }`; grep confirms 0).
+- `[data-scale]` (6 steps) and `[data-monochrome] #app { filter: grayscale(1) }` intact.
+- `prefers-reduced-motion: reduce` blocks intact (`base.css` + `AppShell.module.css`).
+- Streaming regions are `aria-live="polite"`: Studio `.messages` (existing) and the
+  Live Illustrator drawer body (**added in v0.0.3** — was missing).
+- Icon-only buttons: `IconButton` requires a `label` prop and always emits
+  `aria-label`; loading buttons use `aria-busy`.
+- Contrast recomputed from `tokens.css`: 34 pairs, all ≥ target (dark ink exact white).
+
+### Still deferred
+
+- Live Illustrator against a non-mock remote model (prompt policy is unit tested
+  in all three response languages; the owner's live run against the LAN model
+  covered the transport and grounding paths).
+- Determinate `role="progressbar"` on long-running progress (whisper model
+  download, ingest): currently indeterminate `aria-busy` / `Spinner`. Non-blocking
+  a11y polish, not a v0.0.3 regression.
 
 No reproducible crash, data-loss defect, high-severity security defect or open
 automated regression remains.
