@@ -82,11 +82,49 @@ exercised only in the packaged app (no Tauri APIs in a plain browser).
   (`http://192.168.0.165:1234/v1` + key) succeeds from the packaged app after
   granting macOS Local Network access — the defect this release targets.
 
+### Static UI verification (replaces the interactive GUI pass)
+
+The v0.0.3 UI changes were verified by source inspection and static tooling
+rather than a manual click-through:
+
+- **Toolbar drag region** — `AppShell.module.css` scopes `-webkit-app-region: drag`
+  to `.topBar` and `no-drag` to `.topBar :global(button)`, `:global(a)` and
+  `.kbd`. Every interactive child of `.topBar` in `AppShell.tsx` is covered:
+  the menu `IconButton` (renders a `<button>`), the `⌘B` `<kbd className={kbd}>`,
+  and the settings `<NavLink>` (renders an `<a>`). The wordmark/tagline/spacer
+  spans are non-interactive and remain draggable.
+- **Traffic-light inset** — `main.tsx` sets `document.documentElement.dataset.tauri
+  = "true"` only when `inTauri`; `base.css` raises `--titlebar-inset-start` to
+  4.75rem under `:root[data-tauri="true"]`; `tokens.css` keeps the browser default
+  at `--space-xs`; `.topBar` consumes it via `padding-inline-start`. So the inset
+  applies in the packaged app and not in a plain browser.
+- **Overlay title bar** — `tauri.conf.json` `titleBarStyle: "Overlay"` +
+  `hiddenTitle: true`; the release build parsed the schema and produced a working
+  app (startup probe passed).
+- **Studio centred column** — `.messages` is `flex-direction: column; align-items:
+  center` and `.messages > *` gets `width: 100%; max-inline-size:
+  var(--conversation-max)` (48rem). Its DOM children are the `MessageRow`
+  `<article>`, the `.streaming` block and the `.thinking` line — all bounded and
+  centred. `.wsBanner` and `.composer` (direct children of `.conversation`, a
+  flex column) each carry `width: 100%; max-inline-size: var(--conversation-max);
+  margin-inline: auto`. Rails/workspace sit at `--color-paper-2` with
+  `--color-rule-strong` separators against the `--color-paper` conversation.
+- **Page centring** — Home / Settings panel / Search / File Modifier carry
+  `margin-inline: auto` within a bounded measure; verified live at 1440 / 1280 /
+  390 in light and dark.
+- **Gates** — `check-design-rules` (no `position: fixed`, px only in allowed
+  contexts), `check-contrast` (34 pairs), `check-hardcoded`, `check-i18n`
+  (341 × 3), eslint and typecheck all pass on the changed files.
+- **Hit targets** — `--control-h` 2rem with the `.iconBtn::before` negative-inset
+  expansion still yields the 2.75rem `--hit-min` floor.
+
 ### Not exercised in this run
 
-- [ ] `docs/09 §8` 11-step manual GUI smoke test (interactive).
-- [ ] Studio centred-column and overlay-title-bar visual pass inside the packaged app.
-- [ ] Live Illustrator against a non-mock remote model (prompt policy is unit tested in three languages).
+- [ ] `docs/09 §8` fixture import / restart-restore / native file-dialog
+      round-trip (covered at the unit + integration level by the 38 integration
+      tests; not clicked through in a live WebView).
+- [ ] Live Illustrator against a non-mock remote model (prompt policy is unit
+      tested in three languages).
 
 No reproducible crash, data-loss defect, high-severity security defect or open
 automated regression remains.

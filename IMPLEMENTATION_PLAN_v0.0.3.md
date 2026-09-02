@@ -190,17 +190,28 @@
   cargo test` / `cargo deny check licenses bans sources`。
 - `npm run bindings`（ts-rs drift 0）、`git diff --check`。
 
-### 手動（実寸・実機）
-- 第2章 E のビューポート表 × 表示倍率 100% / 150% を実ブラウザ（`npm run dev`）で確認、
-  スクリーンショット保存。
-- ライト／ダーク／モノクロ各テーマで主要画面の可読性・境界視認を確認。
-- **接続テスト（要ユーザー環境）**: `192.168.0.165:1234/v1` + キーで `接続テスト`。
-  macOS のローカルネットワーク許可ダイアログを受諾 → `models` 取得と 1 トークン応答、
-  役割割り当て、Studio 応答までを実確認。失敗時は `note` に実エラーが出ることを確認。
+### UI は静的デバッグで確認（対話 GUI テストの置き換え）
+- 実ブラウザ（`npm run dev`）で 1440 / 1280 / 390 × light/dark を確認（中央寄せ・右端欠けなし・可読性）。
+- それ以外の寸法とパッケージ版 GUI は**ソース点検＋静的ツール**で確認する:
+  - `AppShell` の drag/no-drag セレクタが `.topBar` の全操作要素（menu `IconButton`=`<button>`、
+    `<kbd>`、settings `<NavLink>`=`<a>`）を覆う。
+  - `data-tauri` → `--titlebar-inset-start` の連鎖（シェル内のみ 4.75rem、ブラウザは既定）。
+  - `titleBarStyle: "Overlay"` がスキーマを通り、release build が起動する。
+  - Studio: `.messages > *` と `.wsBanner` / `.composer` が `--conversation-max` で中央寄せ、
+    DOM の直子（`MessageRow` の `<article>` / `.streaming` / `.thinking`）が境界内に収まる。
+  - `check-design-rules` / `check-contrast`(34 pair) / `check-hardcoded` / `check-i18n`(341×3)
+    / eslint / typecheck が緑。
+  - `--control-h` 2rem + `.iconBtn::before` の負 inset で `--hit-min` 2.75rem を維持。
+- **接続テスト（ユーザー実施済み）**: パッケージ版で `192.168.0.165:1234/v1` + キーの
+  `接続テスト` が macOS ローカルネットワーク許可後に成功することをオーナーが確認。
 
 ---
 
 ## 6. リリース（全ゲート緑 ＋ 実機接続確認後、最後の工程）
+
+> **注**: 2026-09-02 の方針変更（§8）により、実際のリリース手順は **§8-2〜8-6** が正。
+> 以下 6-1〜6-10 は方針変更前の下書きで、「remote へ push しない」「ソースは置かない」は
+> §8（ソース公開 D-21）で上書きされている。
 
 WAKARU.md「バージョンアップ時の更新表」と `RELEASE_DRAFT` の手順に従う。
 
@@ -223,8 +234,9 @@ WAKARU.md「バージョンアップ時の更新表」と `RELEASE_DRAFT` の手
 10. 公開後、DMG を再取得して名前・バイト数・SHA-256・非draft/非prerelease・Latest を確認。
 
 ### ユーザー操作が残る項目
-- macOS ローカルネットワーク許可の受諾と実機接続確認（ゲート #1）。
-- `docs/09 §8` の GUI スモークテスト最終一巡。
+- ~~macOS ローカルネットワーク許可の受諾と実機接続確認~~ → **オーナー実施済み・成功**。
+- ~~`docs/09 §8` の GUI スモークテスト最終一巡~~ → **静的デバッグに置き換え**（§5 参照、
+  結合テスト 38 件 + ソース点検 + 静的ゲートで代替。ネイティブ WebView での実クリックは行わない）。
 - Google Search Console のサイトマップ再送信（オーナー）。
 - Developer ID 署名・Apple 公証（証明書未提供のため ad-hoc のまま）。
 
