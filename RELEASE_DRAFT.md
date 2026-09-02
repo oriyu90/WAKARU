@@ -70,7 +70,7 @@ Run the app once end-to-end and confirm it's good. (Plan Part 4 step 6 /
 
 ---
 
-## 6. Create or replace the GitHub pre-release
+## 6. Create or replace the GitHub release
 
 ```bash
 cd ~/places/適当/work/WAKARU
@@ -78,13 +78,13 @@ gh release upload v0.0.1 --repo oriyu90/WAKARU --clobber \
   src-tauri/target/release/bundle/dmg/WAKARU_0.0.1_aarch64.dmg \
   src-tauri/target/release/bundle/dmg/WAKARU_0.0.1_aarch64.dmg.sha256
 gh release edit v0.0.1 --repo oriyu90/WAKARU \
-  --title "WAKARU v0.0.1" --notes-file RELEASE_NOTES.md --prerelease
+  --title "WAKARU v0.0.1" --notes-file RELEASE_NOTES.md --prerelease=false --latest
 ```
 
-For a new tag, use `gh release create` with the same assets and `--prerelease`.
+For a new tag, use `gh release create` with the same assets and `--latest`.
 
-**Release body** = `RELEASE_NOTES.md` (this repo). Pre-release, matching v0.1.0's
-1.0.0 pre-release status per `WAKARU.md`.
+**Release body** = `RELEASE_NOTES.md` (this repo). v0.0.0 and v0.0.1 are
+正式Release; v0.0.1 is explicitly marked Latest.
 
 ---
 
