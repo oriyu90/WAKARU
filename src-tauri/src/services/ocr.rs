@@ -399,15 +399,24 @@ pub fn finalize_pdf(
         });
     }
 
-    match crate::services::pdf_text::render_sandwich(&pages) {
+    let built = match crate::services::pdf_text::render_sandwich(&pages) {
         Ok(bytes) => {
             let out =
                 crate::services::ingest::derived_dir(project_dir, source_id).join("searchable.pdf");
             std::fs::write(&out, bytes)?;
-            Ok(Some(format!("derived/{source_id}/searchable.pdf")))
+            Some(format!("derived/{source_id}/searchable.pdf"))
         }
-        Err(_) => Ok(None), // no CJK font etc. — the Viewer overlay still works
+        Err(_) => None, // no CJK font etc. — the Viewer overlay still works
+    };
+
+    // The page rasters were only needed for the sandwich; keep the small `.json`
+    // box files for the Viewer text overlay.
+    for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+        if entry.path().extension().is_some_and(|e| e == "png") {
+            let _ = std::fs::remove_file(entry.path());
+        }
     }
+    Ok(built)
 }
 
 #[cfg(test)]

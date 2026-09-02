@@ -157,6 +157,16 @@ export function PdfFilePreview({
       const ctx = off.getContext("2d", { alpha: false });
       for (let p = 1; p <= total; p += 1) {
         const pdfPage = await pdf.getPage(p);
+        // Skip pages that already carry a real text layer.
+        const tc = await pdfPage.getTextContent();
+        const chars = tc.items.reduce(
+          (n, it) => n + ("str" in it ? it.str.length : 0),
+          0,
+        );
+        if (chars > 100) {
+          setOcr({ done: p, total });
+          continue;
+        }
         const vp = pdfPage.getViewport({ scale: 2 });
         off.width = Math.floor(vp.width);
         off.height = Math.floor(vp.height);
