@@ -53,6 +53,9 @@ pub struct Outcome {
     pub title_override: Option<String>,
     /// true if some non-fatal step (AI) was skipped — caller sets ready_partial.
     pub partial: bool,
+    /// `Some("pending")` when the PDF has page(s) with no text layer that the
+    /// Viewer should OCR (P12). `None` otherwise (text PDF, image, non-PDF).
+    pub ocr_status: Option<String>,
 }
 
 struct Parsed {
@@ -63,6 +66,8 @@ struct Parsed {
     title_override: Option<String>,
     /// AI step skipped (image with no Vision yet) — ready_partial.
     partial: bool,
+    /// 1-based PDF page numbers with no text layer (OCR candidates).
+    scanned_pdf_pages: Vec<u32>,
 }
 
 pub fn derived_dir(project_dir: &Path, source_id: &str) -> PathBuf {
@@ -93,6 +98,7 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput) -> AppResult<
         first_image_rel,
         title_override,
         partial,
+        scanned_pdf_pages,
     } = parsed;
 
     if units.is_empty() {
@@ -200,6 +206,7 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput) -> AppResult<
         page_count: page_count.or(Some(units.len() as u32)),
         title_override,
         partial,
+        ocr_status: (!scanned_pdf_pages.is_empty()).then(|| "pending".to_string()),
     })
 }
 
@@ -229,11 +236,12 @@ fn parse(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput, dd: &Path) -> A
         SourceKind::Json => Parsed::plain(text::parse_json(&file(input)?)?),
         SourceKind::Jsonl => Parsed::plain(text::parse_jsonl(&file(input)?)?),
         SourceKind::Pdf => {
-            let units = pdf::parse_pdf(&file(input)?)?;
-            let pc = units.len() as u32;
+            let parsed = pdf::parse_pdf(&file(input)?)?;
+            let pc = parsed.units.len() as u32;
             Parsed {
                 page_count: Some(pc),
-                ..Parsed::plain(units)
+                scanned_pdf_pages: parsed.scanned_pages,
+                ..Parsed::plain(parsed.units)
             }
         }
         SourceKind::Sheet => {
@@ -270,6 +278,7 @@ fn parse(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput, dd: &Path) -> A
                 first_image_rel: Some(r.derived_rel),
                 title_override: None,
                 partial: true, // Vision layout analysis still runs post-ingest
+                scanned_pdf_pages: Vec::new(),
             }
         }
         SourceKind::Weblink => {
@@ -284,6 +293,7 @@ fn parse(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput, dd: &Path) -> A
                 first_image_rel: None,
                 title_override: r.title,
                 partial: false,
+                scanned_pdf_pages: Vec::new(),
             }
         }
         SourceKind::Audio | SourceKind::Video => {
@@ -305,6 +315,7 @@ impl Parsed {
             first_image_rel: None,
             title_override: None,
             partial: false,
+            scanned_pdf_pages: Vec::new(),
         }
     }
 }

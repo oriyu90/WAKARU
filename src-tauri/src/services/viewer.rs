@@ -251,5 +251,6 @@ pub fn source_detail(
         mime: s.mime,
         bytes: s.bytes,
         primary_asset_url: primary,
+        ocr_status: s.ocr_status,
     })
 }

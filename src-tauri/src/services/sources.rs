@@ -99,6 +99,7 @@ pub fn row_to_source(r: &rusqlite::Row) -> rusqlite::Result<Source> {
         summary: r.get("summary")?,
         added_at: r.get("added_at")?,
         analyzed_at: r.get("analyzed_at")?,
+        ocr_status: r.get("ocr_status")?,
     })
 }
 
@@ -447,6 +448,7 @@ fn spawn_ingest(
                 "UPDATE sources
                    SET status=?2, lang=?3, page_count=?4, analyzed_at=?5,
                        original_name=COALESCE(?6, original_name),
+                       ocr_status=?7,
                        error_code=NULL, error_message=NULL
                  WHERE id=?1",
                 params![
@@ -456,6 +458,7 @@ fn spawn_ingest(
                     outcome.page_count.map(|v| v as i64),
                     now_iso8601(),
                     outcome.title_override,
+                    outcome.ocr_status,
                 ],
             )?;
             let final_status = if partial { "ready_partial" } else { "ready" };

@@ -52,6 +52,10 @@ pub struct Source {
     pub summary: Option<String>,
     pub added_at: String,
     pub analyzed_at: Option<String>,
+    /// P12: `"pending"` when the PDF has page(s) with no text layer awaiting OCR
+    /// in the Viewer; `"running"` / `"done"` / `"partial"` / `"failed"` after;
+    /// `null` when not applicable (text PDF, image, pre-P12 database).
+    pub ocr_status: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, ts_rs::TS)]

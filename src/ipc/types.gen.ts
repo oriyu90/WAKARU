@@ -260,7 +260,13 @@ export type SearchScope = "global" | "project";
 
 export type Settings = { general: General, language: Language, illustrator: IllustratorSettings, ingest: IngestSettings, sandbox: SandboxSettings, transcription: Transcription, aiBudget: AiBudget, };
 
-export type Source = { id: string, kind: SourceKind, originalName: string, url: string | null, mime: string | null, bytes: number, sha256: string | null, status: SourceStatus, errorCode: string | null, errorMessage: string | null, lang: string | null, pageCount: number | null, durationMs: number | null, summary: string | null, addedAt: string, analyzedAt: string | null, };
+export type Source = { id: string, kind: SourceKind, originalName: string, url: string | null, mime: string | null, bytes: number, sha256: string | null, status: SourceStatus, errorCode: string | null, errorMessage: string | null, lang: string | null, pageCount: number | null, durationMs: number | null, summary: string | null, addedAt: string, analyzedAt: string | null,
+/**
+ * P12: `"pending"` when the PDF has page(s) with no text layer awaiting OCR
+ * in the Viewer; `"running"` / `"done"` / `"partial"` / `"failed"` after;
+ * `null` when not applicable (text PDF, image, pre-P12 database).
+ */
+ocrStatus: string | null, };
 
 /**
  * Lightweight source detail for a preview header (name, kind, page count,
@@ -272,7 +278,11 @@ export type SourceDetail = { id: string, kind: SourceKind, name: string, url: st
  * the normalised image, saved web reader markdown, or original imported
  * file. The URL is project-scoped and never exposes an absolute path.
  */
-primaryAssetUrl: string | null, };
+primaryAssetUrl: string | null,
+/**
+ * P12 OCR state for a scanned PDF (see `Source::ocr_status`).
+ */
+ocrStatus: string | null, };
 
 export type SourceKind = "pdf" | "slides" | "doc" | "image" | "audio" | "video" | "sheet" | "text" | "markdown" | "json" | "jsonl" | "code" | "weblink";
 

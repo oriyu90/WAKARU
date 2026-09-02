@@ -5,7 +5,13 @@ use super::Unit;
 use crate::error::{AppError, AppResult};
 use std::path::Path;
 
-pub fn parse_pdf(path: &Path) -> AppResult<Vec<Unit>> {
+pub struct PdfParse {
+    pub units: Vec<Unit>,
+    /// 1-based page numbers with no extractable text layer — candidates for OCR.
+    pub scanned_pages: Vec<u32>,
+}
+
+pub fn parse_pdf(path: &Path) -> AppResult<PdfParse> {
     let bytes = std::fs::read(path)?;
     let pages = pdf_extract::extract_text_from_mem_by_pages(&bytes).map_err(|e| {
         AppError::new(
@@ -17,26 +23,29 @@ pub fn parse_pdf(path: &Path) -> AppResult<Vec<Unit>> {
 
     let total = pages.len();
     let mut units = Vec::new();
+    let mut scanned_pages = Vec::new();
     for (i, raw) in pages.into_iter().enumerate() {
+        let page = (i + 1) as u32;
         let text = normalize(&raw);
         if text.trim().is_empty() {
             // Scanned page with no text layer. Keep a placeholder so the page
-            // remains a stable citation unit even though it is not searchable.
+            // remains a stable citation unit; the Viewer will OCR it (P12).
+            scanned_pages.push(page);
             units.push(Unit {
-                ordinal: (i + 1) as u32,
+                ordinal: page,
                 kind: "page",
-                title: Some(format!("p.{}", i + 1)),
-                text: format!("[ページ {} / {}] （テキスト層なし）", i + 1, total),
-                locator: serde_json::json!({ "t": "page", "page": i + 1 }),
+                title: Some(format!("p.{page}")),
+                text: format!("[ページ {page} / {total}] （テキスト層なし）"),
+                locator: serde_json::json!({ "t": "page", "page": page }),
             });
             continue;
         }
         units.push(Unit {
-            ordinal: (i + 1) as u32,
+            ordinal: page,
             kind: "page",
-            title: Some(format!("p.{}", i + 1)),
-            text: format!("[ページ {} / {}]\n{}", i + 1, total, text),
-            locator: serde_json::json!({ "t": "page", "page": i + 1 }),
+            title: Some(format!("p.{page}")),
+            text: format!("[ページ {page} / {total}]\n{text}"),
+            locator: serde_json::json!({ "t": "page", "page": page }),
         });
     }
 
@@ -47,7 +56,10 @@ pub fn parse_pdf(path: &Path) -> AppResult<Vec<Unit>> {
             "PDF has no pages",
         ));
     }
-    Ok(units)
+    Ok(PdfParse {
+        units,
+        scanned_pages,
+    })
 }
 
 /// pdf-extract inserts hard line breaks mid-sentence; collapse single newlines

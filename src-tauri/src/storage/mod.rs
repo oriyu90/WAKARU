@@ -33,6 +33,10 @@ pub const PROJECT_MIGRATIONS: &[(&str, &str)] = &[
         "002_studio",
         include_str!("../../migrations/project/002_studio.sql"),
     ),
+    (
+        "003_ocr",
+        include_str!("../../migrations/project/003_ocr.sql"),
+    ),
 ];
 
 /// Open a `project.db`, run its migrations. Called when a project is opened.
@@ -204,6 +208,9 @@ fn adopt_legacy_project_schema(conn: &Connection) -> AppResult<()> {
     if column_exists(conn, "studio_tabs", "scope")? && !migration_applied(conn, "002_studio")? {
         mark_migration_applied(conn, "002_studio")?;
     }
+    if column_exists(conn, "sources", "ocr_status")? && !migration_applied(conn, "003_ocr")? {
+        mark_migration_applied(conn, "003_ocr")?;
+    }
     Ok(())
 }
 
@@ -306,6 +313,47 @@ mod legacy_tests {
         assert_eq!(preserved, ("indexed text".into(), "indexed text".into()));
         assert!(migration_applied(&conn, "001_init").unwrap());
         assert!(migration_applied(&conn, "002_ai_protocol").unwrap());
+    }
+
+    #[test]
+    fn project_003_ocr_adds_the_column_and_a_legacy_db_adopts_it_without_re_altering() {
+        // Fresh project.db: every migration runs, the column and its ledger row exist.
+        let fresh = open_in_memory().unwrap();
+        adopt_legacy_project_schema(&fresh).unwrap();
+        migrate::run(&fresh, PROJECT_MIGRATIONS, PROJECT_SCHEMA_VERSION).unwrap();
+        assert!(column_exists(&fresh, "sources", "ocr_status").unwrap());
+        assert!(migration_applied(&fresh, "003_ocr").unwrap());
+        // The column is nullable and does not disturb existing inserts.
+        fresh
+            .execute(
+                "INSERT INTO sources (id, kind, original_name, rel_path, status, added_at)
+                 VALUES ('s1', 'pdf', 'scan.pdf', 'sources/s1.pdf', 'ready', '2026-01-01')",
+                [],
+            )
+            .unwrap();
+        fresh
+            .execute("UPDATE sources SET ocr_status='pending' WHERE id='s1'", [])
+            .unwrap();
+        let got: Option<String> = fresh
+            .query_row("SELECT ocr_status FROM sources WHERE id='s1'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(got.as_deref(), Some("pending"));
+
+        // Legacy: the column exists (a newer build touched the DB) but the ledger
+        // row is gone. Adoption marks 003_ocr applied so migrate::run does not
+        // re-run `ALTER TABLE ... ADD COLUMN ocr_status` and fail on a duplicate.
+        let legacy = open_in_memory().unwrap();
+        adopt_legacy_project_schema(&legacy).unwrap();
+        migrate::run(&legacy, PROJECT_MIGRATIONS, PROJECT_SCHEMA_VERSION).unwrap();
+        legacy
+            .execute("DELETE FROM schema_migrations WHERE name='003_ocr'", [])
+            .unwrap();
+        adopt_legacy_project_schema(&legacy).unwrap();
+        assert!(migration_applied(&legacy, "003_ocr").unwrap());
+        migrate::run(&legacy, PROJECT_MIGRATIONS, PROJECT_SCHEMA_VERSION).unwrap();
+        // no-op, no error
     }
 
     #[test]

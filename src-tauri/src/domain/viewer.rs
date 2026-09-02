@@ -61,4 +61,6 @@ pub struct SourceDetail {
     /// the normalised image, saved web reader markdown, or original imported
     /// file. The URL is project-scoped and never exposes an absolute path.
     pub primary_asset_url: Option<String>,
+    /// P12 OCR state for a scanned PDF (see `Source::ocr_status`).
+    pub ocr_status: Option<String>,
 }
