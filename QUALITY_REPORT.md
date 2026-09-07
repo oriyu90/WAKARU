@@ -2,6 +2,56 @@
 
 Cumulative; newest release first.
 
+## v0.0.6 release verification — 2026-09-07
+
+Scope: UI-only legibility and alignment refinement. The navigation, feature set,
+IPC contracts, database schema and project format are unchanged.
+
+### What changed
+
+- Raised standard controls to a 40 px target and body copy to a 16 px baseline.
+- Organized supporting labels on a consistent 12/13/14 px scale.
+- Strengthened control outlines, input boundaries and separators in both themes.
+- Normalized SVG layout, 18 px icon sizing, 1.75 stroke weight and flex behavior.
+- Aligned empty-state content with the main page column.
+
+### Automated gates
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck | pass |
+| Frontend lint (eslint + design-rules + hardcoded-strings) | pass |
+| Frontend unit tests (vitest incl. axe) | 9 passed |
+| Contrast | pass; all checked light/dark pairs meet their targets |
+| i18n parity | 351 keys × 3 languages |
+| Production web build | pass |
+| ts-rs binding export | 79 passed; drift 0 |
+| Rust `cargo fmt --check` / `cargo clippy --all-targets --all-features -- -D warnings` | pass |
+| Rust tests | 163 library + 39 integration passed; 2 network/live-endpoint tests remain `#[ignore]` |
+| `cargo deny check licenses bans sources` | pass |
+
+### Visual verification
+
+- Verified Home, navigation and Settings at narrow width in a real browser.
+- Checked light and dark themes, 40 px control geometry, 18 px icon centering,
+  stronger boundaries, readable supporting text and content-column alignment.
+
+### Bundle
+
+| Item | Value |
+|---|---|
+| App | arm64 `WAKARU.app`, version `0.0.6`; ad-hoc signed; `codesign --verify --deep --strict` passes for the build output and the app inside the mounted DMG |
+| `Info.plist` | `CFBundleShortVersionString` 0.0.6; `LSMinimumSystemVersion` 12.0 |
+| DMG | `WAKARU_0.0.6_aarch64.dmg`, 23,080,551 bytes; `hdiutil verify` VALID |
+| SHA-256 | `ff9ac1b1163113aa265091e41343e973594dcd18da58aaab0ba5c4b245ebf996` (basename in `WAKARU_0.0.6_aarch64.dmg.sha256`) |
+| Startup probe | process stayed healthy for 6 seconds and reached `WAKARU backend ready version="0.0.6"`; startup log free of secret patterns |
+| Platform | macOS 12+, Apple Silicon; Windows/Linux not built or verified |
+
+No database migration is required. Existing v0.0.0–v0.0.5 projects and settings
+open unchanged. The bundle is not Developer ID signed or notarized.
+
+---
+
 ## v0.0.5 release verification — 2026-09-07
 
 Scope: UI-only refresh across the existing application hierarchy. The navigation,

@@ -2,6 +2,13 @@
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
+**2026-09-07 · v0.0.6 UI legibility refinement** — standard controls now use a
+40 px target, body text uses a 16 px baseline, compact labels follow a consistent
+12/13/14 px scale, and important boundaries are reinforced in both themes. SVG
+layout and icon stroke weight are normalized, while empty-state content aligns to
+the main column. This is a presentation-only follow-up: backend, IPC, routing,
+database and project formats are unchanged. See `UI_REFINEMENT_PLAN.md`.
+
 **2026-09-07 · v0.0.5 UI refresh** — the React GUI now uses a neutral,
 conversation-first visual system while preserving the existing navigation,
 Viewer/Studio hierarchy and accessibility contracts. The change covers shell, tokens,

@@ -1,28 +1,28 @@
-# v0.0.5 release record
+# v0.0.6 release record
 
-Finalized 2026-09-07. Implementation plan: `IMPLEMENTATION_PLAN_UI_REMAKE.md`.
+Finalized 2026-09-07. Refinement plan: `UI_REFINEMENT_PLAN.md`.
 Verification: `QUALITY_REPORT.md`. Release body: `RELEASE_NOTES.md`.
 
 ## Verified artifact
 
 - App: `src-tauri/target/release/bundle/macos/WAKARU.app`
-  (arm64, version 0.0.5)
-- DMG: `src-tauri/target/release/bundle/dmg/WAKARU_0.0.5_aarch64.dmg`
-- Checksum file: `WAKARU_0.0.5_aarch64.dmg.sha256` (basename only)
-- Size: `23,079,059` bytes
-- SHA-256: `66d0ea04f3f10673b87b74d2072a06a1b09ed7399c5d9b2c7540ba803b133c19`
+  (arm64, version 0.0.6)
+- DMG: `src-tauri/target/release/bundle/dmg/WAKARU_0.0.6_aarch64.dmg`
+- Checksum file: `WAKARU_0.0.6_aarch64.dmg.sha256` (basename only)
+- Size: `23,080,551` bytes
+- SHA-256: `ff9ac1b1163113aa265091e41343e973594dcd18da58aaab0ba5c4b245ebf996`
 - Platform: macOS 12+, Apple Silicon, ad-hoc signed, not notarized
 
 `codesign --verify --deep --strict` passes for the build output and for the app
 inside the mounted DMG. `hdiutil verify` is VALID. The startup probe reached
-`WAKARU backend ready version="0.0.5"` and the log contains no secret patterns.
+`WAKARU backend ready version="0.0.6"` and the log contains no secret patterns.
 
 ## Release scope
 
-- UI-only refresh covering the application shell and all main workspaces.
+- UI-only legibility and alignment refinement across the existing interface.
 - Existing screen hierarchy and capabilities remain in place.
 - No IPC, project format or database migration change.
-- Existing v0.0.0–v0.0.4 projects and settings remain compatible.
+- Existing v0.0.0–v0.0.5 projects and settings remain compatible.
 
 ## Build
 
@@ -36,8 +36,8 @@ publication.
 
 ## Publication sequence
 
-1. Commit the UI refresh, version metadata and release documentation on `main`.
-2. Tag the release as `v0.0.5` and push the branch and tag.
+1. Commit the UI refinement, version metadata and release documentation on `main`.
+2. Tag the release as `v0.0.6` and push the branch and tag.
 3. Publish the GitHub release with the DMG and basename-only checksum file.
 4. Re-download the published assets and verify Latest status, byte size and hash.
 5. Publish the four localized introduction pages and project/news metadata.
@@ -47,4 +47,4 @@ publication.
 
 - No Developer ID signature or Apple notarization credentials were supplied.
 - Windows and Linux are not built or verified.
-- Functional capabilities and their prior limits are unchanged from v0.0.4.
+- Functional capabilities and their prior limits are unchanged from v0.0.5.

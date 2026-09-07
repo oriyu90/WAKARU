@@ -1,31 +1,30 @@
-# WAKARU v0.0.5
+# WAKARU v0.0.6
 
-WAKARU v0.0.5 refreshes the complete application interface while preserving the
-existing navigation, document workflow, projects, settings and data formats.
+WAKARU v0.0.6 improves the legibility and alignment of the refreshed interface
+without changing the application hierarchy, workflows or data formats.
 
 This build is for macOS Apple Silicon. It is ad-hoc signed and **not notarized**;
 on first launch, right-click WAKARU and choose **Open**.
 
 ## Highlights
 
-- **Calmer application shell** — the toolbar and overlay sidebar now use the same
-  neutral surface hierarchy as the rest of the app, with clearer selected rows and
-  more consistent spacing.
-- **Unified controls** — buttons, text fields, selectors, switches and tabs share a
-  softer rounded geometry, quiet boundaries and stronger primary actions.
-- **Refined project workspaces** — Home, Search, File Modifier, Settings, Viewer and
-  project source rows now follow one coherent density and surface system.
-- **Improved Studio conversation** — user messages are easier to distinguish, while
-  the message field and send action form one compact, focused composer.
-- **Light and dark themes rebuilt together** — both themes use accessible neutral
-  contrast, and monochrome mode, display scaling and reduced motion remain supported.
+- **Clearer control boundaries** — important controls and input surfaces use stronger
+  outlines and separators in both light and dark themes.
+- **More comfortable sizing** — standard controls are now 40 px high, body text is
+  16 px, and supporting labels follow a consistent 12/13/14 px scale.
+- **Better icon alignment** — icon sizing, stroke weight and SVG layout are unified
+  so symbols sit centrally inside buttons and rows.
+- **Steadier page rhythm** — empty states, headings and supporting copy align more
+  consistently with their content columns.
+- **Accessibility preserved** — keyboard focus, contrast, display scaling,
+  monochrome mode and reduced-motion behavior remain supported.
 
 ## Compatibility and limits
 
-- Existing v0.0.0–v0.0.4 projects and settings open unchanged. There is no database
+- Existing v0.0.0–v0.0.5 projects and settings open unchanged. There is no database
   migration in this release.
 - OCR, document generation, Viewer rendering, search, local/LAN model connections,
-  MCP and all other v0.0.4 capabilities are unchanged.
+  MCP and all other capabilities are unchanged.
 - macOS 12 or later on Apple Silicon. Windows and Linux are not built or verified in
   this release.
 - Ad-hoc signed, not Apple-notarized.
