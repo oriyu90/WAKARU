@@ -2,6 +2,68 @@
 
 Cumulative; newest release first.
 
+## v0.1.0 release verification — 2026-09-08
+
+Scope: reliability fixes for local and LAN AI streams, capability detection, and
+localized Live Illustrator/text-conversion failures. The application hierarchy,
+IPC contracts, database schema, project format, and existing workflows remain
+unchanged.
+
+### What changed
+
+- Registered stream event listeners before invoking the backend and preserved an
+  event that arrives before React's request-state reset completes.
+- Increased the bounded tool-capability probe allowance so compatible local models
+  can emit their first tool-call fragment instead of being misclassified.
+- Made Illustrator regeneration, questions, and text conversion wait for their
+  stream listener, and localized visible stream failures.
+- Added an environment-configurable, credential-safe live acceptance test with
+  Japanese and English Illustrator grounding plus Studio artifact creation.
+
+### Automated gates
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck | pass |
+| Frontend lint (eslint + design-rules + hardcoded-strings) | pass |
+| Frontend unit tests (vitest incl. axe) | 9 passed |
+| Contrast | pass; all checked light/dark pairs meet their targets |
+| i18n parity | 351 keys × 3 languages |
+| Production web build | pass; existing large-chunk advisory only |
+| ts-rs binding export | 79 passed; drift 0 |
+| Rust `cargo fmt --check` / `cargo clippy --all-targets --all-features -- -D warnings` | pass |
+| Rust library tests | 163 passed; 1 network/npx test intentionally ignored |
+| Rust phase integration tests | 39 passed |
+| Live OpenAI-compatible acceptance test | pass with the owner-authorized local model: discovery, streaming, vision, tools, JSON Schema, Japanese/English Illustrator, injection safety, Studio write, artifact registration, and secret non-disclosure |
+| `cargo deny check licenses bans sources` | pass |
+
+### Design and failure review
+
+- Confirmed the existing content-first visual system remains intact in Japanese
+  and English, including control boundaries, icon alignment, readable labels,
+  keyboard focus, light/dark contrast, and localized connection failures.
+- Verified a missing local endpoint reports a localized, user-actionable error
+  instead of a raw IPC message.
+- The supplied endpoint's embedding route returned a handled request error;
+  WAKARU safely retains text-index search rather than treating that optional
+  capability as a crash or false success.
+
+### Bundle
+
+| Item | Value |
+|---|---|
+| App | arm64 `WAKARU.app`, version `0.1.0`; ad-hoc signed; `codesign --verify --deep --strict` passes for the build output and the app inside the mounted DMG |
+| `Info.plist` | `CFBundleShortVersionString` 0.1.0; `LSMinimumSystemVersion` 12.0 |
+| DMG | `WAKARU_0.1.0_aarch64.dmg`, 23,078,673 bytes; `hdiutil verify` VALID |
+| SHA-256 | `ff0fe62ea067f0856d13289ca90b13b3a049123974e6dca52d7b8cad1819b1cb` (basename in `WAKARU_0.1.0_aarch64.dmg.sha256`) |
+| Startup probe | mounted-DMG app stayed healthy for 8 seconds and reached `WAKARU backend ready version="0.1.0"`; startup log free of secret patterns |
+| Platform | macOS 12+, Apple Silicon; Windows/Linux not built or verified |
+
+No database migration is required. Existing v0.0.0–v0.0.6 projects and settings
+open unchanged. The bundle is not Developer ID signed or notarized.
+
+---
+
 ## v0.0.6 release verification — 2026-09-07
 
 Scope: UI-only legibility and alignment refinement. The navigation, feature set,

@@ -1,30 +1,33 @@
-# WAKARU v0.0.6
+# WAKARU v0.1.0
 
-WAKARU v0.0.6 improves the legibility and alignment of the refreshed interface
-without changing the application hierarchy, workflows or data formats.
+WAKARU v0.1.0 makes local and LAN AI workflows more reliable without changing
+the application hierarchy, project format, or established workflows.
 
 This build is for macOS Apple Silicon. It is ad-hoc signed and **not notarized**;
 on first launch, right-click WAKARU and choose **Open**.
 
 ## Highlights
 
-- **Clearer control boundaries** — important controls and input surfaces use stronger
-  outlines and separators in both light and dark themes.
-- **More comfortable sizing** — standard controls are now 40 px high, body text is
-  16 px, and supporting labels follow a consistent 12/13/14 px scale.
-- **Better icon alignment** — icon sizing, stroke weight and SVG layout are unified
-  so symbols sit centrally inside buttons and rows.
-- **Steadier page rhythm** — empty states, headings and supporting copy align more
-  consistently with their content columns.
-- **Accessibility preserved** — keyboard focus, contrast, display scaling,
-  monochrome mode and reduced-motion behavior remain supported.
+- **Reliable local streaming** — event listeners are ready before a request starts,
+  preventing an early streamed response or error from being lost on fast local
+  models.
+- **Accurate tool detection** — the connection check gives compatible local models
+  enough bounded output space to emit a tool call, avoiding false “tools not
+  supported” results.
+- **Clearer AI failures** — Live Illustrator and text conversion now present
+  localized, actionable failures instead of raw technical messages.
+- **Japanese and English coverage** — Live Illustrator grounding and UI error
+  states were exercised in both languages.
+- **Safe compatibility** — project data, profile storage, sandbox boundaries,
+  cancellation, and existing screen structure remain unchanged.
 
 ## Compatibility and limits
 
-- Existing v0.0.0–v0.0.5 projects and settings open unchanged. There is no database
+- Existing v0.0.0–v0.0.6 projects and settings open unchanged. There is no database
   migration in this release.
 - OCR, document generation, Viewer rendering, search, local/LAN model connections,
-  MCP and all other capabilities are unchanged.
+  MCP, and all other existing capabilities remain available. When an endpoint does
+  not implement embeddings, search safely continues with its built-in text index.
 - macOS 12 or later on Apple Silicon. Windows and Linux are not built or verified in
   this release.
 - Ad-hoc signed, not Apple-notarized.

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "../../components/Button";
@@ -23,6 +23,14 @@ export function TextToDoc() {
   const [name, setName] = useState("notes");
 
   const stream = useStream(streamId);
+
+  useEffect(() => {
+    if (!stream.error) return;
+    toast.push({
+      tone: "error",
+      message: t([`errors.${stream.errorCode ?? "internal"}`, "errors.internal"]),
+    });
+  }, [stream.error, stream.errorCode, t, toast]);
 
   const run = useMutation({
     mutationFn: () => fmApi.textToMarkdown(input),
@@ -98,7 +106,7 @@ export function TextToDoc() {
                   size="sm"
                   variant="quiet"
                   loading={run.isPending || stream.streaming}
-                  disabled={!input.trim() || !inTauri}
+                  disabled={!input.trim() || !inTauri || !stream.ready}
                   onClick={() => {
                     setShowDiff(false);
                     run.mutate();

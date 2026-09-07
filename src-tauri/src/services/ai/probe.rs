@@ -147,7 +147,12 @@ async fn probe_tools(client: &AiClient, model: &str) -> bool {
             model,
             json!([{ "role": "user", "content": "Call the noop tool now." }]),
             &json!({
-                "max_tokens": 16,
+                // Some OpenAI-compatible local models emit a short reasoning
+                // prelude before their first tool-call fragment. Sixteen tokens
+                // can therefore end the probe with `finish_reason: length`
+                // even though the model does support tools. Keep this bounded,
+                // but leave sufficient room for that prelude and the call.
+                "max_tokens": 128,
                 "tool_choice": "required",
                 "tools": [{
                     "type": "function",
