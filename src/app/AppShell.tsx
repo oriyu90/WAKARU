@@ -101,7 +101,7 @@ export function AppShell() {
           }
           aria-label={t("nav.settings")}
         >
-          <SettingsIcon size={16} />
+          <SettingsIcon />
         </NavLink>
       </header>
 
@@ -124,11 +124,11 @@ export function AppShell() {
         >
           <div className={styles.navTop}>
             <NavLink to="/" end className={navItem}>
-              <HomeIcon size={16} />
+              <HomeIcon />
               {t("nav.home")}
             </NavLink>
             <NavLink to="/file-modifier" className={navItem}>
-              <FileSwapIcon size={16} />
+              <FileSwapIcon />
               {t("nav.fileModifier")}
             </NavLink>
           </div>
@@ -136,7 +136,7 @@ export function AppShell() {
           <div className={styles.navProjects}>
             {(projects.data ?? []).map((p) => (
               <NavLink key={p.id} to={`/p/${p.id}`} className={navItem}>
-                <FileIcon size={16} />
+                <FileIcon />
                 <span className={styles.projName}>{p.name}</span>
                 <span className={`${styles.projCount} u-mono-nums`}>
                   {p.sourceCount}
@@ -150,7 +150,7 @@ export function AppShell() {
 
           <div className={styles.navBottom}>
             <NavLink to="/search" className={navItem}>
-              <SearchIcon size={16} />
+              <SearchIcon />
               {t("nav.search")}
             </NavLink>
           </div>

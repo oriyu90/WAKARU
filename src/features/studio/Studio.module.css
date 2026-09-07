@@ -252,7 +252,7 @@
   gap: var(--space-xs);
   align-items: flex-end;
   padding: var(--space-xs);
-  border: var(--rule-1) solid var(--color-rule);
+  border: var(--rule-control) solid var(--color-rule-strong);
   border-radius: var(--radius-lg);
   background: var(--color-paper-3);
   box-shadow: var(--shadow-whisper);

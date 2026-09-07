@@ -56,7 +56,7 @@
   border-bottom: var(--rule-1) solid var(--color-rule);
 }
 .switchLabel {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-md);
   font-weight: var(--weight-medium);
 }
 .note {

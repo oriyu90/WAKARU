@@ -31,11 +31,12 @@ not invent independent palettes or geometry.
 ## Geometry and density
 
 - Spacing uses the shared 4pt-derived `--space-*` scale.
-- Standard controls and tabs are `2.25rem`; the title toolbar is `3.25rem`.
+- Standard controls and tabs are `2.5rem`; the title toolbar is `3.5rem`.
 - Radii are 8 / 12 / 16px for small controls, normal controls and panels. Pills are
   reserved for chips, switches and circular actions.
-- Borders are quiet and usually `--color-rule`. `--color-rule-strong` is reserved for
-  boundaries that require 3:1 contrast.
+- Structural separators remain 1px and use a clearer `--color-rule`. Interactive
+  boundaries use the 2px `--rule-control` with `--color-rule-strong`, preserving a
+  visible 3:1-or-better control edge without making every region heavy.
 - Elevation is limited to `--shadow-whisper` for floating controls and
   `--shadow-overlay` for dialogs and drawers. Shadows are never stacked.
 - Every dimension except hairlines, radii and shadow offsets is expressed in `rem`.
@@ -89,7 +90,8 @@ not invent independent palettes or geometry.
 - Reading: Spectral with the existing CJK serif fallbacks. Users may switch to sans.
 - Machine strings only: JetBrains Mono Variable.
 - Headings are compact, roman and high contrast. Body copy is `--fs-md`; supporting labels
-  may use `--fs-sm` or `--fs-xs`.
+  may use `--fs-sm` or `--fs-xs`. At the default scale the four smallest steps are
+  12 / 13 / 14 / 16px so Japanese controls do not fall below a comfortable reading size.
 
 ## Motion and accessibility
 

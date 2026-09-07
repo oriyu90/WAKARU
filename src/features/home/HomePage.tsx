@@ -30,7 +30,7 @@ export function HomePage() {
         <h1 className={styles.title}>{t("home.title")}</h1>
         <Button
           variant="primary"
-          icon={<PlusIcon size={16} />}
+          icon={<PlusIcon />}
           onClick={() => setDialog(true)}
         >
           {t("home.newProject")}

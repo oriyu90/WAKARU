@@ -44,7 +44,7 @@
   align-items: flex-start;
   gap: var(--space-sm);
   max-width: 34rem;
-  padding: var(--space-xl) var(--space-lg);
+  padding: var(--space-xl) 0;
 }
 .empty {
   color: var(--color-muted);

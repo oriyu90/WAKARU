@@ -55,7 +55,7 @@
   justify-content: center;
   gap: var(--space-xs);
   min-height: 7.5rem;
-  border: var(--rule-1) dashed var(--color-rule);
+  border: var(--rule-control) dashed var(--color-rule-strong);
   border-radius: var(--radius-lg);
   background: var(--color-paper-2);
   color: var(--color-muted);

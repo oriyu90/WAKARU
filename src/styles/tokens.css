@@ -24,10 +24,10 @@
   --pad-control: var(--space-xs) var(--space-sm);
   --gap-tight: var(--space-2xs);
   --gap-default: var(--space-xs);
-  --control-h: 2.25rem;
-  --row-height: 2.25rem;
-  --tab-height: 2.25rem;
-  --toolbar-height: 3.25rem; /* roomy app header; still clears traffic lights */
+  --control-h: 2.5rem;
+  --row-height: 2.5rem;
+  --tab-height: 2.5rem;
+  --toolbar-height: 3.5rem; /* readable app header; still clears traffic lights */
   --hit-min: 2.75rem;
   /* Left inset so the toolbar wordmark clears the macOS traffic lights.
    * Only applied inside the Tauri shell (see base.css [data-tauri]). */
@@ -51,6 +51,7 @@
 
   /* ─── Rules, radii, rings · soft conversational geometry ────────────── */
   --rule-1: 1px;
+  --rule-control: 2px;
   --focus-ring: 3px; /* macOS-weight accent ring */
   --focus-offset: 2px;
   --radius-sm: 8px;
@@ -90,16 +91,16 @@
     "Noto Serif JP", "Songti SC", Georgia, serif;
   --font-mono: "JetBrains Mono Variable", "SFMono-Regular", ui-monospace, monospace;
 
-  --fs-2xs: 0.6875rem;
-  --fs-xs: 0.75rem;
-  --fs-sm: 0.8125rem;
-  --fs-md: 0.9375rem;
+  --fs-2xs: 0.75rem;
+  --fs-xs: 0.8125rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 1rem;
   --fs-lg: 1.125rem;
   --fs-xl: 1.375rem;
   --fs-2xl: 1.75rem;
 
   --lh-tight: 1.22;
-  --lh-normal: 1.5;
+  --lh-normal: 1.55;
   --lh-relaxed: 1.72;
   --tracking-tight: -0.02em;
   --tracking-normal: 0;
@@ -116,7 +117,7 @@
   --color-paper: oklch(100% 0 0);
   --color-paper-2: oklch(97% 0 0);
   --color-paper-3: oklch(93.5% 0 0);
-  --color-rule: oklch(88% 0 0);
+  --color-rule: oklch(81% 0 0);
   --color-rule-strong: oklch(54% 0 0);
   --color-neutral: oklch(50% 0 0);
   --color-muted: oklch(42% 0 0);
@@ -154,7 +155,7 @@
   --color-paper: oklch(0% 0 0);
   --color-paper-2: oklch(8% 0 0);
   --color-paper-3: oklch(15% 0 0);
-  --color-rule: oklch(24% 0 0);
+  --color-rule: oklch(38% 0 0);
   --color-rule-strong: oklch(61% 0 0);
   --color-neutral: oklch(68% 0 0);
   --color-muted: oklch(80% 0 0);

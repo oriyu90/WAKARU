@@ -4,7 +4,7 @@
   flex-direction: column;
   gap: var(--space-2xs);
   padding: var(--space-md) var(--space-lg);
-  border: var(--rule-1) solid transparent;
+  border: var(--rule-1) solid var(--color-rule);
   border-radius: var(--radius-lg);
   background: var(--color-paper-2);
   color: var(--color-ink);
