@@ -1,46 +1,33 @@
-# WAKARU v0.0.4
+# WAKARU v0.0.5
 
-WAKARU v0.0.4 adds text recognition for scanned documents and a document builder
-for the Studio agent. Existing projects and settings open unchanged — no database
-migration is required beyond one additive column.
+WAKARU v0.0.5 refreshes the complete application interface while preserving the
+existing navigation, document workflow, projects, settings and data formats.
 
 This build is for macOS Apple Silicon. It is ad-hoc signed and **not notarized**;
 on first launch, right-click WAKARU and choose **Open**.
 
 ## Highlights
 
-- **OCR for scanned PDFs** — when an imported PDF has pages with no text layer,
-  the Viewer shows a **Recognise text** button. It rasterises each scanned page,
-  runs a pure-Rust OCR engine (`ocrs`, models downloaded once on first use), and
-  folds the recognised text into full-text and semantic search. A
-  `searchable.pdf` — the page image with an invisible, position-matched text
-  layer — is written alongside the source. Pages that already have a text layer
-  are left untouched.
-- **OCR for images** — an imported image that contains text is recognised at
-  ingest time. The text becomes searchable and is also written next to the image
-  as `ocr.txt`. A confidence heuristic keeps noise and patterns from producing
-  spurious "text".
-- **`build_document` in Studio** — a new built-in tool that assembles a
-  formatted **Markdown, Word (.docx) or PDF** document from a title and a list of
-  sections (each a heading and a Markdown body). The model supplies structure,
-  not layout, so even a small local model produces a well-formed document, and
-  the request stays compact. PDF output uses a Simplified-Chinese/Japanese-capable
-  system font; where none is available the Markdown version is written instead.
-- **Text-recognition setting** — Settings › General has an **OCR** switch
-  (on by default) that governs both image OCR and the scanned-PDF prompt.
+- **Calmer application shell** — the toolbar and overlay sidebar now use the same
+  neutral surface hierarchy as the rest of the app, with clearer selected rows and
+  more consistent spacing.
+- **Unified controls** — buttons, text fields, selectors, switches and tabs share a
+  softer rounded geometry, quiet boundaries and stronger primary actions.
+- **Refined project workspaces** — Home, Search, File Modifier, Settings, Viewer and
+  project source rows now follow one coherent density and surface system.
+- **Improved Studio conversation** — user messages are easier to distinguish, while
+  the message field and send action form one compact, focused composer.
+- **Light and dark themes rebuilt together** — both themes use accessible neutral
+  contrast, and monochrome mode, display scaling and reduced motion remain supported.
 
 ## Compatibility and limits
 
-- macOS 12 or later on Apple Silicon. Windows and Linux are not built or
-  verified in this release.
+- Existing v0.0.0–v0.0.4 projects and settings open unchanged. There is no database
+  migration in this release.
+- OCR, document generation, Viewer rendering, search, local/LAN model connections,
+  MCP and all other v0.0.4 capabilities are unchanged.
+- macOS 12 or later on Apple Silicon. Windows and Linux are not built or verified in
+  this release.
 - Ad-hoc signed, not Apple-notarized.
-- v0.0.0–v0.0.3 projects open unchanged. `project.db` gains one nullable
-  `sources.ocr_status` column; an older WAKARU can still open a v0.0.4 project
-  and preserves the column.
-- The OCR models (~14 MB total) download from the network on first use; OCR
-  degrades cleanly to "unavailable" when offline.
-- Generated PDFs that contain CJK text embed a subset of a system font and are
-  correspondingly larger than Latin-only PDFs.
-- All feature limits documented for v0.0.2/v0.0.3 still apply.
 
 See `QUALITY_REPORT.md` for the verification record and artifact checksum.

@@ -42,6 +42,8 @@ so on first launch right-click WAKARU → **Open**.
 - **Private by default** — API keys in the OS keychain; original files served only
   through a project-scoped `wakaru-asset://` protocol; no telemetry.
 - Japanese / English / Simplified Chinese UI, light / dark / monochrome, WCAG AA.
+- A neutral, conversation-first interface with the existing WAKARU
+  navigation and document-work hierarchy preserved.
 
 ## Build from source
 

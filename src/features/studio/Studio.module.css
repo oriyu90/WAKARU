@@ -1,5 +1,4 @@
-/* Claude-app shape: quiet sunk rails, a centred conversation column at the
- * lightest paper. Rail/panel widths are window-width fluid (design.md). */
+/* Conversational workspace: quiet rails and a centred reading thread. */
 .studio {
   flex: 1;
   min-width: 0;
@@ -22,9 +21,9 @@
   flex-direction: column;
   gap: var(--space-xs);
   min-height: 0;
-  padding: var(--space-sm);
+  padding: var(--space-xs);
   background: var(--color-paper-2);
-  border-right: var(--rule-1) solid var(--color-rule-strong);
+  border-right: var(--rule-1) solid var(--color-rule);
   overflow-y: auto;
 }
 .railList {
@@ -39,7 +38,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2xs);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
 }
 .railRow[data-active="true"] {
   background: var(--color-paper-3);
@@ -85,13 +84,13 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-md);
+  padding: var(--space-xl) var(--space-md);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--space-lg);
 }
-/* centred reading column — every turn shares one measure (Claude-app shape) */
+/* Centred reading column — every turn shares one measure. */
 .messages > * {
   width: 100%;
   max-inline-size: var(--conversation-max);
@@ -99,17 +98,24 @@
 .message {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2xs);
+  gap: var(--space-xs);
   font-size: var(--fs-sm);
 }
 .role {
   font-size: var(--fs-2xs);
   color: var(--color-neutral);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-weight: var(--weight-medium);
 }
 .message[data-role="user"] .role {
-  color: var(--color-accent);
+  color: var(--color-muted);
+}
+.message[data-role="user"] {
+  width: fit-content;
+  max-width: min(85%, var(--conversation-max));
+  align-self: flex-end;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-lg);
+  background: var(--color-paper-3);
 }
 .toolOut {
   margin: 0;
@@ -220,7 +226,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-sm) var(--space-md) var(--space-lg);
 }
 .mentions {
   display: flex;
@@ -245,10 +251,19 @@
   display: flex;
   gap: var(--space-xs);
   align-items: flex-end;
+  padding: var(--space-xs);
+  border: var(--rule-1) solid var(--color-rule);
+  border-radius: var(--radius-lg);
+  background: var(--color-paper-3);
+  box-shadow: var(--shadow-whisper);
 }
 .composerRow > :first-child {
   flex: 1;
   min-width: 0;
+  min-height: 3rem;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 .composerBar {
   display: flex;
@@ -258,9 +273,9 @@
 }
 .scopeSel {
   height: 1.75rem;
-  border: var(--rule-1) solid var(--color-rule-strong);
-  border-radius: var(--radius-sm);
-  background: var(--color-paper-3);
+  border: var(--rule-1) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
   font: inherit;
   font-size: var(--fs-2xs);
   color: var(--color-ink);
@@ -280,7 +295,7 @@
   min-height: 0;
   padding: var(--space-sm);
   background: var(--color-paper-2);
-  border-left: var(--rule-1) solid var(--color-rule-strong);
+  border-left: var(--rule-1) solid var(--color-rule);
   overflow-y: auto;
 }
 .wsHead {

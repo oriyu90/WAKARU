@@ -2,6 +2,13 @@
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
+**2026-09-07 · v0.0.5 UI refresh** — the React GUI now uses a neutral,
+conversation-first visual system while preserving the existing navigation,
+Viewer/Studio hierarchy and accessibility contracts. The change covers shell, tokens,
+shared controls, tabs, project cards, Settings, Search, File Modifier, Viewer source rows
+and the Studio composer/user-message treatment. `design.md` and `src/styles/tokens.css`
+are the current visual sources of truth. No backend, IPC or data-model behavior changed.
+
 **2026-09-03 · v0.0.4** — OCR for scanned PDFs and images (`ocrs`+`rten`, pure
 Rust, models downloaded on first use; `commands/ocr.rs`, `services/ocr.rs`,
 `migrations/project/003_ocr.sql` → `sources.ocr_status`), a `build_document`
@@ -31,7 +38,7 @@ A **full re-development** of WAKARU. v0.1.0's application source was lost (the
 GitHub repo held only docs at the time, and the working tree was gone from the
 machine). This is a clean re-implementation from `docs/00–09`, `DECISIONS.md`,
 and the 55-command IPC contract extracted from the v0.1.0 minified bundle.
-Tauri v2 + Rust backend + a from-scratch Hallmark React frontend. Since v0.0.3
+Tauri v2 + Rust backend + a token-driven React frontend. Since v0.0.3
 the source is public on `oriyu90/WAKARU`.
 
 - **`oriyu90/WAKARU` on GitHub is now the public source repository** (MIT, full
@@ -66,7 +73,7 @@ found through it are recorded in `LIVE_ORNITH_VALIDATION.md`.
 ## Layout
 
 ```
-src/                     React frontend (Hallmark). features/, components/, ipc/, i18n/, stores/, styles/
+src/                     React frontend. features/, components/, ipc/, i18n/, stores/, styles/
 src-tauri/src/
   commands/              thin #[tauri::command] wrappers only
   domain/                ts-rs types crossing the IPC boundary → src/ipc/types.gen.ts

@@ -8,8 +8,10 @@
   flex: none;
   display: flex;
   align-items: center;
+  justify-content: center;
   padding: var(--space-xs) var(--space-md);
   border-bottom: var(--rule-1) solid var(--color-rule);
+  background: var(--color-paper);
 }
 .paneBody {
   flex: 1;

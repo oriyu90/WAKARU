@@ -10,9 +10,10 @@
   flex: none;
   display: flex;
   align-items: stretch;
-  gap: var(--space-3xs);
+  gap: var(--space-2xs);
   height: var(--tab-height);
-  padding-inline: var(--space-2xs);
+  padding: var(--space-3xs) var(--space-xs);
+  background: var(--color-paper-2);
   border-bottom: var(--rule-1) solid var(--color-rule);
   overflow-x: auto;
   scrollbar-width: thin;
@@ -26,7 +27,7 @@
   max-width: 14rem;
   padding-inline: var(--space-xs);
   border: none;
-  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-sm);
   background: none;
   font: inherit;
   font-size: var(--fs-sm);
@@ -36,7 +37,7 @@
 }
 .tab[data-active="true"] {
   color: var(--color-ink-strong);
-  border-bottom-color: var(--color-accent);
+  background: var(--color-paper-3);
 }
 @media (hover: hover) {
   .tab:hover {

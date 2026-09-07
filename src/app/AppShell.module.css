@@ -1,4 +1,4 @@
-/* Hallmark · genre: modern-minimal · macrostructure: Workbench · design-system: design.md · designed-as-app */
+/* WAKARU · neutral conversational application shell · design-system: design.md */
 
 .shell {
   position: absolute;
@@ -8,7 +8,6 @@
   background: var(--color-paper);
 }
 
-/* ─── Unified toolbar — draggable, clears the macOS traffic lights ─────── */
 .topBar {
   flex: none;
   height: var(--toolbar-height);
@@ -18,27 +17,26 @@
   padding-inline: var(--titlebar-inset-start) var(--space-sm);
   background: var(--topbar);
   color: var(--topbar-ink);
-  border-bottom: var(--rule-1) solid oklch(0% 0 0 / 0.2);
+  border-bottom: var(--rule-1) solid var(--color-rule);
   min-width: 0;
   -webkit-app-region: drag;
   app-region: drag;
 }
-/* Interactive toolbar controls must not be swallowed by the drag region. */
 .topBar :global(button),
 .topBar :global(a),
 .topBar .kbd {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
-.topBar .wordmark {
+.wordmark {
   font-weight: var(--weight-strong);
   letter-spacing: var(--tracking-tight);
   font-size: var(--fs-md);
 }
-.topBar .tagline {
+.tagline {
   min-width: 0;
-  font-size: var(--fs-2xs);
-  color: color-mix(in oklab, var(--topbar-ink) 62%, transparent);
+  font-size: var(--fs-xs);
+  color: var(--color-neutral);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -50,10 +48,11 @@
 .kbd {
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
-  padding: 0.1rem 0.4rem;
+  padding: var(--space-3xs) var(--space-xs);
   border-radius: var(--radius-sm);
-  border: var(--rule-1) solid color-mix(in oklab, var(--topbar-ink) 30%, transparent);
-  color: color-mix(in oklab, var(--topbar-ink) 78%, transparent);
+  border: var(--rule-1) solid var(--color-rule);
+  color: var(--color-neutral);
+  background: var(--color-paper-2);
 }
 .topBar :global(button),
 .topAction {
@@ -68,29 +67,25 @@
   border-radius: var(--radius-md);
 }
 @media (hover: hover) {
-  .topAction:hover {
-    background: color-mix(in oklab, var(--topbar-ink) 12%, transparent);
-  }
+  .topAction:hover { background: var(--color-paper-3); }
 }
 .topActionActive {
-  color: var(--color-accent);
+  background: var(--color-paper-3);
+  color: var(--color-ink-strong);
 }
 
-/* ─── Body: content + overlay sidebar ─────────────────────────────────── */
 .body {
   position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
 }
-
 .content {
   flex: 1;
   min-width: 0;
   overflow: auto;
+  background: var(--color-paper);
 }
-
-/* The sidebar overlays; it never pushes the content (FR-N1). */
 .sidebar {
   position: absolute;
   inset-block: 0;
@@ -99,57 +94,47 @@
   inline-size: min(var(--sidebar-width), 100%);
   display: flex;
   flex-direction: column;
+  padding: var(--space-xs);
   background: var(--overlay-panel);
-  backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(120%);
   border-inline-end: var(--rule-1) solid var(--color-rule);
   transform: translateX(-100%);
   transition: transform var(--dur-long) var(--ease-out);
 }
-.sidebar[data-open="true"] {
-  transform: translateX(0);
-}
+.sidebar[data-open="true"] { transform: translateX(0); }
 @supports not (backdrop-filter: blur(1px)) {
-  .sidebar {
-    background: var(--color-paper-2);
-  }
+  .sidebar { background: var(--color-paper-2); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sidebar {
-    transition-duration: var(--dur-reduced);
-  }
+  .sidebar { transition-duration: var(--dur-reduced); }
 }
-
 .navTop,
 .navBottom {
   flex: none;
-  padding: var(--space-xs);
   display: flex;
   flex-direction: column;
   gap: var(--space-3xs);
 }
-.navTop {
-  border-bottom: var(--rule-1) solid var(--color-rule);
-}
-.navBottom {
-  border-top: var(--rule-1) solid var(--color-rule);
-}
+.navTop { padding-bottom: var(--space-xs); }
+.navBottom { padding-top: var(--space-xs); }
 .navProjects {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-xs);
+  padding-block: var(--space-xs);
+  border-block: var(--rule-1) solid var(--color-rule);
 }
-
 .navItem {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
-  height: var(--row-height);
-  padding-inline: var(--space-xs);
+  gap: var(--space-sm);
+  min-height: var(--row-height);
+  padding-inline: var(--space-sm);
   border-radius: var(--radius-md);
   color: var(--color-ink);
   font-size: var(--fs-sm);
   font-weight: var(--weight-medium);
+  transition: background-color var(--dur-micro) var(--ease-out);
 }
 @media (hover: hover) {
   .navItem:hover {
@@ -162,10 +147,9 @@
   outline-offset: -2px;
 }
 .navItemActive {
-  color: var(--color-accent);
-  background: var(--color-accent-weak);
+  color: var(--color-ink-strong);
+  background: var(--color-paper-3);
 }
-
 .scrim {
   position: absolute;
   inset: 0;
@@ -182,12 +166,6 @@
   opacity: 1;
   pointer-events: auto;
 }
-@media (prefers-reduced-motion: reduce) {
-  .scrim {
-    transition-duration: var(--dur-reduced);
-  }
-}
-
 .projName {
   flex: 1;
   overflow: hidden;
@@ -200,19 +178,13 @@
   color: var(--color-neutral);
 }
 .navEmpty {
-  padding: var(--space-xs);
-  font-size: var(--fs-2xs);
+  padding: var(--space-md) var(--space-sm);
+  font-size: var(--fs-xs);
   color: var(--color-muted);
 }
-
 @media (max-width: 30rem) {
-  .kbd {
-    display: none;
-  }
+  .kbd { display: none; }
 }
-
 @media (max-width: 23rem) {
-  .topBar .tagline {
-    display: none;
-  }
+  .tagline { display: none; }
 }

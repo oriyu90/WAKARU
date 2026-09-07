@@ -275,3 +275,13 @@
 - **採用**: 組み込みツール `build_document({ path, format: md|docx|pdf, title, toc, sections:[{level,heading,body}] })`。`body` は小さな Markdown 部分集合（段落・`-`/`1.` リスト・`| 表 |`・`**太字**`・`*斜体*`・`` `コード` ``、未対応記法はエスケープ素通し）。整形・改ページ・目次は Rust 側で決定論的に行う。承認・サンドボックスは `write_file` と共有。短い「文書スキル」プロンプトを 3 言語で常時付与（外部 Skill 非同梱・名称も出さない＝D-16 遵守）。
 - **影響**: 依存 `docx-rs`（MIT）。`services/doc_builder.rs`、`services/studio.rs`、`prompts/studio.{en,ja,zh-Hans}.md`。
 - **差し戻し条件**: Markdown 部分集合が足りなければ、pulldown-cmark 等の本格パーサへ差し替え（ブロック/インライン parser の境界は既に分離済み）。
+
+## D-26 · GUIを無彩色の会話UIへ刷新する
+
+- **日付**: 2026-09-07（v0.0.5）
+- **論点**: アプリの機能階層は保ったまま、ボタン、余白、面、ナビゲーション、Studioの会話体験を一貫した視覚言語へ変更する。
+- **採用**: React/Tauri、ルーティング、オーバーレイサイドバー、Viewer/Studioペインを維持し、トークンとCSSを中心に変更する。白/黒の本文面、無彩色の補助面、塗りの選択行、2.25remコントロール、8/12/16px角丸、塗りの主要ボタン、Studioのユーザーバブルと一体型コンポーザーを採用する。外部サービスのブランド資産は使用しない。
+- **理由**: 情報構造と操作契約を壊さず、全画面の視覚的なばらつきを共通トークンで解消できる。Studioが持つ中央会話カラムとも整合する。
+- **維持条件**: 日本語/英語/簡体字、light/dark/system、モノクロ、80〜150%表示倍率、WCAG AA、キーボード操作、`prefers-reduced-motion`、macOSタイトルバーのドラッグ領域。
+- **影響**: `design.md`、`src/styles/{tokens,base}.css`、AppShell、共通controls/Tabs、Home、Settings、Search、File Modifier、Project、Viewer、SourceList、StudioのCSS。バックエンド、IPC、DB、ルーティングは無変更。
+- **差し戻し条件**: ブランド独自性を再度強める場合も、情報階層とアクセシビリティ契約は維持し、`design.md` とトークンを同時に更新する。

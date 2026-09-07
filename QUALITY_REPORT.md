@@ -2,6 +2,60 @@
 
 Cumulative; newest release first.
 
+## v0.0.5 release verification — 2026-09-07
+
+Scope: UI-only refresh across the existing application hierarchy. The navigation,
+feature set, IPC contracts, database schema and project format are unchanged.
+
+### What changed
+
+- Reworked the application shell into a quieter, conversation-first layout with
+  clearer content hierarchy, compact navigation and consistent page widths.
+- Unified buttons, fields, cards, tabs, toolbars, empty states and focus states
+  around one neutral token system in light and dark themes.
+- Refined Home, Settings, Search, File Modifier, Project, Viewer, Source List and
+  Studio without moving or removing their existing capabilities.
+- Improved Studio's message flow, composer placement and supporting side panels.
+- Updated the implementation, UI specification, decision and handoff documents.
+
+### Automated gates
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck | pass |
+| Frontend lint (eslint + design-rules + hardcoded-strings) | pass |
+| Frontend unit tests (vitest incl. axe) | 9 passed |
+| Contrast | pass; all checked light/dark pairs meet their targets |
+| i18n parity | 351 keys × 3 languages |
+| Production web build | pass |
+| ts-rs binding export | 79 passed; drift 0 |
+| Rust `cargo fmt --check` / `cargo clippy --all-targets --all-features -- -D warnings` | pass |
+| Rust tests | 163 library + 39 integration passed; 2 network/live-endpoint tests remain `#[ignore]` |
+| `cargo deny check licenses bans sources` | pass |
+
+### Visual verification
+
+- Verified the redesigned Home, navigation shell and Settings surfaces in a real
+  browser in both light and dark themes.
+- Confirmed responsive hierarchy, keyboard focus visibility, control spacing and
+  content-column alignment while preserving the existing screen structure.
+
+### Bundle
+
+| Item | Value |
+|---|---|
+| App | arm64 `WAKARU.app`, version `0.0.5`; ad-hoc signed; `codesign --verify --deep --strict` passes for the build output and the app inside the mounted DMG |
+| `Info.plist` | `CFBundleShortVersionString` 0.0.5; `LSMinimumSystemVersion` 12.0 |
+| DMG | `WAKARU_0.0.5_aarch64.dmg`, 23,079,059 bytes; `hdiutil verify` VALID |
+| SHA-256 | `66d0ea04f3f10673b87b74d2072a06a1b09ed7399c5d9b2c7540ba803b133c19` (basename in `WAKARU_0.0.5_aarch64.dmg.sha256`) |
+| Startup probe | process stayed healthy for 6 seconds and reached `WAKARU backend ready version="0.0.5"`; startup log free of secret patterns |
+| Platform | macOS 12+, Apple Silicon; Windows/Linux not built or verified |
+
+No database migration is required. Existing v0.0.0–v0.0.4 projects and settings
+open unchanged. The bundle is not Developer ID signed or notarized.
+
+---
+
 ## v0.0.4 release verification — 2026-09-03
 
 Scope: OCR for scanned PDFs and images, and a `build_document` Studio tool

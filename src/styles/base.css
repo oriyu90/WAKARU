@@ -22,12 +22,12 @@ body {
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-ui);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-md);
   font-weight: var(--weight-body);
   line-height: var(--lh-normal);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-variant-numeric: oldstyle-nums;
+  font-variant-numeric: proportional-nums;
 }
 
 /* The whole app is one absolutely-positioned layout inside #app so that the
@@ -72,8 +72,7 @@ a {
   text-decoration: none;
 }
 a:hover {
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
+  text-decoration: none;
 }
 
 button,

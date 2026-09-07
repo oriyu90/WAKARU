@@ -21,18 +21,20 @@
   border-radius: var(--radius-sm);
 }
 
-/* Underline strip — file tabs. Thin weight, underline shows selection. */
+/* Compact track — used by page-level tabs. */
 .underline {
-  gap: var(--space-md);
+  gap: var(--space-2xs);
   height: var(--tab-height);
-  border-bottom: var(--rule-1) solid var(--color-rule);
+  padding: var(--space-3xs);
+  background: var(--color-paper-2);
+  border-radius: var(--radius-md);
 }
 .underline .tab {
   height: 100%;
   padding: 0 var(--space-3xs);
   font-size: var(--fs-sm);
   font-weight: var(--weight-body);
-  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-sm);
 }
 @media (hover: hover) {
   .underline .tab:hover {
@@ -41,7 +43,7 @@
 }
 .underline .tab[aria-selected="true"] {
   color: var(--color-ink-strong);
-  border-bottom-color: var(--color-accent);
+  background: var(--color-paper-3);
 }
 
 /* Segmented — pane switch. Bold, background shows selection, no underline. */
@@ -49,7 +51,7 @@
   gap: var(--space-3xs);
   padding: var(--space-3xs);
   background: var(--color-paper-3);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
 }
 .segmented .tab {
   padding: var(--space-2xs) var(--space-md);
@@ -65,7 +67,6 @@
 .segmented .tab[aria-selected="true"] {
   color: var(--color-ink-strong);
   background: var(--color-paper);
-  box-shadow: var(--shadow-whisper);
 }
 
 .panel {
