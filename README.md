@@ -23,7 +23,9 @@ so on first launch right-click WAKARU → **Open**.
 
 - **Bring your own model** — per-connection OpenAI-compatible (`/chat/completions`,
   Bearer) or Anthropic-compatible (`/messages`, `x-api-key`) wire format. Cloud APIs,
-  LM Studio, Ollama, a local MLX server, or a model host on your LAN.
+  LM Studio, Ollama, a local MLX server, or a model host on your LAN. Reasoning
+  models are handled either way — a `reasoning_content` field or an inline
+  `<think>…</think>` block is kept out of the answer.
 - **Real rendering** — PDF via bundled PDF.js, DOCX/PPTX structure, bounded sheet
   tables, Markdown, images, audio/video with transcripts; rich previews fall back to
   searchable extracted text, never a blank screen.

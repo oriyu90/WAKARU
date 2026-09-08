@@ -57,6 +57,7 @@ export function IllustratorDrawer({
     if (!inTauri || !sourceId || !genStream.ready) return;
     setGen(null);
     setGenErr(null);
+    setAskErr(null);
     clearTimeout(debounce.current);
     debounce.current = setTimeout(() => {
       illustratorApi
@@ -139,6 +140,7 @@ export function IllustratorDrawer({
             onClick={() => {
               setGen(null);
               setGenErr(null);
+              setAskErr(null);
               if (genStream.ready) {
                 illustratorApi
                   .generate({ projectId, sourceId, locator, level, force: true })

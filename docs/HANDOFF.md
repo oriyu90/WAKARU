@@ -2,6 +2,24 @@
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
+**2026-09-09 · v0.1.1 maintenance** — `AiClient` OpenAI-compatible streaming now
+splits a leading inline `<think>…</think>` block out of `content` and sends it to
+the `reasoning` channel (`ThinkSplit` in `src-tauri/src/services/ai/client.rs`),
+so a reasoning model that does not use the `reasoning_content` delta cannot leak
+its chain of thought into Live Illustrator / Studio / the organizer. Live
+Illustrator clears a pending question error when a new explanation starts.
+`src-tauri/deny.toml` records `RUSTSEC-2024-0436` (`paste`, maintenance-status,
+transitive via `fastembed`) as an accepted exception. No backend contract, IPC,
+schema, project format, or design token changed. See
+`IMPLEMENTATION_PLAN_v0.1.1.md` and `docs/DECISIONS.md` D-28.
+
+**2026-09-08 · v0.1.0 AI-workflow reliability** — stream listeners are registered
+before the backend call and an early first event is retained; the tool-capability
+probe allows a short reasoning prelude; Live Illustrator regeneration/questions
+and text conversion wait for their listener and show localized failures; the live
+acceptance test (`src-tauri/tests/live_ornith.rs`) is environment-configurable and
+credential-safe. See `IMPLEMENTATION_PLAN_v0.1.0.md`.
+
 **2026-09-07 · v0.0.6 UI legibility refinement** — standard controls now use a
 40 px target, body text uses a 16 px baseline, compact labels follow a consistent
 12/13/14 px scale, and important boundaries are reinforced in both themes. SVG

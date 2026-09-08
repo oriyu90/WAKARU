@@ -2,6 +2,70 @@
 
 Cumulative; newest release first.
 
+## v0.1.1 release verification — 2026-09-09
+
+Scope: reasoning-model streaming compatibility, a dependency-audit exception, and
+a Live Illustrator error-display fix. No change to the application hierarchy, IPC
+contract, database schema, project format, or any existing workflow. No database
+migration.
+
+### What changed
+
+- `AiClient` OpenAI-compatible streaming now splits a leading inline
+  `<think>…</think>` block out of `content` and routes it to the `reasoning`
+  channel, so a reasoning model that does not use the separate `reasoning_content`
+  delta field cannot leak its chain of thought (and the literal tags) into a Live
+  Illustrator explanation, a Studio answer, or an organized document. The split is
+  deferred until enough bytes are buffered, tolerates tags divided across deltas,
+  and flushes an unterminated block to visible text so nothing is lost. Streams
+  that never open a think block are byte-for-byte unchanged.
+- Live Illustrator clears a pending question error when a new explanation starts
+  (detail-level change, page change, or Regenerate).
+- `src-tauri/deny.toml` records `RUSTSEC-2024-0436` (`paste` 1.0.15, a
+  compile-time identifier macro pulled in by `fastembed → tokenizers`; no runtime
+  component, no maintained drop-in) as an accepted maintenance-status advisory
+  with a written reason, matching the existing entries. No dependency added or
+  removed.
+
+### Automated gates
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck | pass |
+| Frontend lint (eslint + design-rules + hardcoded-strings) | pass |
+| Frontend unit tests (vitest incl. axe) | 9 passed |
+| Contrast | pass; all checked light/dark pairs meet their targets |
+| i18n parity | 351 keys × 3 languages (ja / en / zh-Hans) |
+| Production web build | pass; existing large-chunk advisory only |
+| ts-rs binding export | drift 0 |
+| Rust `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings` | pass |
+| Rust library tests | 170 passed (163 + 7 new `ThinkSplit` cases); 1 network/npx test intentionally ignored |
+| Rust phase integration tests | 39 passed |
+| Live OpenAI-compatible acceptance test | pass with the owner-authorized local `Qwen3.8-27B-MLX-4bit`: discovery (6 models), streaming, vision, tools, JSON Schema, Japanese/English Illustrator grounding, prompt-injection boundary, Studio artifact creation and registration, no `<think>` tag in the answer, and no secret disclosure |
+| `cargo deny check` — advisories, bans, licenses, sources | pass |
+
+### Design and failure review
+
+- The content-first visual system is unchanged; no `*.module.css` or design token
+  was touched. Home, Settings (General / AI / add-connection modal), routing, and
+  the welcome dialog were re-checked in English and Japanese, light and dark, at
+  1280 px and a narrow width — no regression, all strings localized.
+- The reasoning-split path was exercised with unit tests for: one-delta block,
+  tags split across deltas, ordinary `<…>` content untouched, leading whitespace
+  before the tag, an unterminated block flushed without loss, and a stream that
+  never opens a block.
+
+### Bundle
+
+| Item | Value |
+|---|---|
+| App | arm64 `WAKARU.app`, version `0.1.1`; ad-hoc signed; `codesign --verify --deep --strict` passes for the build output and the app inside the mounted DMG |
+| `Info.plist` | `CFBundleShortVersionString` 0.1.1; `LSMinimumSystemVersion` 12.0; `NSLocalNetworkUsageDescription` present |
+| DMG | `WAKARU_0.1.1_aarch64.dmg`, 22,662,684 bytes; `hdiutil verify` VALID |
+| SHA-256 | `232f8d4f11dc891d655ad47c401966e980a7b7b9cc8122631eb209e8c970caeb` (basename in `WAKARU_0.1.1_aarch64.dmg.sha256`) |
+| Startup probe | mounted-DMG app reached `WAKARU backend ready version="0.1.1"`; startup log free of secret patterns |
+| Platform | macOS 12+, Apple Silicon; Windows/Linux not built or verified |
+
 ## v0.1.0 release verification — 2026-09-08
 
 Scope: reliability fixes for local and LAN AI streams, capability detection, and

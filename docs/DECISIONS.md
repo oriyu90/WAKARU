@@ -295,3 +295,12 @@
 - **維持条件**: 既存の画面階層、レスポンシブ動作、キーボード操作、light/dark/system、モノクロ、80〜150%表示倍率、`prefers-reduced-motion` を維持する。
 - **影響**: `design.md`、`UI_REFINEMENT_PLAN.md`、共通トークンと画面CSSのみ。バックエンド、IPC、DB、ルーティングは無変更。
 - **差し戻し条件**: 40pxによって特定画面の情報量が不足する場合は、その画面だけ32pxのcompact variantを明示的に使い、標準値は維持する。
+
+## D-28 · 推論モデルのインライン `<think>…</think>` を回答から分離する
+
+- **日付**: 2026-09-09（v0.1.1）
+- **論点**: OpenAI互換サーバーの一部は、推論モデルの思考を専用の `reasoning_content` デルタではなく `content` 先頭の `<think>…</think>` ブロックとしてそのまま流す。この場合、Live Illustrator の解説・Studio の回答・organizer の整形結果にタグごと思考文が混入する。オーナー提供の `Qwen3.8-27B-MLX-4bit` はこの挙動を示さない（検証済み）が、WAKARU は「任意の OpenAI 互換エンドポイント」を掲げている。
+- **採用**: `AiClient::chat_stream_openai` のみに小さなストリーム状態機械 `ThinkSplit` を追加する。先頭が `<think>` か判定できるまで `content` をバッファし、`<think>` で始まれば `</think>` までを `reasoning` チャネルへ、以降を従来どおり `text` へ送る。タグがデルタ間で分割されても再結合する。閉じない `<think>`（切断・トークン上限）はバッファを `text` へフラッシュして内容を失わない。`<think>` で始まらないストリームは最初の非 `<` バイトで `Passthrough` に落ち、バイト単位で不変。
+- **理由**: Anthropic 経路は既に `thinking_delta` を正しく扱う。OpenAI 経路だけの追加で、既存の非推論モデルの出力・キャンセル・truncation 判定・tool 呼び出し再構築に影響を与えない。SSE パーサ本体（`eventsource_stream`）や `reasoning_content`/`reasoning` の既存処理も変更しない。
+- **影響**: `src-tauri/src/services/ai/client.rs`（`ThinkSplit` と単体テスト7件）、`src-tauri/tests/live_ornith.rs`（回答に `<think>` が出ないことの表明を追加）。DB・IPC・スキーマ・UI は無変更。
+- **差し戻し条件**: `<think>` 以外のタグ名（`<thinking>` 等）や複数ブロックを扱う必要が出たら、タグ集合と複数出現に対応するようパーサを一般化する。ブロック境界の判定は既に分離済み。

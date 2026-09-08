@@ -212,6 +212,11 @@ impl AiClient {
 
         let mut stream = resp.bytes_stream().eventsource();
         let mut usage = None;
+        // Some OpenAI-compatible servers for reasoning models emit the chain of
+        // thought inline in `content` as a leading `<think>…</think>` block
+        // instead of using the separate `reasoning_content` delta field. Route
+        // that span to the `reasoning` channel so it never lands in the answer.
+        let mut think = ThinkSplit::default();
         let mut truncated = true; // until we see [DONE]
                                   // OpenAI-compatible providers report an otherwise cleanly terminated
                                   // response as `finish_reason: "length"` when the output budget is
@@ -252,7 +257,7 @@ impl AiClient {
                     }
                     if let Some(delta) = chunk.pointer("/choices/0/delta") {
                         if let Some(txt) = delta.get("content").and_then(|c| c.as_str()) {
-                            if !txt.is_empty() { on_delta("text", txt); }
+                            if !txt.is_empty() { think.push(txt, &mut on_delta); }
                         }
                         // reasoning models
                         for key in ["reasoning_content", "reasoning"] {
@@ -285,6 +290,7 @@ impl AiClient {
             }
         }
 
+        think.finish(&mut on_delta);
         // Drop any empty slots the model never filled (defensive — sparse index).
         tool_calls.retain(|c| !c.name.is_empty());
         Ok((usage, truncated, tool_calls))
@@ -415,6 +421,89 @@ impl AiClient {
 
         tool_calls.retain(|call| !call.name.is_empty());
         Ok((saw_usage.then_some(usage), truncated, tool_calls))
+    }
+}
+
+const THINK_OPEN: &str = "<think>";
+const THINK_CLOSE: &str = "</think>";
+
+/// Splits a leading `<think>…</think>` span out of an OpenAI-compatible `content`
+/// stream and routes it to the `reasoning` channel. Everything else is passed
+/// straight through as `text`, byte for byte. Tags may be split across deltas;
+/// the decision is deferred until enough bytes are buffered. A stream that never
+/// opens a think block reaches `Passthrough` on its first non-`<` byte, so the
+/// common case adds only a one-delta buffer and no data is ever dropped.
+enum ThinkSplit {
+    /// Not yet known whether the stream opens with a think block.
+    Undecided(String),
+    /// Inside the think block, buffering until `</think>` is seen.
+    Inside(String),
+    /// A think block is done, or the stream provably has none.
+    Passthrough,
+}
+
+impl Default for ThinkSplit {
+    fn default() -> Self {
+        ThinkSplit::Undecided(String::new())
+    }
+}
+
+impl ThinkSplit {
+    fn push<F: FnMut(&str, &str)>(&mut self, chunk: &str, on: &mut F) {
+        match self {
+            ThinkSplit::Passthrough => {
+                if !chunk.is_empty() {
+                    on("text", chunk);
+                }
+            }
+            ThinkSplit::Undecided(buf) => {
+                buf.push_str(chunk);
+                let trimmed = buf.trim_start();
+                if trimmed.is_empty() {
+                    return; // only whitespace so far — wait for more
+                }
+                if let Some(rest) = trimmed.strip_prefix(THINK_OPEN) {
+                    let rest = rest.to_string();
+                    *self = ThinkSplit::Inside(String::new());
+                    self.push(&rest, on);
+                } else if THINK_OPEN.starts_with(trimmed) {
+                    // `trimmed` is still a proper prefix of "<think>" — wait.
+                } else {
+                    let out = std::mem::take(buf);
+                    *self = ThinkSplit::Passthrough;
+                    on("text", &out);
+                }
+            }
+            ThinkSplit::Inside(buf) => {
+                buf.push_str(chunk);
+                let Some(idx) = buf.find(THINK_CLOSE) else {
+                    // Hold the whole block until it closes. If the stream ends
+                    // first, `finish` releases it to `text` (nothing lost).
+                    return;
+                };
+                let inner = buf[..idx].to_string();
+                let after = buf[idx + THINK_CLOSE.len()..].to_string();
+                *self = ThinkSplit::Passthrough;
+                if !inner.is_empty() {
+                    on("reasoning", &inner);
+                }
+                if !after.is_empty() {
+                    on("text", &after);
+                }
+            }
+        }
+    }
+
+    /// Flush whatever is buffered at end of stream. An undecided partial tag or
+    /// the body of an unterminated `<think>` block is released to `text` (without
+    /// the opening tag) so the content is shown rather than lost.
+    fn finish<F: FnMut(&str, &str)>(&mut self, on: &mut F) {
+        match std::mem::replace(self, ThinkSplit::Passthrough) {
+            ThinkSplit::Undecided(buf) | ThinkSplit::Inside(buf) if !buf.is_empty() => {
+                on("text", &buf);
+            }
+            _ => {}
+        }
     }
 }
 
@@ -847,6 +936,105 @@ mod tests {
         assert!(lower.contains("x-api-key: secret-test-key"));
         assert!(lower.contains("anthropic-version: 2023-06-01"));
         assert!(request.contains("\"system\":\"sys\""));
+    }
+
+    fn run_think_split(chunks: &[&str]) -> (String, String) {
+        let mut split = ThinkSplit::default();
+        let mut text = String::new();
+        let mut reasoning = String::new();
+        let mut sink = |kind: &str, delta: &str| match kind {
+            "reasoning" => reasoning.push_str(delta),
+            _ => text.push_str(delta),
+        };
+        for chunk in chunks {
+            split.push(chunk, &mut sink);
+        }
+        split.finish(&mut sink);
+        (text, reasoning)
+    }
+
+    #[test]
+    fn think_split_routes_a_one_delta_block_to_reasoning() {
+        let (text, reasoning) =
+            run_think_split(&["<think>weighing options</think>The answer is 42."]);
+        assert_eq!(text, "The answer is 42.");
+        assert_eq!(reasoning, "weighing options");
+    }
+
+    #[test]
+    fn think_split_reassembles_tags_split_across_deltas() {
+        let (text, reasoning) = run_think_split(&[
+            "<",
+            "think>",
+            "step one",
+            " step two",
+            "</",
+            "think",
+            ">",
+            "Done",
+            ".",
+        ]);
+        assert_eq!(text, "Done.");
+        assert_eq!(reasoning, "step one step two");
+    }
+
+    #[test]
+    fn think_split_leaves_ordinary_content_untouched() {
+        let (text, reasoning) = run_think_split(&["The <thing> ", "is <not> a think block."]);
+        assert_eq!(text, "The <thing> is <not> a think block.");
+        assert!(reasoning.is_empty());
+    }
+
+    #[test]
+    fn think_split_handles_leading_whitespace_before_the_tag() {
+        let (text, reasoning) = run_think_split(&["\n  <think>hmm</think>\nA."]);
+        assert_eq!(text, "\nA.");
+        assert_eq!(reasoning, "hmm");
+    }
+
+    #[test]
+    fn think_split_flushes_an_unterminated_block_to_text_without_loss() {
+        let (text, reasoning) = run_think_split(&["<think>still thinking when the stream died"]);
+        assert_eq!(text, "still thinking when the stream died");
+        assert!(reasoning.is_empty());
+    }
+
+    #[test]
+    fn think_split_passes_through_when_stream_never_opens_a_block() {
+        let (text, reasoning) = run_think_split(&["plain answer, no tags at all"]);
+        assert_eq!(text, "plain answer, no tags at all");
+        assert!(reasoning.is_empty());
+    }
+
+    #[tokio::test]
+    async fn openai_stream_splits_inline_think_block_from_the_answer() {
+        let events = concat!(
+            "data: {\"choices\":[{\"delta\":{\"content\":\"<think>I should\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\" be careful</think>Hello\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\" there\"},\"finish_reason\":null}]}\n\n",
+            "data: [DONE]\n\n"
+        );
+        let (base, _rx) = serve_once(events);
+        let client = AiClient::new(ApiProtocol::Openai, &base, None, Vec::new(), 5_000).unwrap();
+        let mut text = String::new();
+        let mut reasoning = String::new();
+        let (_usage, truncated, calls) = client
+            .chat_stream(
+                "test-model",
+                json!([{ "role": "user", "content": "hi" }]),
+                &json!({ "max_tokens": 32 }),
+                &CancellationToken::new(),
+                |kind, delta| match kind {
+                    "reasoning" => reasoning.push_str(delta),
+                    _ => text.push_str(delta),
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(text, "Hello there");
+        assert_eq!(reasoning, "I should be careful");
+        assert!(!truncated);
+        assert!(calls.is_empty());
     }
 
     #[tokio::test]
