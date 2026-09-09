@@ -90,6 +90,81 @@ fn write(dir: &Path, name: &str, body: &str) -> PathBuf {
 }
 
 #[test]
+fn website_folder_import_extracts_a_unit_per_html_and_lists_files() {
+    use wakaru_lib::services::website;
+    let env = Env::new();
+    let pid = env.project();
+    let pdb = env.pdb(&pid);
+
+    // A tiny site on disk.
+    let site = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(site.path().join("css")).unwrap();
+    std::fs::write(
+        site.path().join("index.html"),
+        "<title>Home</title><h1>Home</h1><p>Welcome to the demo.</p>",
+    )
+    .unwrap();
+    std::fs::write(
+        site.path().join("about.html"),
+        "<title>About</title><p>About the demo.</p>",
+    )
+    .unwrap();
+    std::fs::write(site.path().join("css/site.css"), "body{color:#222}").unwrap();
+
+    // Copy into sources/<id>/ the way `sources::add_folder` would.
+    let sid = uuid::Uuid::now_v7().to_string();
+    let dest = projects::project_dir(&env.projects_dir, &pid)
+        .join("sources")
+        .join(&sid);
+    std::fs::create_dir_all(&dest).unwrap();
+    let copied = website::copy_site_tree(site.path(), &dest).unwrap();
+    assert_eq!(copied.entry, "index.html");
+    assert_eq!(copied.file_count, 3);
+
+    let rel_path = format!("sources/{sid}/{}", copied.entry);
+    pdb.execute(
+        "INSERT INTO sources (id, kind, original_name, rel_path, mime, bytes, status, added_at)
+         VALUES (?1, 'website', 'demo', ?2, 'text/html', ?3, 'queued', ?4)",
+        rusqlite::params![
+            sid,
+            rel_path,
+            copied.total_bytes as i64,
+            wakaru_lib::storage::migrate::now_iso8601()
+        ],
+    )
+    .unwrap();
+
+    let ctx = IngestCtx {
+        project_db: &pdb,
+        app_db: &env.app_db,
+        project_id: &pid,
+        source_id: &sid,
+        source_name: "demo",
+        project_dir: &projects::project_dir(&env.projects_dir, &pid),
+    };
+    let out = ingest::run(&ctx, SourceKind::Website, &IngestInput::File(dest.clone())).unwrap();
+    assert_eq!(out.documents, 2, "one unit per HTML file");
+    assert_eq!(out.page_count, Some(2));
+
+    let first: String = pdb
+        .query_row(
+            "SELECT text FROM documents WHERE source_id=?1 ORDER BY ordinal LIMIT 1",
+            [&sid],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(first.contains("Welcome to the demo."));
+
+    let manifest = website::manifest(&dest, &copied.entry).unwrap();
+    assert_eq!(manifest.entry, "index.html");
+    assert!(manifest.files.iter().any(|f| f.path == "css/site.css"));
+    assert!(manifest
+        .files
+        .iter()
+        .any(|f| f.path == "index.html" && f.is_entry));
+}
+
+#[test]
 fn ac_2_3_opening_a_source_twice_reuses_one_tab() {
     let env = Env::new();
     let pid = env.project();

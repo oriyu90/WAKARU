@@ -12,7 +12,7 @@ import { useUiStore } from "../../stores/ui";
 import { useAppSettings } from "../settings/useAppSettings";
 import { viewerApi } from "../../ipc/viewer";
 import { aiApi } from "../../ipc/ai";
-import { sourcesApi, pickSourceFiles } from "../../ipc/sources";
+import { sourcesApi, pickSourceFiles, pickFolder } from "../../ipc/sources";
 import { IpcError, inTauri } from "../../ipc/client";
 import type { ViewerTab } from "../../ipc/types.gen";
 import { SourceListPanel } from "../project/SourceListPanel";
@@ -110,9 +110,27 @@ export function Viewer({
       }),
   });
 
+  const addFolder = useMutation({
+    mutationFn: (folder: string) => sourcesApi.addFolder(projectId, folder),
+    onSuccess: () => qc.invalidateQueries({ queryKey: sourcesKey }),
+    onError: (err) =>
+      toast.push({
+        tone: "error",
+        message:
+          err instanceof IpcError
+            ? t([`errors.${err.code}`, "errors.internal"])
+            : t("errors.internal"),
+      }),
+  });
+
   async function onAddClick() {
     const paths = await pickSourceFiles();
     if (paths.length) addFiles.mutate(paths);
+  }
+
+  async function onAddWebsiteClick() {
+    const folder = await pickFolder();
+    if (folder) addFolder.mutate(folder);
   }
 
   const openTab = async (sourceId: string) => {
@@ -263,6 +281,16 @@ export function Viewer({
           >
             {t("project.sources.addLink")}
           </Button>
+          <Button
+            size="sm"
+            variant="quiet"
+            block
+            icon={<FileIcon size={14} />}
+            loading={addFolder.isPending}
+            onClick={onAddWebsiteClick}
+          >
+            {t("viewer.addWebsite")}
+          </Button>
           <button
             type="button"
             className={styles.railToggle}
@@ -301,8 +329,6 @@ export function Viewer({
             <IllustratorDrawer
               projectId={projectId}
               sourceId={ctx?.sourceId ?? activeTab?.sourceId ?? null}
-              locator={ctx?.locator ?? activeTab?.locator ?? { t: "whole" }}
-              position={ctx?.position}
               visionSupported={visionSupported}
               autoRun={!justEnabled}
               onStarted={() => setJustEnabled(false)}

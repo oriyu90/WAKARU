@@ -17,6 +17,10 @@ pub enum SourceKind {
     Jsonl,
     Code,
     Weblink,
+    /// An imported static-site folder (issue 5) or a Studio-authored site
+    /// (issue 4). `rel_path` points at the entry HTML; the whole tree lives
+    /// under `sources/<id>/`.
+    Website,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]

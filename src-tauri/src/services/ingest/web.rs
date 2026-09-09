@@ -170,8 +170,9 @@ mod url {
 }
 
 /// Very small readability pass: drop script/style/nav/header/footer/aside, then
-/// take headings and paragraph text in document order.
-fn extract_readable(html: &str) -> (Option<String>, Vec<(Option<String>, String)>) {
+/// take headings and paragraph text in document order. Shared with the imported
+/// website ingest (`services::website`).
+pub(crate) fn extract_readable(html: &str) -> (Option<String>, Vec<(Option<String>, String)>) {
     use scraper::{Html, Selector};
     let doc = Html::parse_document(html);
 

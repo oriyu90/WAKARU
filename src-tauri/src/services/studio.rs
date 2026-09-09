@@ -89,7 +89,7 @@ fn classify_call(ctx: &LoopCtx, name: &str, arguments: &str) -> Approval {
         // Always requires approval (docs/05 §5.3) — it can run arbitrary
         // programs and reach the network.
         "run_command" => Approval::Ask,
-        "write_file" | "build_document" => {
+        "write_file" | "build_document" | "build_site" => {
             let path = serde_json::from_str::<Value>(arguments)
                 .ok()
                 .and_then(|v| v.get("path").and_then(|p| p.as_str()).map(str::to_string))
@@ -568,6 +568,23 @@ fn tool_defs() -> Value {
             }
           }),
           json!(["path", "format", "title", "sections"])),
+        f("build_site",
+          "Create a small static website (HTML/CSS/JS/assets) as ONE folder in workspace/. Use this when the reader asks for a web page, site, landing page or interactive demo. Supply every file with its complete final content; use relative links between them. At least one .html file is required; name the entry `index.html`. The reader can preview it in 資料を見る and import it as a source. Writes into workspace/ and may need approval.",
+          json!({
+            "path": { "type": "string", "description": "folder name in workspace/, e.g. site" },
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "description": "path within the folder, e.g. index.html or css/main.css" },
+                  "content": { "type": "string" }
+                },
+                "required": ["name", "content"]
+              }
+            }
+          }),
+          json!(["path", "files"])),
         f("run_command",
           "Run a program inside workspace/ (no shell). Always needs the reader's approval; it can reach the network.",
           json!({ "command": { "type": "string" }, "args": { "type": "array", "items": { "type": "string" } } }),
@@ -764,12 +781,144 @@ pub fn dispatch_tool(
                 Err(e) => Err(e),
             }
         }
+        "build_site" => {
+            let dir = s("path")
+                .map(|p| p.trim().trim_matches('/').to_string())
+                .filter(|p| !p.is_empty())
+                .unwrap_or_else(|| "site".to_string());
+            let files = args
+                .get("files")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            build_site(db, workspace, thread_id, &dir, &files)
+        }
         other => Err(AppError::new(
             "STUDIO_UNKNOWN_TOOL",
             "error.studio.unknownTool",
             format!("no such tool: {other}"),
         )),
     }
+}
+
+/// Max files / total bytes for one `build_site` call — a weak model can't fill
+/// the workspace by accident.
+const SITE_MAX_FILES: usize = 200;
+const SITE_MAX_TOTAL_BYTES: u64 = 24 * 1024 * 1024;
+
+/// Write a multi-file static site as one folder + a single directory artifact
+/// row (`mime = text/x-wakaru-site`). `import`/`download` treat that row as a
+/// folder (see `commands::studio`).
+fn build_site(
+    db: &Connection,
+    workspace: &Path,
+    thread_id: &str,
+    dir: &str,
+    files: &[Value],
+) -> AppResult<String> {
+    // Validate the whole set before touching disk.
+    if files.is_empty() {
+        return Err(tool_arg("files"));
+    }
+    if files.len() > SITE_MAX_FILES {
+        return Err(AppError::new(
+            "STUDIO_SITE_INVALID",
+            "error.studio.siteInvalid",
+            format!("a site may have at most {SITE_MAX_FILES} files"),
+        ));
+    }
+    let mut planned: Vec<(String, Vec<u8>)> = Vec::new();
+    let mut total: u64 = 0;
+    let mut has_html = false;
+    for f in files {
+        let name = f
+            .get("name")
+            .and_then(Value::as_str)
+            .map(|s| s.trim().trim_start_matches("./"))
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| tool_arg("files[].name"))?;
+        let rel = crate::services::website::safe_rel(name).map_err(|_| {
+            AppError::new(
+                "STUDIO_SITE_INVALID",
+                "error.studio.siteInvalid",
+                format!("unsafe file path: {name}"),
+            )
+        })?;
+        let body = f
+            .get("content")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .as_bytes()
+            .to_vec();
+        total += body.len() as u64;
+        if rel.to_ascii_lowercase().ends_with(".html") || rel.to_ascii_lowercase().ends_with(".htm")
+        {
+            has_html = true;
+        }
+        planned.push((rel, body));
+    }
+    if !has_html {
+        return Err(AppError::new(
+            "STUDIO_SITE_INVALID",
+            "error.studio.siteInvalid",
+            "a site needs at least one .html file",
+        ));
+    }
+    if total > SITE_MAX_TOTAL_BYTES {
+        return Err(AppError::new(
+            "STUDIO_SITE_INVALID",
+            "error.studio.siteInvalid",
+            format!("site exceeds {} MB", SITE_MAX_TOTAL_BYTES / 1024 / 1024),
+        ));
+    }
+
+    // All paths land inside workspace/<dir>/.
+    let site_root = sandbox::resolve_in_sandbox(workspace, dir)?;
+    for (rel, body) in &planned {
+        let abs = sandbox::resolve_in_sandbox(workspace, &format!("{dir}/{rel}"))?;
+        sandbox::reject_symlink(&abs)?;
+        if let Some(parent) = abs.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&abs, body)?;
+    }
+
+    let entry = planned
+        .iter()
+        .map(|(r, _)| r.as_str())
+        .find(|r| r.eq_ignore_ascii_case("index.html"))
+        .or_else(|| {
+            planned
+                .iter()
+                .map(|(r, _)| r.as_str())
+                .find(|r| r.to_ascii_lowercase().ends_with(".html"))
+        })
+        .unwrap_or("index.html")
+        .to_string();
+
+    let rel_path = format!("workspace/{dir}");
+    db.execute(
+        "INSERT INTO artifacts (id, thread_id, rel_path, bytes, mime, created_at)
+         VALUES (?1, ?2, ?3, ?4, 'text/x-wakaru-site', ?5)
+         ON CONFLICT(rel_path) DO UPDATE SET
+           bytes = excluded.bytes, mime = excluded.mime,
+           thread_id = excluded.thread_id, created_at = excluded.created_at",
+        params![
+            Uuid::now_v7().to_string(),
+            thread_id,
+            rel_path,
+            total as i64,
+            now_iso8601()
+        ],
+    )?;
+    let _ = site_root;
+    Ok(format!(
+        "wrote {} file(s) to {rel_path}/ ({} bytes); entry: {entry}. \
+         The reader can preview it in 資料を見る via “{}” and import it as a source.",
+        planned.len(),
+        total,
+        rel_path
+    ))
 }
 
 fn tool_arg(name: &str) -> AppError {

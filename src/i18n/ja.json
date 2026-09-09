@@ -175,7 +175,8 @@
     "json": "JSON",
     "jsonl": "JSONL",
     "code": "コード",
-    "weblink": "Web リンク"
+    "weblink": "Web リンク",
+    "website": "Web サイト"
   },
   "states": {
     "queued": "待機中",
@@ -211,7 +212,9 @@
       "invalid": "文書リクエストが不完全です。",
       "build": "文書の生成に失敗しました。",
       "pdfUnavailable": "このビルドでは PDF 出力を利用できないため、代わりに Markdown 版を保存しました。"
-    }
+    },
+    "WEBSITE_INVALID": "フォルダを Web サイトとして取り込めませんでした。",
+    "STUDIO_SITE_INVALID": "サイトの生成に失敗しました（ファイル構成を確認してください）。"
   },
   "viewer": {
     "readonly": "閲覧専用",
@@ -240,7 +243,15 @@
     "ocrRun": "テキストを認識",
     "ocrProgress": "認識中… {{done}} / {{total}}",
     "ocrDone": "文字認識が完了しました。これらのページを検索できます。",
-    "illustratorStart": "解説をはじめる"
+    "illustratorStart": "解説をはじめる",
+    "scrollUp": "上にスクロール",
+    "scrollDown": "下にスクロール",
+    "addWebsite": "Web サイトを追加",
+    "websiteFiles": "サイト内のファイル",
+    "websiteReload": "再読み込み",
+    "websiteOpenExternal": "ブラウザで開く",
+    "websitePreview": "Web サイトのプレビュー",
+    "websiteEntry": "入口ページ"
   },
   "ai": {
     "connections": "接続先",
@@ -295,7 +306,6 @@
     "regenerate": "再生成",
     "visionOff": "Vision非対応：テキストのみで解説しています",
     "cached": "保存された解説",
-    "willExplain": "ページを開くと自動で解説します。",
     "past": "過去の会話（{{count}}件）",
     "scope": "参照範囲",
     "scopePage": "このページ",
@@ -304,11 +314,9 @@
     "stop": "停止",
     "ask": "質問する…",
     "send": "送信",
-    "viewLabel": "解説の範囲",
-    "viewOverview": "資料全体",
-    "viewPage": "このページ",
     "wholeSource": "資料全体",
-    "overviewHint": "開くと資料全体をやさしく解説します。"
+    "overviewHint": "開くと資料全体をやさしく解説します。",
+    "rewriteAs": "別の詳しさで作り直す"
   },
   "studio": {
     "title": "Studio",
@@ -356,7 +364,8 @@
     "importFailed": "そのファイルを取り込めませんでした。",
     "cancelled": "停止しました。",
     "pickConversation": "会話を選んでください",
-    "pickConversationBody": "左の一覧から会話を開くか、新しい会話を始めます。過去の会話は開くまで表示されません。"
+    "pickConversationBody": "左の一覧から会話を開くか、新しい会話を始めます。過去の会話は開くまで表示されません。",
+    "toolResultLines_other": "{{count}} 行"
   },
   "mcp": {
     "transportSupport": "stdio と MCP Streamable HTTP に対応します。接続失敗はそのサーバだけに隔離されます。",

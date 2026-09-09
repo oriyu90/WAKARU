@@ -54,6 +54,23 @@ pub fn source_add_url(
 }
 
 #[tauri::command]
+pub fn source_add_folder(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    project_id: String,
+    folder: String,
+) -> AppResult<Source> {
+    sources::add_folder(
+        &app,
+        &state.app_db_path,
+        &state.projects_dir,
+        state.jobs.clone(),
+        &project_id,
+        &folder,
+    )
+}
+
+#[tauri::command]
 pub fn source_reanalyze(
     app: AppHandle,
     state: State<'_, AppState>,

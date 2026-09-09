@@ -3,6 +3,7 @@ import type {
   ViewerTab,
   DocumentPayload,
   SourceDetail,
+  WebsiteManifest,
 } from "./types.gen";
 
 export const viewerApi = {
@@ -29,4 +30,6 @@ export const documentApi = {
     call<SourceDetail>("source_detail", { projectId, sourceId }),
   assetUrl: (projectId: string, sourceId: string, relPath: string) =>
     call<string>("source_asset_url", { projectId, sourceId, relPath }),
+  websiteManifest: (projectId: string, sourceId: string) =>
+    call<WebsiteManifest>("website_manifest", { projectId, sourceId }),
 };

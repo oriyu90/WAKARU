@@ -1,47 +1,47 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Markdown } from "../../components/Markdown";
 import { Button } from "../../components/Button";
 import { IconButton } from "../../components/IconButton";
 import { Textarea } from "../../components/Textarea";
-import { Tabs } from "../../components/Tabs";
 import { AlertIcon, InfoIcon } from "../../app/Icons";
 import { illustratorApi } from "../../ipc/illustrator";
 import { inTauri, IpcError } from "../../ipc/client";
+import { useAppSettings } from "../settings/useAppSettings";
 import type { DetailLevel, Scope, GenerateStarted } from "../../ipc/types.gen";
 import { useStream } from "./useStream";
 import styles from "./IllustratorDrawer.module.css";
 
-type View = "overview" | "page";
-
 const WHOLE = { t: "whole" as const };
+const LEVELS: DetailLevel[] = ["simple", "standard", "detailed"];
 
 /** Live Illustrator (docs/05 §4). Standalone from Studio — its own Q&A thread,
- * never fed into a Studio tab. On open it explains the whole source; the reader
- * can switch to a single page. When it was just enabled it waits for one
- * explicit tap before spending tokens (`autoRun={false}`). */
+ * never fed into a Studio tab. On open it explains the whole source at the
+ * detail level chosen in Settings; the two other levels are offered as
+ * one-tap rewrites *below* the explanation, but only while the reader has not
+ * asked a follow-up yet. When it was just enabled it waits for one explicit
+ * tap before spending tokens (`autoRun={false}`). */
 export function IllustratorDrawer({
   projectId,
   sourceId,
-  locator,
-  position,
   visionSupported,
   autoRun = true,
   onStarted,
 }: {
   projectId: string;
   sourceId: string | null;
-  locator: unknown;
-  position?: string;
   visionSupported: boolean;
   autoRun?: boolean;
   onStarted?: () => void;
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const [level, setLevel] = useState<DetailLevel>("standard");
-  const [view, setView] = useState<View>("overview");
+  const { settings } = useAppSettings();
+  const defaultLevel = (settings?.illustrator.defaultLevel ?? "standard") as DetailLevel;
+  // null → follow the Settings default; set → the reader picked a rewrite level.
+  const [levelOverride, setLevelOverride] = useState<DetailLevel | null>(null);
+  const level = levelOverride ?? defaultLevel;
   const [scope, setScope] = useState<Scope>("source");
   const [gen, setGen] = useState<GenerateStarted | null>(null);
   const [genErr, setGenErr] = useState<string | null>(null);
@@ -50,16 +50,6 @@ export function IllustratorDrawer({
   const [text, setText] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [started, setStarted] = useState(autoRun);
-
-  const pageLocator = useMemo(() => {
-    const l = locator as { t?: string } | null | undefined;
-    return l && typeof l === "object" && l.t && l.t !== "whole" ? locator : null;
-  }, [locator]);
-  const activeLocator = useMemo(
-    () => (view === "page" && pageLocator ? pageLocator : WHOLE),
-    [view, pageLocator],
-  );
-  const activeKey = useMemo(() => JSON.stringify(activeLocator), [activeLocator]);
 
   // One Q&A thread per source (FR-L4) — questions survive page moves.
   const thread = useQuery({
@@ -75,8 +65,9 @@ export function IllustratorDrawer({
       ? t([`errors.${error.code}`, "errors.internal"])
       : t("errors.internal");
 
-  // Debounced explanation trigger (FR-L2). Waits for `started` so a just-enabled
-  // panel does not fire until the reader asks.
+  // Debounced whole-source explanation trigger (FR-L2). Waits for `started` so a
+  // just-enabled panel does not fire until the reader asks. Re-fires when the
+  // reader switches detail level.
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => {
     if (!inTauri || !sourceId || !genStream.ready || !started) return;
@@ -86,13 +77,18 @@ export function IllustratorDrawer({
     clearTimeout(debounce.current);
     debounce.current = setTimeout(() => {
       illustratorApi
-        .generate({ projectId, sourceId, locator: activeLocator, level })
+        .generate({ projectId, sourceId, locator: WHOLE, level })
         .then(setGen)
         .catch((e) => setGenErr(errorText(e)));
     }, 300);
     return () => clearTimeout(debounce.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, sourceId, activeKey, level, genStream.ready, started]);
+  }, [projectId, sourceId, level, genStream.ready, started]);
+
+  // A new source starts again from the Settings default.
+  useEffect(() => {
+    setLevelOverride(null);
+  }, [sourceId]);
 
   useEffect(() => {
     if (
@@ -122,7 +118,7 @@ export function IllustratorDrawer({
     setGenErr(null);
     setAskErr(null);
     illustratorApi
-      .generate({ projectId, sourceId, locator: activeLocator, level, force: true })
+      .generate({ projectId, sourceId, locator: WHOLE, level, force: true })
       .then(setGen)
       .catch((e) => setGenErr(errorText(e)));
   }
@@ -160,6 +156,16 @@ export function IllustratorDrawer({
       ? t([`errors.${genStream.errorCode ?? "internal"}`, "errors.internal"])
       : null) ??
     askErr;
+  // The rewrite buttons appear only right after the first auto explanation —
+  // once the reader has asked anything, the explanation is part of a
+  // conversation and silently swapping it would be confusing.
+  const canRewrite =
+    started &&
+    !!explanation &&
+    !streamError &&
+    !streaming &&
+    pastMessages.length === 0 &&
+    !askStreamId;
 
   if (!sourceId) {
     return <div className={styles.empty}>{t("illustrator.openADocument")}</div>;
@@ -176,36 +182,9 @@ export function IllustratorDrawer({
             </IconButton>
           ) : null}
         </div>
-        <Tabs
-          label={t("illustrator.viewLabel")}
-          variant="segmented"
-          value={view}
-          onChange={(v) => setView(v as View)}
-          items={[
-            { id: "overview", label: t("illustrator.viewOverview") },
-            {
-              id: "page",
-              label: t("illustrator.viewPage"),
-              disabled: !pageLocator,
-            },
-          ]}
-        />
-        <div className={styles.headMeta}>
-          <span className={styles.pos}>
-            {view === "page" ? (position ?? "") : t("illustrator.wholeSource")}
-          </span>
-          <Tabs
-            label={t("illustrator.detail")}
-            variant="segmented"
-            value={level}
-            onChange={(v) => setLevel(v as DetailLevel)}
-            items={[
-              { id: "simple", label: t("illustrator.simple") },
-              { id: "standard", label: t("illustrator.standard") },
-              { id: "detailed", label: t("illustrator.detailed") },
-            ]}
-          />
-        </div>
+        <span className={styles.pos}>
+          {t("illustrator.wholeSource")} · {t(`illustrator.${level}`)}
+        </span>
       </header>
 
       {!visionSupported ? (
@@ -241,12 +220,24 @@ export function IllustratorDrawer({
         ) : generating ? (
           <p className={styles.thinking}>{t("common.loading")}…</p>
         ) : (
-          <p className={styles.thinking}>
-            {view === "page"
-              ? t("illustrator.willExplain")
-              : t("illustrator.overviewHint")}
-          </p>
+          <p className={styles.thinking}>{t("illustrator.overviewHint")}</p>
         )}
+
+        {canRewrite ? (
+          <div className={styles.levelSwap}>
+            <span className={styles.levelSwapLabel}>{t("illustrator.rewriteAs")}</span>
+            {LEVELS.filter((l) => l !== level).map((l) => (
+              <Button
+                key={l}
+                size="sm"
+                variant="quiet"
+                onClick={() => setLevelOverride(l)}
+              >
+                {t(`illustrator.${l}`)}
+              </Button>
+            ))}
+          </div>
+        ) : null}
 
         {pastMessages.length > 0 ? (
           <div className={styles.history}>

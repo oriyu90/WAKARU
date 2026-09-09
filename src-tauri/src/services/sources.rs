@@ -199,6 +199,68 @@ pub fn add_url(
     Ok(source)
 }
 
+/// Import a folder of static web files as a single `website` source (issue 5).
+/// The tree is copied verbatim into `sources/<id>/` (bounded + symlink-safe by
+/// [`crate::services::website::copy_site_tree`]); ingest then extracts the
+/// readable text of every HTML file.
+pub fn add_folder(
+    app: &AppHandle,
+    app_db_path: &Path,
+    projects_root: &Path,
+    jobs: Arc<JobRegistry>,
+    project_id: &str,
+    folder: &str,
+) -> AppResult<Source> {
+    let src = PathBuf::from(folder);
+    if !src.is_dir() {
+        return Err(AppError::new(
+            "WEBSITE_INVALID",
+            "error.website.invalid",
+            "not a folder",
+        ));
+    }
+    let project_db = projects::open_db(projects_root, project_id)?;
+    let project_dir = projects::project_dir(projects_root, project_id);
+    let id = Uuid::now_v7().to_string();
+    let name = src
+        .file_name()
+        .and_then(|n| n.to_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("website")
+        .to_string();
+    let dest_dir = project_dir.join("sources").join(&id);
+    std::fs::create_dir_all(&dest_dir)?;
+
+    let copied = match crate::services::website::copy_site_tree(&src, &dest_dir) {
+        Ok(c) => c,
+        Err(e) => {
+            let _ = std::fs::remove_dir_all(&dest_dir);
+            return Err(e);
+        }
+    };
+
+    let rel_path = format!("sources/{id}/{}", copied.entry);
+    project_db.execute(
+        "INSERT INTO sources
+           (id, kind, original_name, rel_path, mime, bytes, status, added_at)
+         VALUES (?1, 'website', ?2, ?3, 'text/html', ?4, 'queued', ?5)",
+        params![id, name, rel_path, copied.total_bytes as i64, now_iso8601()],
+    )?;
+    let source = get(&project_db, &id)?;
+    emit_status(app, project_id, &source);
+    spawn_ingest(
+        app.clone(),
+        app_db_path.to_path_buf(),
+        projects_root.to_path_buf(),
+        jobs,
+        project_id.to_string(),
+        id,
+        SourceKind::Website,
+        IngestInput::File(dest_dir),
+    );
+    Ok(source)
+}
+
 #[derive(Debug)]
 pub struct Added {
     pub source: Source,
@@ -570,6 +632,7 @@ pub fn kind_to_str(k: SourceKind) -> &'static str {
         SourceKind::Jsonl => "jsonl",
         SourceKind::Code => "code",
         SourceKind::Weblink => "weblink",
+        SourceKind::Website => "website",
     }
 }
 
@@ -587,6 +650,7 @@ pub fn kind_from_str(s: &str) -> SourceKind {
         "jsonl" => SourceKind::Jsonl,
         "code" => SourceKind::Code,
         "weblink" => SourceKind::Weblink,
+        "website" => SourceKind::Website,
         _ => SourceKind::Text,
     }
 }

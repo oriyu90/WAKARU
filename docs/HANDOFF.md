@@ -2,6 +2,34 @@
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
+**2026-09-10 · v0.2.1** — five more reader issues (`docs/DECISIONS.md` D-33).
+(1) **Live Illustrator UI simplified**: `IllustratorDrawer.tsx` drops the
+overview/page and detail-level segmented controls — it always explains the whole
+document at the Settings detail level; right under the first auto explanation
+(only while `pastMessages.length === 0`) it shows "rewrite at" buttons for the
+other two levels (`levelOverride` state → the debounced generate effect re-runs
+on `level`). (2) **Viewer navigation**: `FilePreviews.tsx` gains `usePageKeys`
+(←/→/PageUp/PageDown, ignored while typing) on the PDF + PPTX renderers,
+hover-in `EdgeNav` arrows, and `ScrollNav` (up/down + PageUp/PageDown) added to
+`DocxFilePreview` and `ReadingPreview`. (3) **Studio tool output collapses**:
+`role === "tool"` messages render in a closed `<details>`. (4) **Studio builds
+sites**: new `build_site` tool (`services/studio.rs`) writes a multi-file static
+site as one directory artifact (`mime = text/x-wakaru-site`, ≤200 files/24 MB,
+paths checked via `website::safe_rel`); `studio_import_artifact_as_source` calls
+`sources::add_folder` when the artifact is a directory; `studio_download_artifact`
+copies dirs recursively. `build_document` (PDF/Word) unchanged. (5) **Website
+folder import**: new `SourceKind::Website`, new `services/website.rs`
+(`copy_site_tree` — iterative walk, no symlink follow, ext allowlist, 4000
+files/128 MiB/depth 24; `parse_site` — one unit per HTML via
+`ingest::web::extract_readable`; `manifest`). `sources::add_folder` + ingest
+`Website` arm + commands `source_add_folder` / `website_manifest`. Frontend:
+`pickFolder()`, Viewer "Add website" button, `WebsitePreview.tsx` (file tree +
+sandboxed `<iframe sandbox="allow-scripts allow-same-origin allow-forms">` served
+via `wakaru-asset://`; CSP gains `frame-src`). No DB migration; ts-rs adds
+`WebsiteFile`/`WebsiteManifest` + `SourceKind` `"website"`. Wire audit: only
+delta is the extra `build_site` tool definition. Tests: lib 185 (+7 website),
+phase2 +1 integration, frontend 18, i18n 384×3.
+
 **2026-09-10 · v0.2.0 round 2 (same tag)** — seven more reader issues + a wire
 re-audit. (1) **LM Studio "Unexpected endpoint / no reply"**: the profile base
 URL had no `/v1`. `ensure_api_version_path()` (`src-tauri/src/services/ai/client.rs`)

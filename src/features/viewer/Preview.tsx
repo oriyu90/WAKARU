@@ -10,7 +10,8 @@ import { ChevronRightIcon, CloseIcon } from "../../app/Icons";
 import { documentApi } from "../../ipc/viewer";
 import { call } from "../../ipc/client";
 import type { SourceDetail, SourceKind, ViewerTab } from "../../ipc/types.gen";
-import { DocxFilePreview, PdfFilePreview, PptxFilePreview, WorkbookPreview } from "./FilePreviews";
+import { DocxFilePreview, PdfFilePreview, PptxFilePreview, ScrollNav, WorkbookPreview } from "./FilePreviews";
+import { WebsitePreview } from "./WebsitePreview";
 import styles from "./previews.module.css";
 
 /* ───────────────────────── shared bits ───────────────────────── */
@@ -194,6 +195,8 @@ function PagedPreview({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
       if (e.key === "ArrowRight" || e.key === "PageDown") setPage((p) => Math.min(p + 1, total));
       else if (e.key === "ArrowLeft" || e.key === "PageUp") setPage((p) => Math.max(p - 1, 1));
     };
@@ -348,6 +351,7 @@ function ReadingPreview({
   const viaDerived = useAssetText(projectId, detail.id, rel);
   const text = detail.primaryAssetUrl ? direct.data : viaDerived.data;
   const loading = detail.primaryAssetUrl ? direct.isLoading : viaDerived.isLoading;
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className={styles.wrap}>
@@ -366,13 +370,16 @@ function ReadingPreview({
           </Button>
         ) : null}
       </Toolbar>
-      <div className={styles.body}>
+      <div className={styles.body} ref={bodyRef}>
         {loading ? (
           <LoadingRows />
         ) : (
-          <div className={styles.reading}>
-            <Markdown>{text ?? ""}</Markdown>
-          </div>
+          <>
+            <div className={styles.reading}>
+              <Markdown>{text ?? ""}</Markdown>
+            </div>
+            <ScrollNav targetRef={bodyRef} />
+          </>
         )}
       </div>
     </div>
@@ -419,6 +426,9 @@ export function Preview({
   }
   if (d.kind === "weblink") {
     return <ReadingPreview projectId={projectId} detail={d} originalUrl={d.url} />;
+  }
+  if (d.kind === "website") {
+    return <WebsitePreview projectId={projectId} detail={d} />;
   }
   if (d.kind === "pdf" && d.primaryAssetUrl) {
     const initialPage = typeof (tab.locator as { page?: number })?.page === "number"

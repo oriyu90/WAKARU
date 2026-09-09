@@ -2,6 +2,112 @@
 
 Cumulative; newest release first.
 
+## v0.2.1 release verification — 2026-09-10
+
+Scope: five reader-reported issues (`docs/DECISIONS.md` D-33) — Live Illustrator
+UI simplified with under-explanation detail-level rewrites; PDF/PPTX arrow-key +
+edge nav and document scroll buttons; collapsible Studio tool output; a Studio
+`build_site` tool; and importing a website folder into 資料を見る with a
+sandboxed live preview. No project-format change, **no database migration**.
+ts-rs adds `WebsiteFile` / `WebsiteManifest` and a `"website"` member on
+`SourceKind`; IPC adds `source_add_folder` and `website_manifest`.
+
+### What changed
+
+- **Live Illustrator** — `src/features/viewer/IllustratorDrawer.tsx`: removed the
+  資料全体／このページ and かんたん／標準／くわしい segmented controls. Always
+  explains the whole document; default detail from `settings.illustrator.default
+  Level`. After the first auto explanation, while `pastMessages.length === 0`,
+  `.levelSwap` buttons rewrite at the other two levels (`levelOverride` → the
+  debounced generate effect re-runs on `level`).
+- **Viewer navigation** — `src/features/viewer/FilePreviews.tsx`: `usePageKeys`
+  (←/→/PageUp/PageDown, ignored while a field is focused) + hover `EdgeNav`
+  arrows on the PDF and PPTX renderers; `ScrollNav` (buttons + PageUp/PageDown,
+  ~0.9 screen) on `DocxFilePreview` and `ReadingPreview`; typing-guard added to
+  the existing `PagedPreview` key handler.
+- **Studio tool output** — `src/features/studio/Studio.tsx`: `role === "tool"`
+  messages render in a closed `<details>` (`studio.toolResultLines` summary). The
+  `pending_approval` argument dump is unchanged (still full).
+- **Studio `build_site`** — `src-tauri/src/services/studio.rs`: writes a
+  multi-file static site as one directory artifact (`mime =
+  text/x-wakaru-site`). The whole file set is validated before any write —
+  `website::safe_rel` on each path, `.html` required, ≤ `SITE_MAX_FILES` (200)
+  and ≤ `SITE_MAX_TOTAL_BYTES` (24 MiB). `classify_call` gates it like
+  `write_file` (overwrite → approval). `studio_import_artifact_as_source` calls
+  `sources::add_folder` when the artifact is a directory; `studio_download_
+  artifact` copies a directory recursively (symlinks skipped).
+- **Website folder import** — new `SourceKind::Website`; `src-tauri/src/services/
+  website.rs`: `copy_site_tree` is an **iterative** (non-recursive) walk that
+  never follows symlinks, copies only an extension allowlist, skips dot- and
+  `node_modules`-style dirs, and is bounded to `MAX_FILES` 4 000 /
+  `MAX_TOTAL_BYTES` 128 MiB / `MAX_DEPTH` 24; entry = `index.html`, else the
+  shallowest then lexicographically-first `.html`. `parse_site` yields one unit
+  per HTML file via the shared `ingest::web::extract_readable`, capped at 3 MiB
+  of body per file. `manifest` lists every file with an `isEntry` flag.
+  `sources::add_folder` copies the tree into `sources/<id>/` and queues ingest;
+  ingest gains a `Website` arm (entry derived from the DB `rel_path`). New
+  commands `source_add_folder` and `website_manifest`.
+- **Preview** — `src/features/viewer/WebsitePreview.tsx`: a file tree plus an
+  `<iframe sandbox="allow-scripts allow-same-origin allow-forms"
+  referrerpolicy="no-referrer">` whose `src` is a `wakaru-asset://` URL under
+  `sources/<sid>/`. Relative and root-absolute sub-resources resolve inside the
+  project sandbox via `assets::resolve`. `tauri.conf.json` CSP gains
+  `frame-src 'self' wakaru-asset: http://wakaru-asset.localhost`.
+
+### Automated gates
+
+| Gate | Result |
+|---|---|
+| `tsc --noEmit` | clean |
+| `eslint` (`src/`) | clean |
+| `check-design-rules` / `check-hardcoded` | ok |
+| `check-i18n` | **384 keys × 3 languages** |
+| ts-rs `npm run bindings` | regenerated; diff = `WebsiteFile` / `WebsiteManifest` + `SourceKind` `"website"` only |
+| Vitest (`npm test`) | **18 passed** |
+| `vite build` | ok |
+| `cargo fmt --check` | clean |
+| `cargo clippy --all-targets -- -D warnings` | clean |
+| `cargo test` | lib **185 passed**, 1 ignored (+7 `services::website`); integration phases all green (+1 `phase2::website_folder_import_extracts_a_unit_per_html_and_lists_files`) |
+
+### Wire audit — OpenAI / Anthropic
+
+The only change to the AI request path is one extra function tool definition
+(`build_site`) in the `tools` array, serialized by the same code path that has
+carried `build_document` since v0.2.0. No change to parameters, body, streaming
+handling, base-URL processing, or the `/v1` completion added in v0.2.0. OpenAI
+official (`.../v1`) and Anthropic official are unaffected.
+
+### Dangerous-design items
+
+- Folder copy is iterative (stack-safe), never follows symlinks, and is bounded
+  by file count, total bytes and depth — a runaway `node_modules` or a symlink
+  loop cannot exhaust memory, disk or the stack.
+- `build_site` validates the entire file set (paths, `.html` presence, size)
+  before touching disk.
+- `parse_site` caps body extraction per file.
+- The preview iframe has no `allow-popups`; `referrerpolicy=no-referrer`.
+- Directory-artifact download recurses a size-capped tree, skipping symlinks.
+
+### Artifact
+
+Built with `APPLE_SIGNING_IDENTITY="-" MACOSX_DEPLOYMENT_TARGET=12.0 npm run
+tauri build -- --bundles app`; app re-signed `codesign --force --deep --sign -`;
+DMG packaged from the signed app + an `/Applications` symlink via
+`hdiutil create -format UDZO`.
+
+| Field | Value |
+|---|---|
+| App | `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, version 0.2.1) |
+| DMG | `WAKARU_0.2.1_aarch64.dmg` |
+| Size | 23,178,061 bytes |
+| SHA-256 | `6e3218f73da5814e795266e3622adf9c5b46362ec7f7364eadc27379ffb26283` (basename in `WAKARU_0.2.1_aarch64.dmg.sha256`) |
+| `hdiutil verify` | checksum VALID |
+| Inner-app `codesign --verify --deep --strict` | valid on disk; satisfies its Designated Requirement (checked on the mounted DMG) |
+| Startup probe | `WAKARU backend ready version="0.2.1"`; startup log has no secret patterns |
+
+macOS 12+, Apple Silicon, ad-hoc signed, **not** Apple-notarized. Windows and
+Linux are not built or verified.
+
 ## v0.2.0 release verification — round 2 — 2026-09-10
 
 Scope: seven further reader-reported problems folded into the same v0.2.0 tag,

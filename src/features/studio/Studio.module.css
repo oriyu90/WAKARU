@@ -117,17 +117,49 @@
   border-radius: var(--radius-lg);
   background: var(--color-paper-3);
 }
+/* Collapsed-by-default tool output (like Claude). */
+.toolBlock {
+  border: var(--rule-1) solid var(--color-rule);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper-2);
+}
+.toolSummary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-2xs) var(--space-xs);
+  cursor: pointer;
+  list-style: none;
+}
+.toolSummary::-webkit-details-marker {
+  display: none;
+}
+.toolSummary::before {
+  content: "▸";
+  font-size: var(--fs-2xs);
+  color: var(--color-muted);
+}
+.toolBlock[open] .toolSummary::before {
+  content: "▾";
+}
+.toolSummary:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: 2px;
+}
+.toolMeta {
+  font-size: var(--fs-2xs);
+  color: var(--color-muted);
+}
 .toolOut {
   margin: 0;
   padding: var(--space-xs);
-  background: var(--color-paper-2);
-  border-radius: var(--radius-sm);
+  border-block-start: var(--rule-1) solid var(--color-rule);
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
   color: var(--color-neutral);
   white-space: pre-wrap;
   overflow-x: auto;
-  max-height: 9rem;
+  max-height: 18rem;
 }
 .thinking {
   color: var(--color-muted);

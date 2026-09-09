@@ -149,6 +149,7 @@ mark.hitActive {
   min-width: 0;
   min-height: 0;
   height: 100%;
+  position: relative;
 }
 .fileToolbar,
 .fileControls {
@@ -172,6 +173,76 @@ mark.hitActive {
   min-height: 0;
   overflow: auto;
   background: var(--color-paper-3);
+  position: relative;
+}
+
+/* Paged navigation affordances (issue 2). */
+.edgeNav {
+  position: absolute;
+  inset-block: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: clamp(2.25rem, 6vw, 3.5rem);
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+.edgeNav[data-side="prev"] {
+  inset-inline-start: 0;
+}
+.edgeNav[data-side="next"] {
+  inset-inline-end: 0;
+}
+.canvasViewport:hover .edgeNav,
+.slideViewport:hover .edgeNav,
+.edgeNav:focus-visible {
+  opacity: 1;
+}
+.edgeNav:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--color-ink) 8%, transparent);
+  color: var(--color-ink);
+}
+.edgeNav:disabled {
+  opacity: 0;
+  cursor: default;
+}
+.edgeNav:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.scrollNav {
+  position: absolute;
+  inset-inline-end: var(--space-md);
+  inset-block-end: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  z-index: 2;
+}
+.scrollNav button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border: var(--rule-1) solid var(--color-rule-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  cursor: pointer;
+  box-shadow: var(--shadow-overlay);
+}
+.scrollNav button:hover {
+  background: var(--color-paper-2);
+}
+.scrollNav button:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: 2px;
 }
 .canvasViewport {
   display: grid;

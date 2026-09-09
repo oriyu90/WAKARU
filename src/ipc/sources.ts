@@ -9,6 +9,8 @@ export const sourcesApi = {
     call<Source[]>("source_add_files", { input: { projectId, paths } }),
   addUrl: (projectId: string, url: string) =>
     call<Source>("source_add_url", { projectId, url }),
+  addFolder: (projectId: string, folder: string) =>
+    call<Source>("source_add_folder", { projectId, folder }),
   reanalyze: (projectId: string, sourceId: string) =>
     call<void>("source_reanalyze", { projectId, sourceId }),
   delete: (projectId: string, sourceId: string) =>
@@ -27,4 +29,12 @@ export async function pickSourceFiles(): Promise<string[]> {
   });
   if (!picked) return [];
   return Array.isArray(picked) ? picked : [picked];
+}
+
+/** OS folder picker for importing a static-site folder (issue 5). */
+export async function pickFolder(): Promise<string | null> {
+  if (!inTauri) return null;
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const picked = await open({ directory: true, multiple: false, title: "Add website folder" });
+  return typeof picked === "string" ? picked : null;
 }

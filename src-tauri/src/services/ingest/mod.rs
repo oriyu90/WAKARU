@@ -9,7 +9,7 @@ mod office;
 mod pdf;
 mod sheet;
 mod text;
-mod web;
+pub(crate) mod web;
 
 use crate::domain::source::SourceKind;
 use crate::error::{AppError, AppResult};
@@ -304,6 +304,24 @@ fn parse(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput, dd: &Path) -> A
             let n = units.len() as u32;
             Parsed {
                 page_count: Some(n),
+                ..Parsed::plain(units)
+            }
+        }
+        SourceKind::Website => {
+            let site_root = file(input)?;
+            let rel: String = ctx.project_db.query_row(
+                "SELECT rel_path FROM sources WHERE id = ?1",
+                [ctx.source_id],
+                |r| r.get(0),
+            )?;
+            let entry = rel
+                .strip_prefix(&format!("sources/{}/", ctx.source_id))
+                .unwrap_or("index.html")
+                .to_string();
+            let units = crate::services::website::parse_site(&site_root, &entry)?;
+            let pc = units.len() as u32;
+            Parsed {
+                page_count: Some(pc),
                 ..Parsed::plain(units)
             }
         }

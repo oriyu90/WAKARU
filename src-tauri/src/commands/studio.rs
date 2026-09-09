@@ -6,6 +6,26 @@ use crate::state::AppState;
 use std::path::Path;
 use tauri::{AppHandle, State};
 
+/// Recursively copy `src` dir into `dst` (used when downloading a `build_site`
+/// folder artifact). Bounded by the caller — a site artifact is size-capped.
+fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ft = entry.file_type()?;
+        if ft.is_symlink() {
+            continue;
+        }
+        let to = dst.join(entry.file_name());
+        if ft.is_dir() {
+            copy_dir_recursive(&entry.path(), &to)?;
+        } else if ft.is_file() {
+            std::fs::copy(entry.path(), &to)?;
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn studio_list_tabs(
     state: State<'_, AppState>,
@@ -132,21 +152,33 @@ pub fn studio_import_artifact_as_source(
         let db = projects::open_db(&state.projects_dir, &project_id)?;
         studio::artifact_abs_path(&state.projects_dir, &project_id, &db, &artifact_id)?
     };
-    let created = sources::add_files(
-        &app,
-        &state.app_db_path,
-        &state.projects_dir,
-        state.jobs.clone(),
-        &project_id,
-        vec![abs.to_string_lossy().to_string()],
-    )?;
-    let source = created.into_iter().next().ok_or_else(|| {
-        AppError::new(
-            "STUDIO_IMPORT_FAILED",
-            "error.studio.importFailed",
-            "nothing imported",
-        )
-    })?;
+    // A `build_site` artifact is a folder — import it as one `website` source.
+    let source = if abs.is_dir() {
+        sources::add_folder(
+            &app,
+            &state.app_db_path,
+            &state.projects_dir,
+            state.jobs.clone(),
+            &project_id,
+            &abs.to_string_lossy(),
+        )?
+    } else {
+        let created = sources::add_files(
+            &app,
+            &state.app_db_path,
+            &state.projects_dir,
+            state.jobs.clone(),
+            &project_id,
+            vec![abs.to_string_lossy().to_string()],
+        )?;
+        created.into_iter().next().ok_or_else(|| {
+            AppError::new(
+                "STUDIO_IMPORT_FAILED",
+                "error.studio.importFailed",
+                "nothing imported",
+            )
+        })?
+    };
     let db = projects::open_db(&state.projects_dir, &project_id)?;
     studio::mark_artifact_imported(&db, &artifact_id, &source.id)?;
     Ok(source)
@@ -168,6 +200,10 @@ pub fn studio_download_artifact(
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| "artifact".into());
     let dest = Path::new(&dest_dir).join(name);
-    std::fs::copy(&abs, &dest)?;
+    if abs.is_dir() {
+        copy_dir_recursive(&abs, &dest)?;
+    } else {
+        std::fs::copy(&abs, &dest)?;
+    }
     Ok(dest.to_string_lossy().to_string())
 }

@@ -19,4 +19,5 @@ pub mod sources;
 pub mod studio;
 pub mod viewer;
 pub mod vision;
+pub mod website;
 pub mod whisper;

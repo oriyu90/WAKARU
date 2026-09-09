@@ -90,3 +90,26 @@ pub fn source_asset_url(
 ) -> AppResult<String> {
     Ok(assets::url(&project_id, &source_id, &rel_path))
 }
+
+/// File list + entry for a `website` source, for the Viewer's file tree.
+#[tauri::command]
+pub fn website_manifest(
+    state: State<'_, AppState>,
+    project_id: String,
+    source_id: String,
+) -> AppResult<crate::services::website::WebsiteManifest> {
+    let db = projects::open_db(&state.projects_dir, &project_id)?;
+    let rel: String = db.query_row(
+        "SELECT rel_path FROM sources WHERE id = ?1 AND kind = 'website'",
+        [&source_id],
+        |r| r.get(0),
+    )?;
+    let entry = rel
+        .strip_prefix(&format!("sources/{source_id}/"))
+        .unwrap_or("index.html")
+        .to_string();
+    let site_root = projects::project_dir(&state.projects_dir, &project_id)
+        .join("sources")
+        .join(&source_id);
+    crate::services::website::manifest(&site_root, &entry)
+}

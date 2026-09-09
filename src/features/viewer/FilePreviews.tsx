@@ -70,6 +70,94 @@ function PageControls({ page, total, onPage }: { page: number; total: number; on
   );
 }
 
+/** True while the reader is typing somewhere — page/scroll keys must not steal
+ * those keystrokes (e.g. the Illustrator textarea sits next to the viewer). */
+function isTypingTarget() {
+  const el = document.activeElement as HTMLElement | null;
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+}
+
+/** Arrow / PageUp / PageDown page turning, shared by the PDF and PPTX renderers
+ * (issue 2). Ignored while typing. */
+function usePageKeys(onDelta: (delta: number) => void) {
+  const cb = useRef(onDelta);
+  cb.current = onDelta;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isTypingTarget()) return;
+      if (e.key === "ArrowRight" || e.key === "PageDown") {
+        e.preventDefault();
+        cb.current(1);
+      } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+        e.preventDefault();
+        cb.current(-1);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+}
+
+/** Large translucent ‹ › affordances pinned to the sides of a paged viewport. */
+function EdgeNav({ page, total, onPage }: { page: number; total: number; onPage: (page: number) => void }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <button
+        type="button"
+        className={styles.edgeNav}
+        data-side="prev"
+        aria-label={t("viewer.prevPage")}
+        disabled={page <= 1}
+        onClick={() => onPage(page - 1)}
+      >
+        <ChevronRightIcon size={22} style={{ transform: "rotate(180deg)" }} />
+      </button>
+      <button
+        type="button"
+        className={styles.edgeNav}
+        data-side="next"
+        aria-label={t("viewer.nextPage")}
+        disabled={page >= Math.max(total, 1)}
+        onClick={() => onPage(page + 1)}
+      >
+        <ChevronRightIcon size={22} />
+      </button>
+    </>
+  );
+}
+
+/** Up / down scroll affordances for a long, non-paged document (issue 2). */
+export function ScrollNav({ targetRef }: { targetRef: React.RefObject<HTMLElement | null> }) {
+  const { t } = useTranslation();
+  const by = (dir: number) => {
+    const el = targetRef.current;
+    if (el) el.scrollBy({ top: dir * el.clientHeight * 0.9, behavior: "smooth" });
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isTypingTarget() || !targetRef.current) return;
+      if (e.key === "PageDown") { e.preventDefault(); by(1); }
+      else if (e.key === "PageUp") { e.preventDefault(); by(-1); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <div className={styles.scrollNav}>
+      <button type="button" aria-label={t("viewer.scrollUp")} onClick={() => by(-1)}>
+        <ChevronRightIcon size={18} style={{ transform: "rotate(-90deg)" }} />
+      </button>
+      <button type="button" aria-label={t("viewer.scrollDown")} onClick={() => by(1)}>
+        <ChevronRightIcon size={18} style={{ transform: "rotate(90deg)" }} />
+      </button>
+    </div>
+  );
+}
+
 export function PdfFilePreview({
   detail,
   projectId,
@@ -92,6 +180,9 @@ export function PdfFilePreview({
   const [zoom, setZoom] = useState(1);
   const [error, setError] = useState<unknown>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  usePageKeys((d) =>
+    setPage((p) => Math.min(Math.max(p + d, 1), pdf?.numPages ?? detail.pageCount ?? p)),
+  );
   const [availWidth, setAvailWidth] = useState(0);
   const onPageRef = useRef(onPage);
   onPageRef.current = onPage;
@@ -241,6 +332,9 @@ export function PdfFilePreview({
       <div ref={viewportRef} className={styles.canvasViewport} aria-label={t("viewer.pdfPreview")}>
         {!pdf && !error ? <div className={styles.centered}>{t("states.analyzing")}…</div> : null}
         <canvas ref={canvasRef} className={styles.pdfCanvas} />
+        {pdf && pdf.numPages > 1 ? (
+          <EdgeNav page={page} total={pdf.numPages} onPage={setPage} />
+        ) : null}
       </div>
     </div>
   );
@@ -278,7 +372,12 @@ export function DocxFilePreview({ detail, fallback }: { detail: SourceDetail; fa
 
   if (detail.bytes > MAX_INTERACTIVE_BYTES) return <FileLimit detail={detail} fallback={fallback} />;
   if (asset.isError || error) return <div className={styles.previewFallback}><ErrorState error={asset.error ?? error} onRetry={() => { setError(null); void asset.refetch(); }} />{fallback}</div>;
-  return <div className={styles.officeViewport} aria-label={t("viewer.docxPreview")} ref={host} />;
+  return (
+    <div className={styles.filePreview}>
+      <div className={styles.officeViewport} aria-label={t("viewer.docxPreview")} ref={host} />
+      <ScrollNav targetRef={host} />
+    </div>
+  );
 }
 
 export function PptxFilePreview({
@@ -301,6 +400,7 @@ export function PptxFilePreview({
   const [error, setError] = useState<unknown>(null);
   const onPageRef = useRef(onPage);
   onPageRef.current = onPage;
+  usePageKeys((d) => setPage((p) => Math.min(Math.max(p + d, 1), total)));
 
   useEffect(() => {
     if (!asset.data) return;
@@ -335,7 +435,10 @@ export function PptxFilePreview({
   return (
     <div className={styles.filePreview}>
       <div className={styles.fileToolbar}><PageControls page={page} total={total} onPage={setPage} /></div>
-      <div className={styles.slideViewport} aria-label={t("viewer.pptxPreview")}><div ref={host} className={styles.slideHost} /></div>
+      <div className={styles.slideViewport} aria-label={t("viewer.pptxPreview")}>
+        <div ref={host} className={styles.slideHost} />
+        {total > 1 ? <EdgeNav page={page} total={total} onPage={setPage} /> : null}
+      </div>
     </div>
   );
 }

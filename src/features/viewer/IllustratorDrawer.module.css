@@ -31,14 +31,23 @@
   font-size: var(--fs-md);
   font-weight: var(--weight-strong);
 }
-.headMeta {
+.pos {
+  font-size: var(--fs-2xs);
+  color: var(--color-muted);
+}
+
+/* One-tap rewrites at the two detail levels the reader did not pick, shown
+   directly under the first auto explanation (issue 1). */
+.levelSwap {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   flex-wrap: wrap;
+  margin-block-start: var(--space-md);
+  padding-block-start: var(--space-sm);
+  border-block-start: var(--rule-1) solid var(--color-rule);
 }
-.pos {
+.levelSwapLabel {
   font-size: var(--fs-2xs);
   color: var(--color-muted);
 }

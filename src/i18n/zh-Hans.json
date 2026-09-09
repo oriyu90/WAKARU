@@ -175,7 +175,8 @@
     "json": "JSON",
     "jsonl": "JSONL",
     "code": "代码",
-    "weblink": "网页链接"
+    "weblink": "网页链接",
+    "website": "网站"
   },
   "states": {
     "queued": "等待中",
@@ -211,7 +212,9 @@
       "invalid": "文档请求不完整。",
       "build": "生成文档失败。",
       "pdfUnavailable": "此版本暂不支持 PDF 输出，已改为保存 Markdown 版本。"
-    }
+    },
+    "WEBSITE_INVALID": "无法将该文件夹作为网站导入。",
+    "STUDIO_SITE_INVALID": "无法生成站点（请检查文件集）。"
   },
   "viewer": {
     "readonly": "只读",
@@ -240,7 +243,15 @@
     "ocrRun": "识别文字",
     "ocrProgress": "识别中… {{done}} / {{total}}",
     "ocrDone": "文字识别完成，这些页面现在可被搜索。",
-    "illustratorStart": "开始讲解"
+    "illustratorStart": "开始讲解",
+    "scrollUp": "向上滚动",
+    "scrollDown": "向下滚动",
+    "addWebsite": "添加网站",
+    "websiteFiles": "站点内文件",
+    "websiteReload": "重新加载",
+    "websiteOpenExternal": "在浏览器中打开",
+    "websitePreview": "网站预览",
+    "websiteEntry": "入口页面"
   },
   "ai": {
     "connections": "连接",
@@ -295,7 +306,6 @@
     "regenerate": "重新生成",
     "visionOff": "不支持图像：仅根据文本讲解",
     "cached": "已保存的讲解",
-    "willExplain": "打开页面会自动讲解。",
     "past": "历史对话（{{count}}）",
     "scope": "引用范围",
     "scopePage": "本页",
@@ -304,11 +314,9 @@
     "stop": "停止",
     "ask": "提问…",
     "send": "发送",
-    "viewLabel": "讲解范围",
-    "viewOverview": "整份资料",
-    "viewPage": "本页",
     "wholeSource": "整份资料",
-    "overviewHint": "打开后会通俗地讲解整份资料。"
+    "overviewHint": "打开后会通俗地讲解整份资料。",
+    "rewriteAs": "以其他详细程度重写"
   },
   "studio": {
     "title": "Studio",
@@ -356,7 +364,8 @@
     "importFailed": "无法导入该文件。",
     "cancelled": "已停止。",
     "pickConversation": "请选择一个会话",
-    "pickConversationBody": "从左侧列表打开会话，或新建一个。过去的会话在打开前不会显示。"
+    "pickConversationBody": "从左侧列表打开会话，或新建一个。过去的会话在打开前不会显示。",
+    "toolResultLines_other": "{{count}} 行"
   },
   "mcp": {
     "transportSupport": "支持 stdio 和 MCP Streamable HTTP。连接失败仅影响该服务器。",

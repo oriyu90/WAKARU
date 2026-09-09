@@ -288,7 +288,7 @@ primaryAssetUrl: string | null,
  */
 ocrStatus: string | null, };
 
-export type SourceKind = "pdf" | "slides" | "doc" | "image" | "audio" | "video" | "sheet" | "text" | "markdown" | "json" | "jsonl" | "code" | "weblink";
+export type SourceKind = "pdf" | "slides" | "doc" | "image" | "audio" | "video" | "sheet" | "text" | "markdown" | "json" | "jsonl" | "code" | "weblink" | "website";
 
 export type SourceStatus = "queued" | "analyzing" | "ready" | "ready_partial" | "failed";
 
@@ -396,6 +396,18 @@ export type UpdateProjectInput = { id: string, name: string | null, description:
 export type VersionVerdict = "accept" | "migrate" | "warnOpen" | "reject";
 
 export type ViewerTab = { id: string, sourceId: string, kind: SourceKind, name: string, locator: unknown, pinned: boolean, ordinal: number, };
+
+export type WebsiteFile = { 
+/**
+ * POSIX-style path relative to the site root.
+ */
+path: string, bytes: number, isEntry: boolean, };
+
+export type WebsiteManifest = { 
+/**
+ * Entry document, relative to the site root (usually `index.html`).
+ */
+entry: string, files: Array<WebsiteFile>, };
 
 export type WhisperModel = { 
 /**

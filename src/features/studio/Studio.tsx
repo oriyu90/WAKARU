@@ -488,10 +488,20 @@ function MessageRow({
   const calls = (message.toolCalls ?? []) as StudioToolCall[];
 
   if (message.role === "tool") {
+    // Collapsed by default (like Claude): the reader opens it only when they
+    // want to inspect the raw output.
+    const lines = message.content.split("\n").length;
     return (
       <article className={styles.message} data-role="tool">
-        <span className={styles.role}>{t("studio.toolResult")}</span>
-        <pre className={styles.toolOut}>{message.content}</pre>
+        <details className={styles.toolBlock}>
+          <summary className={styles.toolSummary}>
+            <span className={styles.role}>{t("studio.toolResult")}</span>
+            <span className={styles.toolMeta}>
+              {t("studio.toolResultLines", { count: lines })}
+            </span>
+          </summary>
+          <pre className={styles.toolOut}>{message.content}</pre>
+        </details>
       </article>
     );
   }
