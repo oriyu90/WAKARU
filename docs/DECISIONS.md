@@ -304,3 +304,14 @@
 - **理由**: Anthropic 経路は既に `thinking_delta` を正しく扱う。OpenAI 経路だけの追加で、既存の非推論モデルの出力・キャンセル・truncation 判定・tool 呼び出し再構築に影響を与えない。SSE パーサ本体（`eventsource_stream`）や `reasoning_content`/`reasoning` の既存処理も変更しない。
 - **影響**: `src-tauri/src/services/ai/client.rs`（`ThinkSplit` と単体テスト7件）、`src-tauri/tests/live_ornith.rs`（回答に `<think>` が出ないことの表明を追加）。DB・IPC・スキーマ・UI は無変更。
 - **差し戻し条件**: `<think>` 以外のタグ名（`<thinking>` 等）や複数ブロックを扱う必要が出たら、タグ集合と複数出現に対応するようパーサを一般化する。ブロック境界の判定は既に分離済み。
+
+## D-29 · 設定スイッチのクリック不達を修正し、stdio MCP のコマンド解決を広げる（SearXNG プリセット同梱）
+
+- **日付**: 2026-09-09（v0.1.2）
+- **論点1（クラッシュではないが機能不全）**: `Switch` コンポーネントは視覚的に隠した `<input type="checkbox">` の上に装飾用 `<span class="switchTrack/switchThumb">` を後置し、いずれも `position:absolute; inset:0`。装飾スパンに `pointer-events` 指定が無いため input の上へ描画され、**マウス/タップのクリックが input に届かない**。キーボード（Tab→Space）でしか切り替えられず、オーナーから「ライブ解説が有効にできない」と報告。Settings の全スイッチ（更新確認・OCR・先読み・引き継ぎ 等）が同じ症状。`Checkbox` は `<label>` 包みのため無事。
+- **論点2**: MCP は汎用 stdio サーバ（command + args + env、env はキーチェーン）を受け付けるので SearXNG 用 MCP サーバ（`npx -y mcp-searxng` + `SEARXNG_URL`）は表現できる。しかし Finder 起動の `.app` は `PATH=/usr/bin:/bin:/usr/sbin:/sbin` しか継承せず、`services/mcp.rs::connect()` は `env_clear()` 後この最小 PATH のみ子へ渡すため `npx`/`uvx`/`node` が解決できず `MCP_SPAWN_FAILED`。プリセットも無く、コマンド・引数・env を暗記する必要があった。
+- **採用1**: `src/components/controls.module.css` の `.switchTrack` / `.switchThumb` に `pointer-events: none` を追加（隠し input 上の装飾オーバーレイの定石）。挙動・見た目・フォーカスリング・a11y 契約・キーボード操作は不変。回帰テスト `src/components/Switch.test.tsx` を追加。
+- **採用2**: `services/mcp.rs` に stdio コマンド解決を追加。`command` に `/` を含まなければ `$PATH` ∪ 実在する既知の実行ファイルディレクトリ（`/opt/homebrew/bin`, `/usr/local/bin`, `~/.local/bin`, `~/.cargo/bin`, `~/.bun/bin`, `~/.deno/bin`, `~/.volta/bin`, `~/Library/pnpm`, nvm/fnm の各バージョン `bin` 等）から探索し、実行可能な最初の一致を使う。見つからなければ元の名前を返し、`spawn` は従来どおり失敗する。子プロセスの `PATH` も同じ結合（重複排除・実在のみ）を渡す（解決した `npx` が自前の `node` を見つけられるように）。`env_clear()` と秘密情報なしの env allowlist 方針は維持し、探索の**追加のみ**でユーザーが既に持つ順序は保つ。MCP 設定に「SearXNG（Web 検索）」プリセット（form 自動入力のみ、自動接続なし）と i18n 3言語を追加。
+- **理由**: いずれも既存の型・IPC 契約・DB スキーマ・画面階層に触れない純粋な不具合修正と探索拡張。ts-rs バインディングの差分ゼロ。npx/uvx 系の全 MCP サーバが恩恵を受ける。パスは文字列処理のみで `unsafe`・panic 経路なし。
+- **影響**: `src/components/controls.module.css`, `src/components/Switch.test.tsx`（新規）, `src/features/settings/McpSettings.tsx`, `src/i18n/{ja,en,zh-Hans}.json`（`mcp.preset*` と `mcp.commandHint`）, `src-tauri/src/services/mcp.rs`（`extra_bin_dirs` / `child_path` / `resolve_program` と単体テスト3件）。
+- **差し戻し条件**: 既知ディレクトリの決め打ちが将来の環境で不足/過剰になった場合は、ユーザーが MCP サーバ単位で追加パスを指定できる項目を設ける。Windows/Linux 配布を再開する際は、その OS の慣習パス（`%APPDATA%\npm` 等）を条件付きで加える。

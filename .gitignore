@@ -32,3 +32,6 @@ dist-ssr
 
 # tsc
 *.tsbuildinfo
+
+# Release artifacts (uploaded to GitHub Releases, never committed)
+*.dmg

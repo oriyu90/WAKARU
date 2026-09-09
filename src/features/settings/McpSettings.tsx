@@ -25,6 +25,20 @@ type Draft = {
 
 const BLANK: Draft = { name: "", transport: "stdio", command: "", url: "", args: "", env: "" };
 
+/** One-click starting points for common servers. The user still reviews every
+ * field and saves manually; nothing connects on its own. `command` stays a bare
+ * name — the backend resolves `npx` from the usual install locations. */
+const PRESETS: Record<string, Omit<Draft, "id">> = {
+  searxng: {
+    name: "SearXNG",
+    transport: "stdio",
+    command: "npx",
+    args: "-y mcp-searxng",
+    url: "",
+    env: "SEARXNG_URL=http://localhost:8888",
+  },
+};
+
 function toDraft(s: McpServer): Draft {
   return {
     id: s.id,
@@ -201,6 +215,23 @@ export function McpSettings() {
       >
         {editing ? (
           <div className={styles.form}>
+            {!editing.id ? (
+              <Field label={t("mcp.preset")} hint={t("mcp.presetSearxngHint")}>
+                {({ id }) => (
+                  <Select
+                    id={id}
+                    value=""
+                    onChange={(e) => {
+                      const p = PRESETS[e.target.value];
+                      if (p) setEditing({ ...p });
+                    }}
+                  >
+                    <option value="">{t("mcp.presetCustom")}</option>
+                    <option value="searxng">{t("mcp.presetSearxng")}</option>
+                  </Select>
+                )}
+              </Field>
+            ) : null}
             <Field label={t("mcp.name")}>
               {({ id }) => (
                 <Input

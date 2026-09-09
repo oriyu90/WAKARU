@@ -2,6 +2,19 @@
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
+**2026-09-09 · v0.1.2 maintenance** — Settings switches (`Switch` component) were
+click-dead: the decorative track/thumb spans painted over the visually hidden
+`<input>` with no `pointer-events: none`, so only keyboard toggled them — reported
+as "Live Illustrator can't be enabled". Fixed in `src/components/controls.module.css`
+(+ `src/components/Switch.test.tsx`). stdio MCP command resolution widened: a bare
+`npx` / `uvx` / `node` is now found in the usual install locations (Homebrew,
+`~/.local/bin`, cargo/bun/deno/volta, nvm/fnm) even when the app is launched from
+Finder with a minimal `PATH`, and the child gets that same widened `PATH`
+(`extra_bin_dirs` / `child_path` / `resolve_program` in `src-tauri/src/services/mcp.rs`).
+A "SearXNG (web search)" preset in MCP settings pre-fills a known-good stdio config.
+No IPC / schema / type / routing change; ts-rs bindings unchanged. See
+`IMPLEMENTATION_PLAN_v0.1.2.md` and `docs/DECISIONS.md` D-29.
+
 **2026-09-09 · v0.1.1 maintenance** — `AiClient` OpenAI-compatible streaming now
 splits a leading inline `<think>…</think>` block out of `content` and sends it to
 the `reasoning` channel (`ThinkSplit` in `src-tauri/src/services/ai/client.rs`),

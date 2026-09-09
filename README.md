@@ -40,7 +40,9 @@ so on first launch right-click WAKARU → **Open**.
   source you are viewing, with citations.
 - **Studio** — an agentic loop over your sources and a sandboxed workspace, with tool
   approval, iteration limits and artifact export.
-- **MCP** — local stdio servers and policy-checked Streamable HTTP servers.
+- **MCP** — local stdio servers (a bare `npx` / `uvx` / `node` command is found
+  in the usual install locations; a SearXNG web-search preset is built in) and
+  policy-checked Streamable HTTP servers.
 - **Private by default** — API keys in the OS keychain; original files served only
   through a project-scoped `wakaru-asset://` protocol; no telemetry.
 - Japanese / English / Simplified Chinese UI, light / dark / monochrome, WCAG AA.
@@ -56,7 +58,8 @@ npm run tauri build        # package (macOS: add -- --bundles app for an app-onl
 ```
 
 Requirements: Node 20+, a stable Rust toolchain (see `src-tauri/Cargo.toml`
-`rust-version`), and Xcode command-line tools on macOS.
+`rust-version`), CMake (for the bundled `whisper.cpp`), and Xcode command-line
+tools on macOS.
 
 ## Repository layout
 

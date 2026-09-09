@@ -13,7 +13,9 @@ use rmcp::ClientServiceExt;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
+use std::ffi::OsString;
 use std::hash::{Hash, Hasher};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use tokio::sync::Mutex;
 
@@ -210,6 +212,109 @@ pub fn set_policy(app_db: &Connection, server_id: &str, tool: &str, policy: &str
     Ok(())
 }
 
+// ───────────────────────── stdio command resolution ─────────────────────────
+//
+// A macOS app launched from Finder inherits only `PATH=/usr/bin:/bin:/usr/sbin:
+// /sbin`, so a stdio MCP server registered as `npx` / `uvx` / `node` (the common
+// case — e.g. a SearXNG web-search server) fails to spawn unless the user hunts
+// down an absolute path. WAKARU widens the search to the well-known interpreter
+// install locations, without a shell and without touching the secret-free env
+// allowlist (docs/05 §6.4, D-29). This only *adds* candidate directories; a
+// directory the user already had on `PATH` keeps its priority.
+
+/// Well-known bin directories for language runtimes and tool managers that a
+/// GUI-launched process does not get on `PATH`. Only ones that exist are used.
+fn extra_bin_dirs() -> Vec<PathBuf> {
+    let mut dirs: Vec<PathBuf> = [
+        "/opt/homebrew/bin",
+        "/opt/homebrew/sbin",
+        "/usr/local/bin",
+        "/usr/local/sbin",
+        "/usr/bin",
+        "/bin",
+        "/usr/sbin",
+        "/sbin",
+        "/opt/local/bin", // MacPorts
+    ]
+    .iter()
+    .map(PathBuf::from)
+    .collect();
+
+    if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
+        for rel in [
+            ".local/bin",
+            ".cargo/bin",
+            ".bun/bin",
+            ".deno/bin",
+            ".volta/bin",
+            "Library/pnpm",
+            ".npm-global/bin",
+            "n/bin",
+        ] {
+            dirs.push(home.join(rel));
+        }
+        // nvm / fnm keep versioned `node` under per-version dirs; include all,
+        // sorted so the newest wins ties added later.
+        for base in [
+            home.join(".nvm/versions/node"),
+            home.join(".local/share/fnm/node-versions"),
+        ] {
+            if let Ok(rd) = std::fs::read_dir(&base) {
+                let mut found: Vec<PathBuf> = rd
+                    .flatten()
+                    .flat_map(|e| [e.path().join("bin"), e.path().join("installation/bin")])
+                    .filter(|p| p.is_dir())
+                    .collect();
+                found.sort();
+                dirs.extend(found);
+            }
+        }
+    }
+    dirs
+}
+
+/// `PATH` for a stdio MCP child: the inherited `PATH` first (user intent wins),
+/// then [`extra_bin_dirs`], de-duplicated, existing directories only.
+fn child_path() -> OsString {
+    let mut seen = std::collections::HashSet::new();
+    let mut ordered: Vec<PathBuf> = Vec::new();
+    let inherited = std::env::var_os("PATH").unwrap_or_default();
+    for p in std::env::split_paths(&inherited)
+        .chain(extra_bin_dirs())
+        .filter(|p| !p.as_os_str().is_empty())
+    {
+        if p.is_dir() && seen.insert(p.clone()) {
+            ordered.push(p);
+        }
+    }
+    std::env::join_paths(&ordered).unwrap_or(inherited)
+}
+
+/// Resolve a bare command name against `search_path`. An absolute or
+/// path-qualified command is returned unchanged; if nothing matches, the
+/// original name is returned so `spawn` fails exactly as it did before.
+fn resolve_program(program: &str, search_path: &OsString) -> OsString {
+    if program.contains('/') || Path::new(program).is_absolute() {
+        return program.into();
+    }
+    for dir in std::env::split_paths(search_path) {
+        let candidate = dir.join(program);
+        if !candidate.is_file() {
+            continue;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            match std::fs::metadata(&candidate) {
+                Ok(md) if md.permissions().mode() & 0o111 != 0 => {}
+                _ => continue,
+            }
+        }
+        return candidate.into_os_string();
+    }
+    program.into()
+}
+
 // ───────────────────────── connection lifecycle ─────────────────────────
 
 /// Connect (or reconnect) one stdio server and cache its tool list. HTTP is not
@@ -241,10 +346,17 @@ pub async fn connect(
         })?;
 
     // Build a shell-free command with a scrubbed environment (docs/05 §6.4).
-    let mut cmd = tokio::process::Command::new(&program);
+    // The command name is resolved against a widened search path so `npx` /
+    // `uvx` / `node` work without an absolute path (D-29); the child gets that
+    // same widened `PATH` so a resolved `npx` can find its own `node`.
+    let search_path = child_path();
+    let program_path = resolve_program(&program, &search_path);
+    let mut cmd = tokio::process::Command::new(&program_path);
     cmd.args(&row.args).env_clear();
     for key in ENV_ALLOWLIST {
-        if let Ok(v) = std::env::var(key) {
+        if *key == "PATH" {
+            cmd.env("PATH", &search_path);
+        } else if let Ok(v) = std::env::var(key) {
             cmd.env(key, v);
         }
     }
@@ -732,6 +844,54 @@ pub async fn shutdown_all() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn child_path_is_deduped_and_all_dirs_exist() {
+        let joined = child_path();
+        let dirs: Vec<_> = std::env::split_paths(&joined).collect();
+        for d in &dirs {
+            assert!(d.is_dir(), "child_path yielded a non-existent dir: {d:?}");
+        }
+        let unique: std::collections::HashSet<_> = dirs.iter().collect();
+        assert_eq!(unique.len(), dirs.len(), "child_path has duplicate entries");
+        // A POSIX system always has /bin or /usr/bin.
+        assert!(dirs
+            .iter()
+            .any(|d| d == Path::new("/bin") || d == Path::new("/usr/bin")));
+    }
+
+    #[test]
+    fn resolve_program_finds_a_bare_name_on_path() {
+        let path = child_path();
+        let resolved = resolve_program("sh", &path);
+        let p = Path::new(&resolved);
+        assert!(
+            p.is_absolute(),
+            "sh should resolve to an absolute path: {resolved:?}"
+        );
+        assert!(p.is_file());
+        assert_eq!(p.file_name().unwrap(), "sh");
+    }
+
+    #[test]
+    fn resolve_program_passes_through_qualified_and_unknown_names() {
+        let path = child_path();
+        // Absolute path: unchanged.
+        assert_eq!(
+            resolve_program("/usr/bin/env", &path),
+            OsString::from("/usr/bin/env")
+        );
+        // Contains a slash: unchanged (relative command, caller's cwd).
+        assert_eq!(
+            resolve_program("./local-server", &path),
+            OsString::from("./local-server")
+        );
+        // Not found anywhere: returned verbatim so spawn fails as before.
+        assert_eq!(
+            resolve_program("wakaru-no-such-binary-xyz", &path),
+            OsString::from("wakaru-no-such-binary-xyz")
+        );
+    }
 
     #[test]
     fn server_namespaces_are_stable_and_unique() {

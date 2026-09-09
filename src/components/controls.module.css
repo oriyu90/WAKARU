@@ -258,6 +258,9 @@
 .switchTrack {
   position: absolute;
   inset: 0;
+  /* Decoration only — must not intercept the pointer, or the visually hidden
+     <input> underneath never receives the click (it still works by keyboard). */
+  pointer-events: none;
   border-radius: var(--radius-pill);
   background: var(--color-neutral);
   transition: background-color var(--dur-short) var(--ease-in-out);
@@ -266,6 +269,7 @@
   position: absolute;
   inset-block: 0.15rem;
   inset-inline-start: 0.15rem;
+  pointer-events: none;
   aspect-ratio: 1;
   border-radius: 50%;
   background: var(--color-paper);

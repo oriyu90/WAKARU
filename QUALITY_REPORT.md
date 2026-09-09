@@ -2,6 +2,81 @@
 
 Cumulative; newest release first.
 
+## v0.1.2 release verification — 2026-09-09
+
+Scope: a Settings switch click-target fix and wider stdio MCP command resolution
+with a SearXNG preset. No change to the application hierarchy, IPC contract,
+database schema, project format, design tokens, or any existing workflow. No
+database migration. ts-rs bindings unchanged.
+
+### What changed
+
+- **`Switch` click target** — `src/components/controls.module.css`: the
+  decorative `.switchTrack` / `.switchThumb` spans, which are absolutely
+  positioned over the visually hidden `<input type="checkbox">`, now carry
+  `pointer-events: none`. Before the fix a click or tap landed on the decoration
+  and never reached the input, so every Settings switch (Enable Live Illustrator
+  included) could only be changed with the keyboard. Persistence, the settings
+  backend merge, and the Viewer's Illustrator gating were already correct — only
+  the pointer target was broken. New `src/components/Switch.test.tsx`.
+- **stdio MCP command resolution** — `src-tauri/src/services/mcp.rs`: a bare
+  command (`npx`, `uvx`, `node`, …) is resolved against `$PATH` plus the usual
+  interpreter install locations that a Finder-launched app does not inherit
+  (Homebrew, `~/.local/bin`, Cargo/Bun/Deno/Volta, nvm/fnm version dirs). The
+  child process receives that same de-duplicated, existing-only `PATH`. A
+  path-qualified or absolute command is used verbatim; an unresolved name is
+  passed through so `spawn` fails exactly as before. `env_clear()`, the shell-free
+  launch, and the secret-free env allowlist are unchanged. `extra_bin_dirs` /
+  `child_path` / `resolve_program` with 3 new unit tests.
+- **SearXNG preset** — `src/features/settings/McpSettings.tsx`: the Add-server
+  dialog offers a preset chooser that pre-fills a `npx -y mcp-searxng` /
+  `SEARXNG_URL` stdio configuration. Form-fill only; no auto-connect, no new IPC,
+  no backend change. New `mcp.preset*` strings and an updated `mcp.commandHint` in
+  all three languages.
+
+### Automated gates
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck | pass |
+| Frontend lint (eslint + design-rules + hardcoded-strings) | pass |
+| Frontend unit tests (vitest incl. axe) | 12 passed (9 + 3 new `Switch` cases) |
+| Contrast | pass; all checked light/dark pairs meet their targets |
+| i18n parity | 355 keys × 3 languages (ja / en / zh-Hans) |
+| Production web build | pass; existing large-chunk advisory only |
+| ts-rs binding export | drift 0 |
+| Rust `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings` | pass |
+| Rust library tests | 173 passed (170 + 3 new MCP path cases); 1 network/npx test intentionally ignored |
+| Rust phase integration tests | 39 passed |
+| `cargo deny check` — advisories, bans, licenses, sources | pass |
+
+### Design and behaviour review
+
+- No `*.module.css` structural change and no design token touched; the single CSS
+  edit adds `pointer-events: none` to two decoration-only spans.
+- Verified in the running app (`npm run dev`, in-browser): before the fix,
+  `document.elementFromPoint` at the centre of a Settings switch returned the
+  decorative `.switchTrack` span; after it, every switch on the General and Live
+  Illustrator sections hit-tests to the `<input>`. A real pointer click on
+  **Enable Live Illustrator** toggles it on and off and the value persists to
+  `localStorage`; keyboard (Space) still toggles. The MCP Add-server dialog's
+  **SearXNG (web search)** preset fills name / transport / command / args / env as
+  expected.
+- MCP path resolution reviewed for safety: string/`Path` work only, no `unsafe`,
+  no new panic path; candidate directories are only *added* to the search order,
+  never removed, so a user's existing `PATH` precedence is preserved.
+
+### Bundle
+
+| Item | Value |
+|---|---|
+| App | arm64 `WAKARU.app`, version `0.1.2`; ad-hoc signed; `codesign --verify --deep --strict` passes for the build output and the app inside the mounted DMG |
+| `Info.plist` | `CFBundleShortVersionString` 0.1.2; `LSMinimumSystemVersion` 12.0; `NSLocalNetworkUsageDescription` present |
+| DMG | `WAKARU_0.1.2_aarch64.dmg`, 23,129,323 bytes; `hdiutil verify` VALID |
+| SHA-256 | `9950bc0d325a680c094a9edf4a6c67fb0c1825aca3e891bb57ae9798bc38df7d` (basename in `WAKARU_0.1.2_aarch64.dmg.sha256`) |
+| Startup probe | mounted-DMG app reached `WAKARU backend ready version="0.1.2"`; startup log free of secret patterns |
+| Platform | macOS 12+, Apple Silicon; Windows/Linux not built or verified |
+
 ## v0.1.1 release verification — 2026-09-09
 
 Scope: reasoning-model streaming compatibility, a dependency-audit exception, and

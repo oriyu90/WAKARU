@@ -1,9 +1,11 @@
-# WAKARU v0.1.1
+# WAKARU v0.1.2
 
-WAKARU v0.1.1 is a maintenance release. It broadens reasoning-model
-compatibility, keeps the dependency-audit gate green, and fixes a small Live
-Illustrator error-display issue. The application hierarchy, project format, IPC
-contract, database schema, and every existing workflow are unchanged.
+WAKARU v0.1.2 is a maintenance release. It fixes a Settings bug where toggle
+switches did not respond to a mouse click or tap, and it makes stdio MCP servers
+easier to run — a bare `npx` / `uvx` / `node` command is now found automatically,
+and there is a one-click SearXNG web-search preset. The application hierarchy,
+project format, IPC contract, database schema, and every existing workflow are
+unchanged. There is no database migration.
 
 This build is for macOS Apple Silicon. It is ad-hoc signed and **not notarized**;
 on first launch, right-click WAKARU and choose **Open**, then approve WAKARU under
@@ -12,23 +14,33 @@ server on your network.
 
 ## Fixes
 
-- **Reasoning models** — when an OpenAI-compatible endpoint streams a model's
-  chain of thought inline as a leading `<think>…</think>` block (instead of the
-  separate `reasoning_content` field), that span is now routed to the reasoning
-  channel. It no longer appears, tags and all, inside a Live Illustrator
-  explanation, a Studio answer, or an organized document. Models that do not emit
-  such a block are completely unaffected.
-- **Live Illustrator** — a question error no longer stays on screen after you
-  change the detail level, move to another page, or regenerate the explanation.
-- **Dependency audit** — `cargo deny check` passes again. `RUSTSEC-2024-0436`
-  (the `paste` build-time macro, pulled in transitively by `fastembed`) is a
-  maintenance-status advisory with no runtime component and no available
-  replacement; it is now recorded as a reviewed, accepted exception with a
-  written reason, alongside the existing ones.
+- **Settings switches respond to click and tap again** — every on/off switch in
+  Settings (Enable Live Illustrator, Check for updates on startup, OCR, Prefetch
+  next page, Carry over the previous page's conversation, and the rest) could
+  only be toggled with the keyboard: the switch's decorative track sat on top of
+  the actual control and absorbed the pointer. Clicking or tapping a switch now
+  toggles it, in every language and both themes. Keyboard operation and the focus
+  ring are unchanged.
+
+## MCP
+
+- **`npx` / `uvx` / `node` stdio servers start without an absolute path** — a
+  macOS app launched from Finder inherits only a minimal `PATH`, so a stdio MCP
+  server registered as `npx …` previously failed to start unless you hunted down
+  the full path. WAKARU now also looks in the usual install locations (Homebrew,
+  `~/.local/bin`, Cargo/Bun/Deno/Volta, nvm/fnm) and passes that same widened
+  `PATH` to the server process. Servers registered with an absolute path are
+  unaffected. The command is still started **without a shell**, and the
+  secret-free environment allowlist is unchanged.
+- **SearXNG web-search preset** — the "Add MCP server" dialog has a preset
+  chooser. Picking **SearXNG (web search)** fills in a known-good stdio
+  configuration (`npx -y mcp-searxng`, `SEARXNG_URL=…`). You still review every
+  field and save it yourself; nothing connects on its own. You need your own
+  running SearXNG instance with its JSON output format enabled.
 
 ## Compatibility and limits
 
-- Existing v0.0.0–v0.1.0 projects and settings open unchanged. There is no
+- Existing v0.0.0–v0.1.1 projects and settings open unchanged. There is no
   database migration in this release.
 - OCR, document generation, Viewer rendering, search, local/LAN model
   connections, MCP, and every other existing capability remain available. When an
