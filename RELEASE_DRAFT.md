@@ -1,42 +1,37 @@
-# v0.1.3 release record
+# v0.2.0 release record
 
-Finalized 2026-09-09. Implementation plan: `IMPLEMENTATION_PLAN_v0.1.3.md`.
+Finalized 2026-09-09. Implementation plan: `IMPLEMENTATION_PLAN_v0.2.0.md`.
 Verification: `QUALITY_REPORT.md`. Release body: `RELEASE_NOTES.md`.
 
 ## Verified artifact
 
-- App: `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, version 0.1.3)
-- DMG: `WAKARU_0.1.3_aarch64.dmg`
-- Checksum file: `WAKARU_0.1.3_aarch64.dmg.sha256` (basename only)
-- Size: `23,129,085` bytes
-- SHA-256: `657c9613d8a7d3d180f440e9421556b6f199b8cef2b3baa50e0724bcc4c1e4ca`
+- App: `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, version 0.2.0)
+- DMG: `WAKARU_0.2.0_aarch64.dmg`
+- Checksum file: `WAKARU_0.2.0_aarch64.dmg.sha256` (basename only)
+- Size: `23,149,813` bytes
+- SHA-256: `415a7d2f862babd541b08c49cf98ef604be5053296731f82121a6dd385057731`
 - Platform: macOS 12+, Apple Silicon, ad-hoc signed, not notarized
 
-`codesign --verify --deep --strict` passes for the build output and for the app
-inside the mounted DMG. `hdiutil verify` is VALID. The startup probe reached
-`WAKARU backend ready version="0.1.3"` and the log contains no secret patterns.
+`hdiutil verify` VALID; `codesign --verify --deep --strict` passes for the build
+output and for the app inside the mounted DMG; startup probe reached
+`WAKARU backend ready version="0.2.0"`; the log contains no secret patterns.
 
 ## Release scope
 
-- The Settings switches respond to a click in the packaged app: `Switch` is now a
-  `<label>`, which forwards a press anywhere on the control to the input in every
-  engine (v0.1.2 fixed only Chromium; the app ships WKWebView). Keyboard, focus
-  ring and accessible name unchanged (`src/components/Switch.tsx`).
-- Right-click a project in the sidebar for an Export (ZIP) / Delete menu — a new
-  `ContextMenu` component wired in `AppShell`, using the same IPC as Settings →
-  Project Management. Delete asks for confirmation.
-- The Settings button is a toggle: pressing it on `/settings` returns to the view
-  you came from.
-- The "資料を見る" pane fills its width instead of collapsing to the left
-  (`Viewer.module.css` `.pane > * { flex:1; min-width:0 }`).
-- A Live Illustrator conversation is kept per document, not per page, so it
-  survives a page turn (`IllustratorDrawer` thread key; page explanations still
-  per page). Studio keeps the selected tab across refetches and no longer
-  double-renders a streamed reply.
-- Existing screen hierarchy, data format, IPC, database schema, design tokens and
-  capabilities are unchanged. No project-format or database migration; existing
-  v0.0.0–v0.1.2 projects and settings remain compatible. ts-rs bindings unchanged.
-  No Rust source change.
+- LM Studio / OpenAI-compatible replies return: a stream that ends after a
+  terminal `finish_reason` is complete even without `data: [DONE]`.
+- Studio degrades to plain chat (retry once without tools) when the model rejects
+  tool definitions.
+- The streaming chat POST is not re-sent on a 5xx response (double-generation).
+- 資料を見る redesigned around a vertical tab rail; an opened document fits the
+  window width and re-fits on resize; Live Illustrator has a discoverable toggle.
+- Studio: the composer clears on send; the tab list no longer loads every tab's
+  full history; the selected tab is kept across refreshes.
+- Fullscreen drops the empty traffic-light inset.
+- Existing screen hierarchy (minus the redesigned viewer internals), data format,
+  DB schema, design tokens and capabilities are unchanged. No project-format or
+  database migration; v0.0.0–v0.1.3 projects and settings remain compatible.
+  ts-rs bindings change only by the added `StudioTab.messageCount` field.
 
 ## Build
 
@@ -44,27 +39,29 @@ inside the mounted DMG. `hdiutil verify` is VALID. The startup probe reached
 APPLE_SIGNING_IDENTITY="-" MACOSX_DEPLOYMENT_TARGET=12.0 npm run tauri build -- --bundles app
 ```
 
-The signed app is staged with an `/Applications` symlink and packaged as a UDZO
-DMG with `hdiutil`. Both the disk image and its mounted app are verified before
-publication. CMake must be on `PATH` for the bundled `whisper.cpp` build.
+Signed app staged with an `/Applications` symlink and packaged as a UDZO DMG with
+`hdiutil`; disk image and mounted app both verified. CMake must be on `PATH` for
+the bundled `whisper.cpp` build.
 
 ## Publication sequence
 
 1. Commit the fixes, version metadata and release documentation on `main`.
-2. Tag the release as `v0.1.3` and push the branch and tag.
-3. Publish the GitHub release with the DMG and basename-only checksum file
-   (`--repo oriyu90/WAKARU --latest`). The repository remains private.
-4. Re-download the published assets and verify Latest status, byte size and hash.
-5. Publish the four localized introduction pages and project/news metadata on
-   `oriyu90/studio-rizi`.
-6. Record final commit and release details in the maintenance repository
-   (`common-rules-document/WAKARU.md`).
+2. Tag `v0.2.0`; push the branch and the tag.
+3. `gh release create v0.2.0 --repo oriyu90/WAKARU --latest` with the DMG and the
+   basename-only checksum file. Repository stays private.
+4. Re-download the assets and verify Latest status, byte size and hash.
+5. studio-rizi: bump version strings to `0.2.0`, set the wakaru card and the four
+   intro pages' hero note to **"近日公開 / Coming soon / 即将推出 / Em breve"**,
+   add a 4-language NEWS entry; `npm test` + build; push; confirm the Cloudflare
+   deploy. (Per the owner: the site says "coming soon" even though the DMG is
+   published to GitHub the same day.)
+6. Record the final commit and release details in
+   `common-rules-document/WAKARU.md`.
 
 ## Explicit limits
 
 - No Developer ID signature or Apple notarization credentials were supplied.
 - Windows and Linux are not built or verified.
-- Live Illustrator question threads created before this release are not deleted,
-  but are no longer surfaced in the drawer (one thread per document now).
-- Semantic embedding search still requires an endpoint that implements
-  `/v1/embeddings`; the built-in text index remains available when it does not.
+- With `titleBarStyle: "Overlay"` the macOS traffic lights are part of the
+  webview content by design; they are positioned in the top bar, not moved
+  outside the window.

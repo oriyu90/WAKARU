@@ -12,6 +12,8 @@ const lang = () => i18n.language;
 export const studioApi = {
   listTabs: (projectId: string) =>
     call<StudioTab[]>("studio_list_tabs", { projectId }),
+  getTab: (projectId: string, tabId: string) =>
+    call<StudioTab>("studio_get_tab", { projectId, tabId }),
   createTab: (projectId: string, title?: string) =>
     call<StudioTab>("studio_create_tab", { projectId, title: title ?? null }),
   renameTab: (projectId: string, tabId: string, title: string) =>

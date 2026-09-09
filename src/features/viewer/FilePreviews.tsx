@@ -91,8 +91,26 @@ export function PdfFilePreview({
   const [page, setPage] = useState(Math.max(1, initialPage));
   const [zoom, setZoom] = useState(1);
   const [error, setError] = useState<unknown>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [availWidth, setAvailWidth] = useState(0);
   const onPageRef = useRef(onPage);
   onPageRef.current = onPage;
+
+  // Track the usable width so the page can be drawn fit-to-width and re-fit as
+  // the window resizes (P1). `zoom` stays a manual multiplier on top of the fit.
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      const cs = getComputedStyle(el);
+      const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+      setAvailWidth(Math.max(0, el.clientWidth - pad));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!asset.data) return;
@@ -121,14 +139,20 @@ export function PdfFilePreview({
     void (async () => {
       const pdfPage = await pdf.getPage(page);
       if (cancelled || !canvasRef.current) return;
-      const viewport = pdfPage.getViewport({ scale: Math.min(window.devicePixelRatio || 1, 2) * zoom });
+      const raster = Math.min(window.devicePixelRatio || 1, 2);
+      // Fit the page to the available width; `zoom` (the − / + control) multiplies
+      // on top. Clamp so a small page doesn't balloon and a huge one still fits.
+      const intrinsic = pdfPage.getViewport({ scale: 1 }).width;
+      const fit = availWidth > 0 ? availWidth / intrinsic : 1;
+      const cssScale = Math.min(Math.max(fit * zoom, 0.1), 4);
+      const viewport = pdfPage.getViewport({ scale: raster * cssScale });
       const canvas = canvasRef.current;
       const context = canvas.getContext("2d", { alpha: false });
       if (!context) throw new Error("canvas-context-unavailable");
       canvas.width = Math.floor(viewport.width);
       canvas.height = Math.floor(viewport.height);
-      canvas.style.width = `${viewport.width / Math.min(window.devicePixelRatio || 1, 2)}px`;
-      canvas.style.height = `${viewport.height / Math.min(window.devicePixelRatio || 1, 2)}px`;
+      canvas.style.width = `${viewport.width / raster}px`;
+      canvas.style.height = `${viewport.height / raster}px`;
       renderTask.current?.cancel();
       const task = pdfPage.render({ canvas, canvasContext: context, viewport });
       renderTask.current = task;
@@ -141,7 +165,7 @@ export function PdfFilePreview({
       cancelled = true;
       renderTask.current?.cancel();
     };
-  }, [page, pdf, zoom]);
+  }, [page, pdf, zoom, availWidth]);
 
   const qc = useQueryClient();
   const toast = useToast();
@@ -167,7 +191,12 @@ export function PdfFilePreview({
           setOcr({ done: p, total });
           continue;
         }
-        const vp = pdfPage.getViewport({ scale: 2 });
+        // Cap the raster so a large page can't spike hundreds of MB, and yield
+        // to the event loop between pages so the UI stays responsive.
+        await new Promise((r) => setTimeout(r, 0));
+        const base = pdfPage.getViewport({ scale: 1 });
+        const ocrScale = Math.min(2, 2000 / Math.max(base.width, base.height));
+        const vp = pdfPage.getViewport({ scale: Math.max(ocrScale, 1) });
         off.width = Math.floor(vp.width);
         off.height = Math.floor(vp.height);
         if (!ctx) throw new Error("canvas-context-unavailable");
@@ -209,7 +238,7 @@ export function PdfFilePreview({
         <span className={styles.pageLabel}>{Math.round(zoom * 100)}%</span>
         <Button size="sm" variant="quiet" onClick={() => setZoom((value) => Math.min(3, value + .25))}>+</Button>
       </div>
-      <div className={styles.canvasViewport} aria-label={t("viewer.pdfPreview")}>
+      <div ref={viewportRef} className={styles.canvasViewport} aria-label={t("viewer.pdfPreview")}>
         {!pdf && !error ? <div className={styles.centered}>{t("states.analyzing")}…</div> : null}
         <canvas ref={canvasRef} className={styles.pdfCanvas} />
       </div>

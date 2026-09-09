@@ -51,6 +51,7 @@ export function Studio({
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
 
+  // The rail: tab metadata + message counts only, never every tab's history.
   const tabs = useQuery({
     queryKey: ["studio-tabs", projectId],
     queryFn: () => studioApi.listTabs(projectId),
@@ -62,13 +63,25 @@ export function Studio({
     enabled: inTauri,
   });
 
-  const refreshTabs = () => qc.invalidateQueries({ queryKey: ["studio-tabs", projectId] });
+  const rows = tabs.data ?? [];
+  const activeRow = rows.find((tb) => tb.id === activeId) ?? rows[0];
+  const activeTabId = activeRow?.id ?? "";
+
+  // The full conversation for just the active tab.
+  const conversation = useQuery({
+    queryKey: ["studio-tab", projectId, activeTabId],
+    queryFn: () => studioApi.getTab(projectId, activeTabId),
+    enabled: inTauri && !!activeTabId,
+  });
+  const active = conversation.data ?? activeRow;
+
+  const refreshTabs = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ["studio-tabs", projectId] }),
+      qc.invalidateQueries({ queryKey: ["studio-tab", projectId] }),
+    ]);
   const refreshArtifacts = () =>
     qc.invalidateQueries({ queryKey: ["studio-artifacts", projectId] });
-
-  const rows = tabs.data ?? [];
-  const active = rows.find((tb) => tb.id === activeId) ?? rows[0];
-  const activeTabId = active?.id ?? "";
 
   // Keep the local scope selector in step with the active tab.
   useEffect(() => {
@@ -80,11 +93,14 @@ export function Studio({
   // create) or a reload, `activeId` can be "" or point at a closed tab; without
   // this the selection silently falls back to the first tab on every render.
   useEffect(() => {
-    if (active && active.id !== activeId) setActiveId(active.id);
+    if (activeRow && activeRow.id !== activeId) setActiveId(activeRow.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active?.id]);
+  }, [activeRow?.id]);
 
-  const messages = useMemo(() => active?.messages ?? [], [active]);
+  const messages = useMemo(
+    () => conversation.data?.messages ?? [],
+    [conversation.data],
+  );
   const last = messages.at(-1);
   const awaitingApproval = last?.status === "pending_approval";
   const needsContinue = last?.status === "needs_continue";
@@ -115,19 +131,26 @@ export function Studio({
   const send = useMutation({
     mutationFn: (payload: string) => studioApi.send(projectId, activeTabId, payload, scope),
     onMutate: () => {
+      // The turn is persisted before the model call, so clearing the composer
+      // now can't lose it — and it stops the sent text lingering in the box
+      // (esp. when the model call then fails).
+      setText("");
       setProvisional("");
       setRunningTool("");
     },
     onSuccess: async () => {
-      // Clear the streamed placeholder *before* the refetch resolves, so the
-      // persisted message never renders alongside its own provisional copy.
-      setText("");
       setProvisional("");
       setRunningTool("");
       await Promise.all([refreshTabs(), refreshArtifacts()]);
       composerRef.current?.focus();
     },
-    onError: (e) => toast.push({ tone: "error", message: (e as Error).message }),
+    onError: async (e) => {
+      setProvisional("");
+      setRunningTool("");
+      // Surface the persisted user turn + its error even though the send failed.
+      await refreshTabs();
+      toast.push({ tone: "error", message: (e as Error).message });
+    },
   });
 
   useEffect(() => {
@@ -256,7 +279,7 @@ export function Studio({
                   >
                     <span className={styles.railName}>{tab.title}</span>
                     <span className={`${styles.railCount} u-mono-nums`}>
-                      {t("studio.messageCount", { count: tab.messages.length })}
+                      {t("studio.messageCount", { count: tab.messageCount })}
                     </span>
                   </button>
                   <IconButton

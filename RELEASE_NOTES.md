@@ -1,61 +1,67 @@
-# WAKARU v0.1.3
+# WAKARU v0.2.0
 
-WAKARU v0.1.3 is a maintenance release. It makes the Settings switches reliably
-clickable in the packaged app, adds a right-click menu on the sidebar's projects
-(Export / Delete), lets the Settings button toggle back to the view you came
-from, fixes the "資料を見る" pane collapsing to the left half of the window, and
-keeps a Live Illustrator conversation together across page turns. The application
-hierarchy, project format, IPC contract, and database schema are unchanged. There
-is no database migration.
+A feature and reliability release. It redesigns "資料を見る" around a vertical
+tab rail, makes an opened document grow with the window, gives Live Illustrator a
+real toggle you can find, fixes local-model (LM Studio / mlx-bar) replies not
+coming back, stops a sent Studio message lingering in the box, and tidies the
+window chrome. The project format, database schema, and existing workflows are
+unchanged; projects from v0.0.0–v0.1.3 open as-is with no migration.
 
 This build is for macOS Apple Silicon. It is ad-hoc signed and **not notarized**;
-on first launch, right-click WAKARU and choose **Open**, then approve WAKARU under
-System Settings → Privacy & Security → Local Network if you connect to a model
-server on your network.
+on first launch, right-click WAKARU and choose **Open**.
 
-## Fixes
+## 資料を見る, redesigned
 
-- **The "Enable Live Illustrator" switch (and every Settings switch) responds to a
-  click again.** v0.1.2 fixed this for one browser engine; the packaged app uses
-  another (WKWebView), where a click on the switch's decorative surface was still
-  not reaching the control. The switch is now a real `<label>`, so a press
-  anywhere on it toggles the control in every engine. Keyboard operation, the
-  focus ring, and the accessible name are unchanged.
+- **A vertical tab rail** replaces the row of horizontal tabs and the ladder of
+  divider lines. The rail holds the source list, one row per open document (with
+  a close button), and — pinned at the bottom — **追加**, **リンクを追加**, and
+  the **ライブ解説** toggle.
+- **An opened document fills the pane and re-fits as you resize the window.** PDF
+  pages were drawn at their native size on a wide black margin; they now fit to
+  width, and the − / % / + control multiplies on top of the fit.
+- **Live Illustrator has a visible control.** The old open affordance was an
+  8-pixel bar the same colour as the background. The rail button now turns the
+  feature on (and opens the panel) when it is off, and opens/closes the panel
+  when it is on. `Cmd/Ctrl + \` still toggles it.
 
-- **"資料を見る" fills the whole pane.** With no document open, the source list,
-  its toolbar and the bottom divider were squeezed into the left part of the
-  window and the right side stayed blank. The pane now uses its full width.
+## Local models
 
-- **A Live Illustrator conversation stays together.** Questions you ask in the
-  Illustrator drawer were filed per page, so moving to the next page appeared to
-  lose the exchange. Questions and answers are now kept per document and remain
-  visible as you read. Page *explanations* are still produced and cached per page.
+- **LM Studio and other OpenAI-compatible servers now return their replies.**
+  WAKARU treated a stream that ended without the optional `data: [DONE]` marker
+  as truncated and raised an error — but LM Studio in several setups, llama.cpp's
+  server, and others close the stream cleanly right after the model finishes. A
+  finished response is now recognised by its completion signal, with or without
+  the marker. A genuine mid-stream disconnect is still reported.
+- **Studio no longer fails on a model without tool support.** If the server
+  rejects the request because it carried tool definitions, Studio retries the
+  turn as a plain chat and keeps going without tools for the rest of that run.
+- A streaming chat request is no longer re-sent on a temporary server error
+  (which could start a second generation); only a failed connection is retried.
 
-## Changes
+## Studio
 
-- **Right-click a project in the sidebar** for a small menu: **Export (ZIP)** —
-  choose a folder and WAKARU writes the project archive there — and **Delete**,
-  which asks for confirmation first. Both do exactly what the same actions in
-  Settings → Project Management do. The context-menu key and Shift+F10 work too.
+- **A sent message clears from the composer immediately** (the turn is saved
+  before the model is called, so it is never lost) — it no longer sits in the
+  box next to its own sent bubble when a reply fails.
+- The conversation list no longer loads every message of every tab on each
+  refresh; only the open conversation's history is fetched. Long chat histories
+  stay responsive.
+- The selected tab is kept after sending, closing a tab, or reloading.
 
-- **The Settings button is a toggle.** Press it to open Settings; press it again
-  to return to the view you were on, instead of nothing happening.
+## Window
 
-- **Studio keeps the selected chat tab** after sending a message, closing a tab,
-  or reloading, and a streamed reply no longer flashes twice as it is saved.
+- **In fullscreen the toolbar no longer reserves empty space** where the macOS
+  traffic lights would be — macOS hides them there. In a window the space is
+  kept (the lights sit inside the top bar by design with this title-bar style)
+  and the cluster is positioned to sit cleanly in the bar.
 
 ## Compatibility and limits
 
-- Existing v0.0.0–v0.1.2 projects and settings open unchanged. There is no
-  database migration in this release. No IPC, schema, or project-format change;
-  the generated TypeScript bindings are byte-identical.
-- Live Illustrator question threads created before this release are not deleted;
-  they are simply no longer shown in the drawer, which now keeps one thread per
-  document.
-- OCR, document generation, Viewer rendering, search, local/LAN model
-  connections, MCP, and every other existing capability remain available.
-- macOS 12 or later on Apple Silicon. Windows and Linux are not built or verified
-  in this release.
+- Projects and settings from v0.0.0–v0.1.3 open unchanged. No database migration.
+  The only internal change is that the Studio tab list carries a message count
+  instead of full histories (a new call fetches one conversation on demand);
+  no project-format change, and the OpenAI/Anthropic wire formats are unchanged.
+- macOS 12 or later on Apple Silicon. Windows and Linux are not built or verified.
 - Ad-hoc signed, not Apple-notarized.
 
 See `QUALITY_REPORT.md` for the verification record and artifact checksum.

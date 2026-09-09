@@ -16,6 +16,16 @@ pub fn studio_list_tabs(
 }
 
 #[tauri::command]
+pub fn studio_get_tab(
+    state: State<'_, AppState>,
+    project_id: String,
+    tab_id: String,
+) -> AppResult<StudioTab> {
+    let db = projects::open_db(&state.projects_dir, &project_id)?;
+    studio::get_tab(&db, &tab_id)
+}
+
+#[tauri::command]
 pub fn studio_create_tab(
     state: State<'_, AppState>,
     project_id: String,

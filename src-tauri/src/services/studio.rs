@@ -185,35 +185,50 @@ async fn execute_call(ctx: &LoopCtx, name: &str, arguments: &str, approved: bool
 
 // ───────────────────────── tab CRUD (FR-T1/T2) ─────────────────────────
 
+/// Rail data only: one cheap `COUNT(*)` per tab, never the message bodies.
+/// The active conversation is fetched with `get_tab`.
 pub fn list_tabs(db: &Connection) -> AppResult<Vec<StudioTab>> {
     let mut stmt = db.prepare(
-        "SELECT id, thread_id, title, ordinal, scope FROM studio_tabs ORDER BY ordinal, created_at",
+        "SELECT t.id, t.thread_id, t.title, t.ordinal, t.scope,
+                (SELECT COUNT(*) FROM messages m WHERE m.thread_id = t.thread_id)
+         FROM studio_tabs t ORDER BY t.ordinal, t.created_at",
     )?;
-    let rows: Vec<(String, String, String, u32, String)> = stmt
+    let out: Vec<StudioTab> = stmt
         .query_map([], |r| {
-            Ok((
-                r.get(0)?,
-                r.get(1)?,
-                r.get(2)?,
-                r.get::<_, i64>(3)? as u32,
-                r.get(4)?,
-            ))
+            Ok(StudioTab {
+                id: r.get(0)?,
+                thread_id: r.get(1)?,
+                title: r.get(2)?,
+                ordinal: r.get::<_, i64>(3)? as u32,
+                scope: r.get(4)?,
+                message_count: r.get::<_, i64>(5)? as u32,
+                messages: Vec::new(),
+            })
         })?
         .collect::<rusqlite::Result<_>>()?;
-    drop(stmt);
-
-    let mut out = Vec::with_capacity(rows.len());
-    for (id, thread_id, title, ordinal, scope) in rows {
-        out.push(StudioTab {
-            messages: load_messages(db, &thread_id)?,
-            id,
-            thread_id,
-            title,
-            ordinal,
-            scope,
-        });
-    }
     Ok(out)
+}
+
+/// One tab with its full conversation.
+pub fn get_tab(db: &Connection, tab_id: &str) -> AppResult<StudioTab> {
+    let (thread_id, title, ordinal, scope): (String, String, u32, String) = db
+        .query_row(
+            "SELECT thread_id, title, ordinal, scope FROM studio_tabs WHERE id = ?1",
+            [tab_id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get::<_, i64>(2)? as u32, r.get(3)?)),
+        )
+        .optional()?
+        .ok_or_else(|| AppError::new("STUDIO_TAB_NOT_FOUND", "error.studio.tabNotFound", tab_id))?;
+    let messages = load_messages(db, &thread_id)?;
+    Ok(StudioTab {
+        id: tab_id.to_string(),
+        thread_id,
+        title,
+        ordinal,
+        scope,
+        message_count: messages.len() as u32,
+        messages,
+    })
 }
 
 pub fn create_tab(db: &Connection, title: Option<String>) -> AppResult<StudioTab> {
@@ -248,6 +263,7 @@ pub fn create_tab(db: &Connection, title: Option<String>) -> AppResult<StudioTab
         title,
         ordinal: ord as u32,
         scope: "project".into(),
+        message_count: 0,
         messages: Vec::new(),
     })
 }
@@ -1341,6 +1357,42 @@ fn last_user_text(db: &Connection, thread_id: &str) -> AppResult<String> {
 
 /// The agentic loop. Reads/writes `messages` each pass so it can be resumed
 /// across the IPC boundary; never holds a connection across the model await.
+/// One model turn: stream the answer, forwarding text deltas to the tab and
+/// accumulating the assistant text. Returns `(usage, truncated, tool_calls,
+/// text)`.
+async fn stream_round(
+    ctx: &LoopCtx,
+    client: &AiClient,
+    model: &str,
+    messages: &[Value],
+    params: &Value,
+    token: &CancellationToken,
+) -> AppResult<(
+    Option<crate::domain::ai::TokenUsage>,
+    bool,
+    Vec<crate::services::ai::client::StreamedToolCall>,
+    String,
+)> {
+    let acc = std::sync::Mutex::new(String::new());
+    let event_app = ctx.app.clone();
+    let event_tab = ctx.tab_id.clone();
+    let (usage, truncated, calls) = client
+        .chat_stream(model, json!(messages), params, token, |kind, t| {
+            if kind == "text" {
+                acc.lock().unwrap_or_else(|e| e.into_inner()).push_str(t);
+            }
+            if let Some(app) = &event_app {
+                let _ = app.emit(
+                    "studio://delta",
+                    json!({ "tabId": event_tab, "kind": kind, "text": t }),
+                );
+            }
+        })
+        .await?;
+    let text = acc.into_inner().unwrap_or_else(|e| e.into_inner());
+    Ok((usage, truncated, calls, text))
+}
+
 async fn run_loop(
     ctx: &LoopCtx,
     client: &AiClient,
@@ -1349,6 +1401,10 @@ async fn run_loop(
 ) -> AppResult<StudioSendResult> {
     let mut round = start_round;
     let mut summarised_total = 0u32;
+    // Set once a model rejects the request *because* it carried `tools`
+    // (LM Studio and other servers 400 for models with no tool template).
+    // Studio then continues as plain RAG chat for the rest of this run.
+    let mut tools_disabled = false;
 
     loop {
         if token.is_cancelled() {
@@ -1365,30 +1421,39 @@ async fn run_loop(
         summarised_total += folded;
 
         let mut params = ctx.base_params.clone();
-        let mut tools = tool_defs();
-        if let (Some(arr), true) = (tools.as_array_mut(), !ctx.mcp_tool_defs.is_empty()) {
-            arr.extend(ctx.mcp_tool_defs.iter().cloned());
+        if !tools_disabled {
+            let mut tools = tool_defs();
+            if let (Some(arr), true) = (tools.as_array_mut(), !ctx.mcp_tool_defs.is_empty()) {
+                arr.extend(ctx.mcp_tool_defs.iter().cloned());
+            }
+            params["tools"] = tools;
+            params["tool_choice"] = json!("auto");
         }
-        params["tools"] = tools;
-        params["tool_choice"] = json!("auto");
 
-        let acc = std::sync::Mutex::new(String::new());
-        let event_app = ctx.app.clone();
-        let event_tab = ctx.tab_id.clone();
-        let (usage, truncated, calls) = client
-            .chat_stream(&ctx.model, json!(messages), &params, token, |kind, t| {
-                if kind == "text" {
-                    acc.lock().unwrap_or_else(|e| e.into_inner()).push_str(t);
-                }
-                if let Some(app) = &event_app {
-                    let _ = app.emit(
-                        "studio://delta",
-                        json!({ "tabId": event_tab, "kind": kind, "text": t }),
+        let (usage, truncated, calls, text) =
+            match stream_round(ctx, client, &ctx.model, &messages, &params, token).await {
+                Ok(v) => v,
+                // A 400/404/422 while the request carried tools -> the model has
+                // no tool template. Retry this turn once as plain chat and keep
+                // tools off for the rest of the run (P4).
+                Err(e)
+                    if !tools_disabled
+                        && e.code == "AI_REQUEST"
+                        && params.get("tools").is_some() =>
+                {
+                    tracing::warn!(
+                        "studio: chat request rejected with tools ({}); retrying without tools",
+                        e.message
                     );
+                    tools_disabled = true;
+                    if let Some(obj) = params.as_object_mut() {
+                        obj.remove("tools");
+                        obj.remove("tool_choice");
+                    }
+                    stream_round(ctx, client, &ctx.model, &messages, &params, token).await?
                 }
-            })
-            .await?;
-        let text = acc.into_inner().unwrap_or_else(|e| e.into_inner());
+                Err(e) => return Err(e),
+            };
 
         if token.is_cancelled() {
             persist_assistant(ctx, &text, &[], "cancelled", usage.as_ref())?;

@@ -46,11 +46,19 @@ pub async fn probe(client: &AiClient, model: &str) -> AppResult<TestResult> {
         note: None,
     };
     if !reachable {
-        result.note = Some(
-            soft_note
-                .map(|m| format!("endpoint unreachable: {m}"))
-                .unwrap_or_else(|| "endpoint unreachable".into()),
-        );
+        let mut note = soft_note
+            .map(|m| format!("endpoint unreachable: {m}"))
+            .unwrap_or_else(|| "endpoint unreachable".into());
+        // The most common misconfiguration for a local OpenAI-compatible server
+        // (LM Studio, Ollama's OpenAI shim, …) is a base URL missing the `/v1`
+        // path segment — `/models` and `/chat/completions` then 404.
+        if !client.base_url().contains("/v1") {
+            note.push_str(
+                " — the base URL has no `/v1` path segment; most OpenAI-compatible \
+                 servers expect it (e.g. http://host:1234/v1).",
+            );
+        }
+        result.note = Some(note);
         return Ok(result);
     }
 

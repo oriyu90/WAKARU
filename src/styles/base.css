@@ -46,7 +46,11 @@ body {
  * so the unified toolbar must leave room for the macOS traffic lights. In a
  * plain browser there are none, so the inset stays at the default. */
 :root[data-tauri="true"] {
-  --titlebar-inset-start: 4.75rem;
+  --titlebar-inset-start: 5rem;
+}
+/* Fullscreen: macOS hides the traffic lights, so reclaim the reserved space. */
+:root[data-tauri="true"][data-fullscreen="true"] {
+  --titlebar-inset-start: var(--space-sm);
 }
 
 html,

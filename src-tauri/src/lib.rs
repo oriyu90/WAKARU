@@ -117,6 +117,7 @@ pub fn run() {
             commands::illustrator_cancel,
             commands::illustrator_import_to_studio,
             commands::studio_list_tabs,
+            commands::studio_get_tab,
             commands::studio_create_tab,
             commands::studio_rename_tab,
             commands::studio_close_tab,

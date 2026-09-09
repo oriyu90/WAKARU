@@ -359,7 +359,13 @@ export type StudioTab = { id: string, threadId: string, title: string, ordinal: 
 /**
  * `"project"` or `"source:<id>"` (docs/06 §6 scope selector).
  */
-scope: string, messages: Array<ChatMessage>, };
+scope: string, 
+/**
+ * Total turns in the thread. Always set. `messages` is only filled by
+ * `studio_get_tab` — `studio_list_tabs` returns it empty so the rail does
+ * not pay for every tab's whole history on each poll.
+ */
+messageCount: number, messages: Array<ChatMessage>, };
 
 export type TestResult = { ok: boolean, models: Array<string>, latencyMs: number, supportsVision: boolean, supportsTools: boolean, supportsEmbed: boolean, jsonSchema: boolean, note: string | null, };
 

@@ -105,3 +105,20 @@ export const InfoIcon = (p: IconProps) => (
     <path d="M12 11v5M12 8h.01" />
   </Svg>
 );
+
+/** A framed panel with a filled right column — the Live Illustrator drawer. */
+export const PanelRightIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M15 4v16" />
+    <path d="M17.5 9v6M19.5 9v6" strokeWidth={1.25} />
+  </Svg>
+);
+
+/** A link / chain — "add a web link". */
+export const LinkIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M10 14a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 0 0-5-5l-1.5 1.5" />
+    <path d="M14 10a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 0 0 5 5l1.5-1.5" />
+  </Svg>
+);

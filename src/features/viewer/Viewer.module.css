@@ -1,64 +1,74 @@
 .viewer {
   display: flex;
-  flex-direction: column;
   flex: 1;
   min-width: 0;
   min-height: 0;
 }
 
-.strip {
+/* ── vertical rail: home · open documents · add / link · Illustrator ── */
+.rail {
   flex: none;
+  inline-size: clamp(11rem, 16vw, 15rem);
   display: flex;
-  align-items: stretch;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--space-xs);
   gap: var(--space-2xs);
-  height: var(--tab-height);
-  padding: var(--space-3xs) var(--space-xs);
   background: var(--color-paper-2);
-  border-bottom: var(--rule-1) solid var(--color-rule);
-  overflow-x: auto;
+  border-inline-end: var(--rule-1) solid var(--color-rule);
+}
+.railScroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
   scrollbar-width: thin;
 }
-
-.tab {
-  display: inline-flex;
+.railTab {
+  display: flex;
   align-items: center;
-  gap: var(--space-2xs);
-  min-width: 6rem;
-  max-width: 14rem;
+  gap: var(--space-xs);
+  min-height: var(--row-height);
   padding-inline: var(--space-xs);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: none;
   font: inherit;
   font-size: var(--fs-sm);
   color: var(--color-muted);
+  text-align: start;
   cursor: pointer;
-  white-space: nowrap;
 }
-.tab[data-active="true"] {
+@media (hover: hover) {
+  .railTab:hover {
+    color: var(--color-ink);
+    background: var(--color-paper-3);
+  }
+}
+.railTab[data-active="true"] {
   color: var(--color-ink-strong);
   background: var(--color-paper-3);
 }
-@media (hover: hover) {
-  .tab:hover {
-    color: var(--color-ink);
-  }
-}
-.tab:focus-visible {
+.railTab:focus-visible {
   outline: var(--focus-ring) solid var(--color-focus);
-  outline-offset: -3px;
-  border-radius: var(--radius-sm);
+  outline-offset: -2px;
 }
-.homeTab {
-  min-width: unset;
-  padding-inline: var(--space-sm);
+.railHome {
+  color: var(--color-ink);
+  font-weight: var(--weight-medium);
 }
-.tabName {
+.railName {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.tabClose {
+.railClose {
   display: inline-flex;
+  flex: none;
   border: none;
   background: none;
   padding: var(--space-3xs);
@@ -67,33 +77,70 @@
   cursor: pointer;
   opacity: 0;
 }
-.tab:hover .tabClose,
-.tab[data-active="true"] .tabClose,
-.tab:focus-within .tabClose {
+.railTab:hover .railClose,
+.railTab[data-active="true"] .railClose,
+.railTab:focus-within .railClose {
   opacity: 1;
 }
 @media (hover: hover) {
-  .tabClose:hover {
-    background: var(--color-paper-3);
+  .railClose:hover {
+    background: var(--color-paper);
     color: var(--color-ink);
   }
 }
 
+.railFoot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  padding-top: var(--space-2xs);
+  border-top: var(--rule-1) solid var(--color-rule);
+}
+.railToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--row-height);
+  padding-inline: var(--space-xs);
+  border: var(--rule-control) solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-micro) var(--ease-out),
+    color var(--dur-micro) var(--ease-out);
+}
+@media (hover: hover) {
+  .railToggle:hover {
+    color: var(--color-ink);
+    background: var(--color-paper-3);
+  }
+}
+.railToggle[data-on="true"] {
+  color: var(--color-ink-strong);
+}
+.railToggle[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.railToggle:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+/* ── stage ── */
 .stage {
   position: relative;
   flex: 1;
+  min-width: 0;
   min-height: 0;
   display: flex;
-}
-
-@media (max-width: 42rem) {
-  .stage > :global([role="region"]) {
-    position: absolute;
-    inset-block: 0;
-    inset-inline-end: 0;
-    z-index: var(--z-dropdown);
-    box-shadow: var(--shadow-overlay);
-  }
+  container-type: inline-size;
 }
 .pane {
   flex: 1;
@@ -102,35 +149,20 @@
   display: flex;
   background: var(--color-paper);
 }
-/* The pane holds exactly one child (source list or a preview); make it fill the
-   width instead of collapsing to its content — otherwise short content (empty
-   state, a single row) leaves the right half of the pane blank (bug: v0.1.2). */
+/* one child at a time (source list or a preview) — let it fill the width */
 .pane > * {
   flex: 1;
   min-width: 0;
 }
 
-.handle {
-  flex: none;
-  inline-size: 0.5rem;
-  border: none;
-  border-inline-start: var(--rule-1) solid var(--color-rule);
-  background: var(--color-paper-2);
-  cursor: ew-resize;
-  transition: background-color var(--dur-short) var(--ease-out);
-}
-@media (hover: hover) {
-  .handle:hover {
-    background: var(--color-accent-weak);
+/* On a narrow stage the Illustrator drawer floats over the content instead of
+   squeezing it. Container query so it tracks the pane, not the whole window. */
+@container (max-width: 34rem) {
+  .stage > :global([role="region"]) {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    z-index: var(--z-dropdown);
+    box-shadow: var(--shadow-overlay);
   }
-}
-.handle:focus-visible {
-  outline: var(--focus-ring) solid var(--color-focus);
-  outline-offset: -2px;
-}
-
-.drawerBody {
-  padding: var(--space-lg);
-  font-size: var(--fs-sm);
-  color: var(--color-muted);
 }

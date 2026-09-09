@@ -332,3 +332,28 @@
 - **理由**: 5件すべて型・IPC 契約・DB スキーマ・プロジェクト形式・ルーティングに触れないフロントエンドのみの修正。ts-rs バインディング差分ゼロ。マイグレーション無し。`ContextMenu` は portal と listener を unmount で確実に解除し、外部入力に対する新規 `unwrap` 無し。i18n はキーを ja/en/zh-Hans に追加し parity ゲートで担保。
 - **影響**: `src/components/Switch.tsx`, `src/components/ContextMenu.tsx`（新規）, `src/components/ContextMenu.module.css`（新規）, `src/app/AppShell.tsx`, `src/features/viewer/Viewer.module.css`, `src/features/viewer/IllustratorDrawer.tsx`, `src/features/studio/Studio.tsx`, `src/i18n/{ja,en,zh-Hans}.json`（`nav.settingsClose` / `nav.exportProject` / `nav.deleteProject` / `nav.deleteProjectTitle` / `nav.deleteProjectBody`）, テスト（`Switch.test.tsx` / `ContextMenu.test.tsx` 新規 / `AppShell.test.tsx`）。
 - **差し戻し条件**: ライブ解説をページ単位の Q&A に戻す必要が出た場合は、スレッドキーに locator を戻したうえで、ページ間の会話引き継ぎ表示を別途用意する。`ContextMenu` に階層メニューやチェック項目が必要になったら、`role="menuitemcheckbox"` とサブメニュー対応へ一般化する。
+
+## D-31 · 資料ビューアを垂直タブへ再設計・PDF をウィンドウ追従・ライブ解説トグル・ローカルモデル応答不達の修正
+
+- **日付**: 2026-09-09（v0.2.0）
+- **論点（オーナー報告7件＋外部仕様監査＋危険設計）**:
+  1. 資料を見るで資料を開いてもウィンドウ幅に追従せず、PDF が中央に小さく表示される。
+  2. ライブ解説をオンにしてもパネルが出ず、パネルを開くハンドル（`.handle` 幅 0.5rem、暗色地に同系色）が視認不能。
+  3. Studio でメッセージ送信後も入力欄にテキストが残る（送信失敗時に特に目立つ）。
+  4. LM Studio / mlx-bar 接続時に応答が返らない。
+  5. フルスクリーン時に信号機ボタン用の左インセットが無駄に残り、`☰` が右へ寄る。ウィンドウ表示時は信号機がアプリ内に描画される。
+  6. 一部 UI がウィンドウ幅に追従しない。
+  7. 資料を見るが横罫線だらけで読みにくい。
+- **採用1（P4・応答不達の主因）**: `chat_stream_openai` は `truncated` を初期値 `true` とし `data: [DONE]` でのみ解除していた。LM Studio の一部構成・llama.cpp サーバ等は `finish_reason` チャンクの直後に SSE を正常クローズし `[DONE]` を送らないため、WAKARU が `AI_TRUNCATED` を投げて「応答なし」になっていた。**終端 `finish_reason`（`stop`/`tool_calls`/`content_filter`/`function_call`/`length`）を観測したら、`[DONE]` が無くても完了とみなす**。`finish_reason` の無いストリーム断は従来どおり `truncated`。単体テスト2件追加。
+- **採用2（P4・tools 拒否）**: Studio は毎回 `tools` + `tool_choice:"auto"` を送る。tool テンプレートを持たないモデルで LM Studio 等が `400` を返す。`supports_tools` はプロファイル既定 `0`（接続テスト実行時のみ設定）で当てにならないため、これでゲートせず、**`run_loop` が tools 付きリクエストで `AI_REQUEST`（400/404/422）を受けたら、その回を tools 無しで一度だけ再試行し、以降その実行は素の RAG チャットとして継続**する（`stream_round` ヘルパを分離）。
+- **採用3（危険設計）**: `retry()` に `retry_5xx: bool` を追加。ストリーミングのチャット POST（非冪等）は接続/タイムアウトのみ再試行し、`5xx` 応答では再試行しない（二重生成の回避）。`embeddings`（冪等）は従来どおり。
+- **採用4（危険設計・ボトルネック C1）**: `studio::list_tabs` は全タブの全メッセージを毎ポーラで読み込み、frontend は送信・タブ切替・リロードのたびに再取得していた（O(全 Studio 履歴)）。**`list_tabs` はメタデータ＋`message_count`（`COUNT(*)`）のみ返し、`studio_get_tab(tabId)` が 1 タブの本文を返す**。`Studio.tsx` はアクティブタブの会話だけを別クエリで取得。DB スキーマ・プロジェクト形式は不変。`StudioTab.message_count` 追加により ts-rs バインディング差分あり（想定内）。
+- **採用5（P7・再設計）**: `Viewer` を水平タブ帯（`.strip`）＋不可視ハンドルから、**左の垂直タブレール**へ。レール＝ホーム＋開いている資料 1 件 1 行（閉じるボタン）＋末尾固定で「追加」「リンクを追加」「ライブ解説」トグル。罫線はレール／ステージ間と単一ツールバー下のみ。資料の追加・URL 追加ロジックと URL ダイアログは `SourceListPanel` から `Viewer` へ持ち上げ（`SourceListPanel` は Viewer 専用のため影響範囲は限定）。ドラッグ&ドロップ・中クリック閉じ・引用ジャンプ・キーボード順・空状態は維持。i18n 3言語に `viewer.illustratorEnable/Show/Hide` 追加。
+- **採用6（P2・ライブ解説）**: レール末尾の「ライブ解説」ボタンは、無効時は有効化＋パネルを開く、有効時はパネルの開閉（`aria-pressed`/`aria-label` 切替）。`Cmd/Ctrl+\` は維持。
+- **採用7（P1・PDF 追従）**: `PdfFilePreview` に `ResizeObserver` を追加し利用可能幅を測定。描画スケール＝`fit(利用可能幅 / 原寸幅) × userZoom × raster`、`[0.1, 4]` にクランプ。`.pdfCanvas` は CSS 幅を fit で指定。C3: OCR ループは各ページを原寸ではなく長辺 ≤2000px にキャップし、ページ間で 0ms yield。
+- **採用8（P5・ウィンドウクローム）**: `main.tsx` が Tauri の `onResized` を購読し `<html data-fullscreen>` を更新。`base.css` で `:root[data-tauri][data-fullscreen="true"]` のとき `--titlebar-inset-start` を `var(--space-sm)` に。ウィンドウ表示時は `5rem`。`tauri.conf.json` に `trafficLightPosition {x:16,y:20}` を追加し 3.5rem バー内でクラスタを中央寄せ。`titleBarStyle:"Overlay"` の性質上、信号機はウェブビュー内に描画される（macOS の仕様）。カスタムクロームは保守ラインの範囲外。
+- **採用9（C4）**: `main.tsx` の `useUiStore.subscribe` は表示系フィールド（theme/scale/monochrome/readingFont）の署名が変わった時だけ `applyUiToDocument` を呼ぶ（`sidebarOpen` トグル等で DOM を触らない）。
+- **外部仕様監査（OpenAI / Anthropic）**: 既定フロー（params=`{}`）では両者とも正常。OpenAI パスは role-binding params を素通しするため `o*` 系の `max_completion_tokens` もそのまま届く。Anthropic の `response_format→output_config` マッピングは既存のテスト済み挙動で、今日の UI からは到達不能のため**据え置き**。リーダーが踏んだ互換ギャップは P4 の 2 点（`[DONE]` 欠落・tools 拒否）でサーバ非依存に解消。
+- **不変**: IPC 契約（Studio タブ payload の内部変更のみ）・DB スキーマ・プロジェクト形式・`design.md`/トークン・OpenAI/Anthropic ワイヤ。マイグレーションなし。既存 v0.0.0〜v0.1.3 のプロジェクト/設定はそのまま開く。
+- **影響**: `src/features/viewer/{Viewer.tsx,Viewer.module.css,FilePreviews.tsx}`, `src/features/project/{SourceListPanel.tsx,SourceList.module.css}`, `src/features/studio/Studio.tsx`, `src/ipc/studio.ts`, `src/app/Icons.tsx`, `src/main.tsx`, `src/styles/base.css`, `src/i18n/{ja,en,zh-Hans}.json`, `src-tauri/src/services/ai/client.rs`, `src-tauri/src/services/studio.rs`, `src-tauri/src/domain/studio.rs`, `src-tauri/src/commands/studio.rs`, `src-tauri/src/lib.rs`, `src-tauri/tauri.conf.json`, テスト（client 2件 / phase6）。
+- **差し戻し条件**: `[DONE]` 緩和で誤完了が観測されたら、`finish_reason` に加えて「最後のチャンク受信からの経過時間」も要件に加える。垂直レールが特定言語で幅不足なら `--rail-w` を言語別に調整。tools ストリップ再試行が正当な 400 を隠すようなら、tools 由来を示すエラー文言の判定を厳格化する。

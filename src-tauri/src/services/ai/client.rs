@@ -53,6 +53,11 @@ impl AiClient {
         })
     }
 
+    /// The configured base URL (already trimmed of a trailing `/`).
+    pub fn base_url(&self) -> &str {
+        &self.base
+    }
+
     fn req(&self, method: reqwest::Method, path: &str) -> reqwest::RequestBuilder {
         let mut rb = self.http.request(method, format!("{}{path}", self.base));
         for (h, v) in &self.extra_headers {
@@ -107,7 +112,7 @@ impl AiClient {
             ));
         }
         let body = json!({ "model": model, "input": inputs });
-        let resp = retry(|| async {
+        let resp = retry(true, || async {
             self.req(reqwest::Method::POST, "/embeddings")
                 .json(&body)
                 .send()
@@ -196,7 +201,7 @@ impl AiClient {
             }
         }
 
-        let resp = retry(|| async {
+        let resp = retry(false, || async {
             self.req(reqwest::Method::POST, "/chat/completions")
                 .json(&body)
                 .send()
@@ -217,12 +222,18 @@ impl AiClient {
         // instead of using the separate `reasoning_content` delta field. Route
         // that span to the `reasoning` channel so it never lands in the answer.
         let mut think = ThinkSplit::default();
-        let mut truncated = true; // until we see [DONE]
+        let mut truncated = true; // until we see [DONE] or a terminal finish_reason
                                   // OpenAI-compatible providers report an otherwise cleanly terminated
                                   // response as `finish_reason: "length"` when the output budget is
                                   // exhausted. `[DONE]` still follows, so the transport alone cannot
                                   // distinguish this from a complete answer.
         let mut output_limit_reached = false;
+        // LM Studio (several configs), llama.cpp's server, and other
+        // OpenAI-compatible servers close the SSE stream cleanly right after a
+        // `finish_reason` chunk and never send the `[DONE]` sentinel. Seeing a
+        // terminal reason means the model finished; only a drop with *no*
+        // finish_reason is a real truncation.
+        let mut saw_terminal_reason = false;
         // Reassembled by streamed `index`; kept dense so `into_iter` yields
         // calls in their original order.
         let mut tool_calls: Vec<StreamedToolCall> = Vec::new();
@@ -244,10 +255,15 @@ impl AiClient {
                         break;
                     }
                     let Ok(chunk): Result<Value, _> = serde_json::from_str(&ev.data) else { continue };
-                    if chunk.pointer("/choices/0/finish_reason").and_then(Value::as_str)
-                        == Some("length")
-                    {
-                        output_limit_reached = true;
+                    match chunk.pointer("/choices/0/finish_reason").and_then(Value::as_str) {
+                        Some("length") => {
+                            output_limit_reached = true;
+                            saw_terminal_reason = true;
+                        }
+                        Some("stop" | "tool_calls" | "content_filter" | "function_call") => {
+                            saw_terminal_reason = true;
+                        }
+                        _ => {}
                     }
                     if let Some(u) = chunk.get("usage").filter(|u| !u.is_null()) {
                         usage = Some(TokenUsage {
@@ -291,6 +307,12 @@ impl AiClient {
         }
 
         think.finish(&mut on_delta);
+        // A clean close after a terminal `finish_reason` is a complete response
+        // even on servers that omit `[DONE]`. `length` still counts as
+        // output-limit-reached (`output_limit_reached` already set).
+        if truncated && saw_terminal_reason {
+            truncated = output_limit_reached;
+        }
         // Drop any empty slots the model never filled (defensive — sparse index).
         tool_calls.retain(|c| !c.name.is_empty());
         Ok((usage, truncated, tool_calls))
@@ -305,7 +327,7 @@ impl AiClient {
         mut on_delta: impl FnMut(&str, &str),
     ) -> AppResult<(Option<TokenUsage>, bool, Vec<StreamedToolCall>)> {
         let body = anthropic_body(model, messages, params)?;
-        let resp = retry(|| async {
+        let resp = retry(false, || async {
             self.req(reqwest::Method::POST, "/messages")
                 .json(&body)
                 .send()
@@ -759,9 +781,13 @@ fn classify(status: u16, body: String) -> AppError {
     }
 }
 
-/// Exponential backoff (1s, 2s, 4s ±25% jitter), max 3 attempts, for retriable
-/// errors only.
-async fn retry<F, Fut>(mut f: F) -> AppResult<reqwest::Response>
+/// Exponential backoff (1s, 2s, 4s ±25% jitter), max 3 attempts.
+///
+/// `retry_5xx` retries a `429/5xx` *response*; pass `false` for a non-idempotent
+/// request (a streaming chat completion) where a retry after the server already
+/// accepted the call would trigger a second full generation. Connect/timeout
+/// errors — where no request reached the model — are always retried.
+async fn retry<F, Fut>(retry_5xx: bool, mut f: F) -> AppResult<reqwest::Response>
 where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = Result<reqwest::Response, reqwest::Error>>,
@@ -771,7 +797,7 @@ where
         match f().await {
             Ok(resp) => {
                 let s = resp.status().as_u16();
-                if matches!(s, 429 | 500 | 502 | 503 | 504 | 529) && attempt < 2 {
+                if retry_5xx && matches!(s, 429 | 500 | 502 | 503 | 504 | 529) && attempt < 2 {
                     let wait = retry_after(&resp)
                         .unwrap_or_else(|| Duration::from_millis(jitter(delay_ms)));
                     tokio::time::sleep(wait).await;
@@ -1065,6 +1091,62 @@ mod tests {
         assert_eq!(text, "partial");
         assert!(truncated);
         assert!(calls.is_empty());
+    }
+
+    // LM Studio / llama.cpp and other OpenAI-compatible servers close the stream
+    // cleanly after a `finish_reason` chunk and never send `data: [DONE]`.
+    #[tokio::test]
+    async fn openai_stream_completes_without_done_after_stop_finish_reason() {
+        let events = concat!(
+            "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\" world\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n"
+        );
+        let (base, _rx) = serve_once(events);
+        let client = AiClient::new(ApiProtocol::Openai, &base, None, Vec::new(), 5_000).unwrap();
+        let mut text = String::new();
+        let (_usage, truncated, calls) = client
+            .chat_stream(
+                "test-model",
+                json!([{ "role": "user", "content": "hi" }]),
+                &json!({}),
+                &CancellationToken::new(),
+                |kind, delta| {
+                    if kind == "text" {
+                        text.push_str(delta);
+                    }
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(text, "Hello world");
+        assert!(
+            !truncated,
+            "a clean close after finish_reason:stop is complete"
+        );
+        assert!(calls.is_empty());
+    }
+
+    // A real mid-stream drop (no finish_reason, no [DONE]) is still truncation.
+    #[tokio::test]
+    async fn openai_stream_dropped_without_finish_reason_is_truncated() {
+        let events =
+            "data: {\"choices\":[{\"delta\":{\"content\":\"half a sen\"},\"finish_reason\":null}]}\n\n";
+        let (base, _rx) = serve_once(events);
+        let client = AiClient::new(ApiProtocol::Openai, &base, None, Vec::new(), 5_000).unwrap();
+        let mut text = String::new();
+        let (_usage, truncated, _calls) = client
+            .chat_stream(
+                "test-model",
+                json!([{ "role": "user", "content": "hi" }]),
+                &json!({}),
+                &CancellationToken::new(),
+                |_k, d| text.push_str(d),
+            )
+            .await
+            .unwrap();
+        assert_eq!(text, "half a sen");
+        assert!(truncated);
     }
 
     fn serve_once(body: &'static str) -> (String, mpsc::Receiver<String>) {

@@ -16,6 +16,10 @@ pub struct StudioTab {
     pub ordinal: u32,
     /// `"project"` or `"source:<id>"` (docs/06 §6 scope selector).
     pub scope: String,
+    /// Total turns in the thread. Always set. `messages` is only filled by
+    /// `studio_get_tab` — `studio_list_tabs` returns it empty so the rail does
+    /// not pay for every tab's whole history on each poll.
+    pub message_count: u32,
     pub messages: Vec<ChatMessage>,
 }
 

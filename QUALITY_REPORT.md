@@ -2,6 +2,98 @@
 
 Cumulative; newest release first.
 
+## v0.2.0 release verification — 2026-09-09
+
+Scope: seven reader-reported problems, an OpenAI/Anthropic/LM-Studio wire audit,
+and the dangerous-design items found alongside. No project-format change, no
+database migration. The only IPC change is on the Studio tab payload (internal):
+`StudioTab` gains `messageCount`, `studio_list_tabs` stops shipping message
+bodies, and a new `studio_get_tab` fetches one conversation.
+
+### What changed
+
+- **`chat_stream_openai` truncation** — `src-tauri/src/services/ai/client.rs`:
+  a stream that ends after a terminal `finish_reason` (`stop` / `tool_calls` /
+  `content_filter` / `function_call` / `length`) is now a complete response even
+  without `data: [DONE]`. LM Studio / llama.cpp / other OpenAI-compatible servers
+  omit the sentinel. A drop with no `finish_reason` is still `truncated`. Two
+  new unit tests.
+- **Studio tools fallback** — `src-tauri/src/services/studio.rs`: `run_loop`
+  extracts `stream_round`; a `400/404/422` while the request carried `tools`
+  retries the turn once without tools and disables them for the rest of the run.
+- **Non-idempotent retry** — `retry()` gains `retry_5xx`; the streaming chat POST
+  passes `false` (connect/timeout only), `embeddings` passes `true`.
+- **Studio tab loading** — `list_tabs` returns metadata + a `COUNT(*)`;
+  `get_tab(tabId)` returns one conversation. `Studio.tsx` fetches the active
+  tab's messages in its own query and pins `activeId` to a real tab.
+- **Composer clears on send** — `Studio.tsx` clears the text in `onMutate` (the
+  turn is persisted first) so a failed reply doesn't leave it in the box.
+- **Viewer redesign** — `Viewer.tsx` / `Viewer.module.css`: a vertical tab rail
+  (home · open documents · 追加 / リンクを追加 / ライブ解説 pinned at the foot).
+  Add-files / add-URL logic and the URL dialog moved up from `SourceListPanel`
+  (Viewer-only, contained). Drag-drop, middle-click close, citation focus,
+  keyboard order, empty state preserved.
+- **Live Illustrator toggle** — the rail button enables + opens the drawer when
+  off, opens/closes it when on (`aria-pressed` / `aria-label`). `Cmd/Ctrl+\`
+  kept. New `viewer.illustratorEnable/Show/Hide` strings ×3 languages.
+- **PDF fit-to-width** — `FilePreviews.tsx`: a `ResizeObserver` measures the
+  viewport; render scale = fit(width) × userZoom × raster, clamped `[0.1, 4]`.
+  OCR raster capped at 2000 px long edge with a per-page yield.
+- **Window chrome** — `main.tsx` tracks Tauri `onResized` → `<html
+  data-fullscreen>`; `base.css` drops `--titlebar-inset-start` to `--space-sm`
+  in fullscreen, `5rem` windowed; `tauri.conf.json` sets
+  `trafficLightPosition {x:16,y:20}`.
+- **Store subscription** — `main.tsx` only re-applies display prefs when a
+  display field's signature changed.
+
+### Automated gates
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck (`tsc --noEmit`) | pass |
+| Frontend lint (eslint + design-rules + hardcoded-strings) | pass |
+| Frontend unit tests (vitest incl. axe) | 18 passed |
+| Contrast | pass |
+| i18n parity | 363 keys × 3 languages (ja / en / zh-Hans) |
+| Production web build | pass; pre-existing large-chunk advisory only |
+| ts-rs binding export | regenerated; diff is the `StudioTab.messageCount` field only |
+| Rust `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings` | pass |
+| Rust library tests | 175 passed (173 + 2 new `[DONE]`-absent cases); 1 network test ignored |
+| Rust phase integration tests | 39 passed (phase6 extended for `get_tab` / `message_count`) |
+| `cargo deny check` — advisories, bans, licenses, sources | pass |
+
+### Wire-format audit (OpenAI / Anthropic / LM Studio / mlx-bar)
+
+- LM Studio: covered by the `[DONE]`-absent and tools-fallback fixes.
+- mlx-bar (`oriyu90/mlx-bar`): strict param allowlist; WAKARU only ever sends
+  allowlisted keys; sends `[DONE]` and `finish_reason`; `: keep-alive` SSE
+  comments are ignored by `eventsource-stream` (verified in source). No change.
+- OpenAI: always sends `[DONE]`; the OpenAI path passes binding params verbatim
+  (no `max_tokens` rewrite there). Reviewed — no change.
+- Anthropic: `anthropic_body` valid for the default flow; the
+  `response_format → output_config` mapping is tested, deliberate, and
+  unreachable from the current UI. Left as-is.
+
+### Design / behaviour review
+
+- Live pass in the running dev build (Browser preview at 1280×800): the vertical
+  rail renders with home · 追加 · リンクを追加 · ライブ解説; the ライブ解説
+  button flips `illustratorEnabled` (persisted to `localStorage`), sets
+  `aria-pressed`, and mounts the drawer `[role="region"]`.
+- Live pass in the packaged v0.2.0 app: the vertical rail renders with the source list, the open PDF tab, and 追加 / リンクを追加 / ライブ解説 at the foot; the PDF fits the pane width and **re-fit wider when the window went fullscreen**; the ライブ解説 rail button enabled the feature and opened the drawer in one press; in fullscreen the ☰ sits flush-left (no traffic-light inset) while windowed keeps it. Studio send/tools paths could not be exercised end-to-end (the bound endpoint was offline during the check); they are covered by the Rust unit tests and code review.
+
+### Bundle
+
+| Field | Value |
+|---|---|
+| App | `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, version 0.2.0) |
+| DMG | `WAKARU_0.2.0_aarch64.dmg` |
+| Size | `23,149,813` bytes |
+| SHA-256 | `415a7d2f862babd541b08c49cf98ef604be5053296731f82121a6dd385057731` |
+| `hdiutil verify` | VALID |
+| Inner-app `codesign --verify --deep --strict` | pass (valid on disk, satisfies its Designated Requirement) |
+| Startup probe | reached `WAKARU backend ready version="0.2.0"`; log free of secret patterns |
+
 ## v0.1.3 release verification — 2026-09-09
 
 Scope: five reader-reported issues, fixed frontend-only. No change to the

@@ -37,6 +37,29 @@ fn ac_6_1_tabs_can_be_created_renamed_reordered_and_closed() {
     assert_eq!(b.title, "Draft");
     assert_eq!(studio::list_tabs(&db).unwrap().len(), 2);
 
+    // list_tabs is metadata-only; get_tab carries the conversation.
+    let pdb = projects::open_db(&root, &pid).unwrap();
+    let th: String = pdb
+        .query_row(
+            "SELECT thread_id FROM studio_tabs WHERE id = ?1",
+            [&a.id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    pdb.execute(
+        "INSERT INTO messages (id, thread_id, role, content, created_at)
+         VALUES ('mm1', ?1, 'user', 'hi', 'now')",
+        rusqlite::params![th],
+    )
+    .unwrap();
+    let listed = studio::list_tabs(&db).unwrap();
+    let a_row = listed.iter().find(|t| t.id == a.id).unwrap();
+    assert_eq!(a_row.message_count, 1);
+    assert!(a_row.messages.is_empty(), "list_tabs never ships bodies");
+    let full = studio::get_tab(&db, &a.id).unwrap();
+    assert_eq!(full.messages.len(), 1);
+    assert_eq!(full.messages[0].content, "hi");
+
     studio::rename_tab(&db, &a.id, "Renamed").unwrap();
     studio::reorder_tabs(&db, &[b.id.clone(), a.id.clone()]).unwrap();
     let tabs = studio::list_tabs(&db).unwrap();

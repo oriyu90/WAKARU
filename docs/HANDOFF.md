@@ -2,6 +2,31 @@
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
+**2026-09-09 · v0.2.0 feature + reliability** — seven reader issues + a wire
+audit + dangerous-design items. (1) **LM Studio replies not returning**:
+`chat_stream_openai` marked a stream `truncated` unless it saw `data: [DONE]`;
+now a terminal `finish_reason` counts as complete without it
+(`src-tauri/src/services/ai/client.rs`, 2 tests). (2) **Studio + tool-less
+models**: `run_loop` (now via `stream_round`) retries a `400` that carried
+`tools` once without them and keeps them off for that run
+(`src-tauri/src/services/studio.rs`). (3) `retry()` gained `retry_5xx` — the
+streaming chat POST no longer re-sends on 5xx (double-generation). (4) **Studio
+tab loading**: `list_tabs` is metadata + `COUNT(*)`; new `studio_get_tab(id)`
+returns one conversation; `Studio.tsx` fetches the active tab's history
+separately and pins `activeId`. `StudioTab` gained `messageCount` (ts-rs diff).
+(5) **Viewer redesign**: vertical tab rail (home · open docs · 追加 / リンク /
+ライブ解説 at the foot) replacing the horizontal strip + the invisible
+`.handle`; add-files / add-URL + dialog lifted from `SourceListPanel` into
+`Viewer`. (6) **Live Illustrator toggle**: the rail button enables+opens when
+off, opens/closes when on. (7) **PDF fit-to-width**: `ResizeObserver` in
+`FilePreviews.tsx`; scale = fit × userZoom × raster. (8) **Fullscreen chrome**:
+`main.tsx` tracks `onResized` → `<html data-fullscreen>`; `base.css` drops the
+traffic-light inset there; `tauri.conf.json` sets `trafficLightPosition`. (9)
+`useUiStore.subscribe` only re-applies display prefs on a real change. Composer
+clears in `onMutate`. No project-format change, no migration; v0.0.0–v0.1.3
+data opens as-is. See `IMPLEMENTATION_PLAN_v0.2.0.md` and `docs/DECISIONS.md`
+D-31.
+
 **2026-09-09 · v0.1.3 maintenance** — five reader-reported issues, all fixed
 frontend-only (no IPC / schema / type / routing change; ts-rs bindings identical;
 no migration). (1) The Settings switches were still click-dead in the packaged
