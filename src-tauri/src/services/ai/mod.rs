@@ -94,6 +94,41 @@ pub async fn test_profile(
     Ok(result)
 }
 
+/// `ai_list_models` — just the model catalogue (`GET /models`), with no
+/// capability probing. Used by Settings so the user can pick a model from a
+/// list instead of typing its id (LM Studio, mlx-bar, Ollama, OpenAI all
+/// expose it). A server that does not implement `/models` yields an empty list,
+/// not an error the UI has to special-case — except a hard transport failure,
+/// which is surfaced so the user knows the endpoint is unreachable.
+pub async fn list_models(
+    app_db_path: &std::path::Path,
+    profile_id: &str,
+) -> AppResult<Vec<String>> {
+    let (base_url, protocol, headers, timeout) = {
+        let conn = crate::storage::open(app_db_path)?;
+        let p = profiles::get(&conn, profile_id)?;
+        let headers: Vec<(String, String)> = p
+            .extra_headers
+            .as_object()
+            .map(|o| {
+                o.iter()
+                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                    .collect()
+            })
+            .unwrap_or_default();
+        (p.base_url, p.protocol, headers, p.timeout_ms)
+    };
+    let key = profiles::get_key(profile_id);
+    let client = AiClient::new(protocol, &base_url, key, headers, timeout)?;
+    match client.list_models().await {
+        Ok(models) => Ok(models),
+        // No `/models` route (404) is not fatal here — the user can still type a
+        // model id. Only a real network failure propagates.
+        Err(e) if e.code == "AI_NETWORK" => Err(e),
+        Err(_) => Ok(Vec::new()),
+    }
+}
+
 /// Stream a chat completion for `role`, emitting `stream://delta|done|error`.
 /// Returns the `stream_id` immediately-ish (it awaits the whole stream here; the
 /// command wrapper spawns it). `messages` is the OpenAI `messages` array.

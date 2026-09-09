@@ -52,6 +52,9 @@ export function Viewer({
   const setIllustratorEnabled = useUiStore((s) => s.setIllustratorEnabled);
   const { patch } = useAppSettings();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // True only for the first render after the reader flips Live Illustrator on,
+  // so the panel opens but waits for one tap before spending tokens.
+  const [justEnabled, setJustEnabled] = useState(false);
   const [ctx, setCtx] = useState<PreviewContext | null>(null);
   const [urlDialog, setUrlDialog] = useState(false);
   const [url, setUrl] = useState("");
@@ -151,6 +154,12 @@ export function Viewer({
       ?.scrollIntoView({ block: "nearest" });
   }, [active, tabs.data]);
 
+  // When Live Illustrator is on, the panel comes up automatically as soon as a
+  // document is open (issue 6). Closing it stays closed until the next doc.
+  useEffect(() => {
+    if (illustratorEnabled && active !== HOME) setDrawerOpen(true);
+  }, [active, illustratorEnabled]);
+
   // Cmd/Ctrl+\ toggles the Illustrator drawer (docs/06 §3.2).
   useEffect(() => {
     if (!illustratorEnabled) return;
@@ -171,6 +180,7 @@ export function Viewer({
     if (!illustratorEnabled) {
       setIllustratorEnabled(true);
       patch({ illustrator: { enabled: true } });
+      setJustEnabled(true);
       setDrawerOpen(true);
     } else {
       setDrawerOpen((v) => !v);
@@ -294,6 +304,8 @@ export function Viewer({
               locator={ctx?.locator ?? activeTab?.locator ?? { t: "whole" }}
               position={ctx?.position}
               visionSupported={visionSupported}
+              autoRun={!justEnabled}
+              onStarted={() => setJustEnabled(false)}
             />
           </Drawer>
         ) : null}

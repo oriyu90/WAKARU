@@ -46,7 +46,7 @@ impl AiClient {
             .map_err(|e| AppError::internal(format!("http client: {e}")))?;
         Ok(Self {
             http,
-            base: base_url.trim_end_matches('/').to_string(),
+            base: ensure_api_version_path(base_url),
             protocol,
             key: key.filter(|k| !k.is_empty()),
             extra_headers,
@@ -749,6 +749,23 @@ fn token_count(usage: &Value, field: &str) -> u32 {
         .min(u32::MAX as u64) as u32
 }
 
+/// Complete a base URL that omits the API version segment. Local OpenAI- and
+/// Anthropic-compatible servers (LM Studio, Ollama, llama.cpp, vLLM, LocalAI,
+/// mlx-bar) — and `api.anthropic.com` itself — serve every route under `/v1`.
+/// A base URL of just `scheme://host:port` therefore 404s, or, on LM Studio,
+/// draws a bogus `200 "Unexpected endpoint or method"` whose body is not a
+/// stream (the reported "no reply" symptom). When the URL carries no path we
+/// append `/v1`; any explicit path (`/v1`, `/openai/v1`, a gateway prefix) is
+/// left exactly as the user typed it. A string that will not parse is returned
+/// unchanged so the caller's own error handling still runs.
+pub(crate) fn ensure_api_version_path(base: &str) -> String {
+    let trimmed = base.trim().trim_end_matches('/');
+    match reqwest::Url::parse(trimmed) {
+        Ok(url) if url.path().is_empty() || url.path() == "/" => format!("{trimmed}/v1"),
+        _ => trimmed.to_string(),
+    }
+}
+
 fn net_err(e: reqwest::Error) -> AppError {
     AppError::new("AI_NETWORK", "error.ai.network", e.to_string()).retriable()
 }
@@ -958,7 +975,8 @@ mod tests {
 
         let request = request_rx.recv().unwrap();
         let lower = request.to_ascii_lowercase();
-        assert!(request.starts_with("POST /messages HTTP/1.1"));
+        // The mock base URL has no path, so the client completes it to `/v1`.
+        assert!(request.starts_with("POST /v1/messages HTTP/1.1"));
         assert!(lower.contains("x-api-key: secret-test-key"));
         assert!(lower.contains("anthropic-version: 2023-06-01"));
         assert!(request.contains("\"system\":\"sys\""));
@@ -1147,6 +1165,54 @@ mod tests {
             .unwrap();
         assert_eq!(text, "half a sen");
         assert!(truncated);
+    }
+
+    #[test]
+    fn ensure_api_version_path_appends_v1_only_when_the_url_has_no_path() {
+        for (input, want) in [
+            ("http://localhost:1234", "http://localhost:1234/v1"),
+            ("http://localhost:1234/", "http://localhost:1234/v1"),
+            (
+                "  http://192.168.0.114:1234/  ",
+                "http://192.168.0.114:1234/v1",
+            ),
+            ("https://api.anthropic.com", "https://api.anthropic.com/v1"),
+            ("http://localhost:1234/v1", "http://localhost:1234/v1"),
+            ("https://api.openai.com/v1", "https://api.openai.com/v1"),
+            (
+                "https://gw.example.com/openai/v1",
+                "https://gw.example.com/openai/v1",
+            ),
+            ("not a url", "not a url"),
+        ] {
+            assert_eq!(ensure_api_version_path(input), want, "input {input:?}");
+        }
+    }
+
+    // The user's LM Studio profile was `http://host:1234` with no `/v1`; the
+    // request must still land on `/v1/chat/completions`, not `/chat/completions`.
+    #[tokio::test]
+    async fn openai_client_targets_v1_when_the_base_url_omits_it() {
+        let events =
+            "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}\n\n";
+        let (base, request_rx) = serve_once(events);
+        let client = AiClient::new(ApiProtocol::Openai, &base, None, Vec::new(), 5_000).unwrap();
+        let _ = client
+            .chat_stream(
+                "m",
+                json!([{ "role": "user", "content": "hi" }]),
+                &json!({}),
+                &CancellationToken::new(),
+                |_, _| {},
+            )
+            .await
+            .unwrap();
+        let request = request_rx.recv().unwrap();
+        assert!(
+            request.starts_with("POST /v1/chat/completions HTTP/1.1"),
+            "request line was {:?}",
+            request.lines().next().unwrap_or_default()
+        );
     }
 
     fn serve_once(body: &'static str) -> (String, mpsc::Receiver<String>) {

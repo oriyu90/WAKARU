@@ -239,7 +239,8 @@
     "keyframes": "视频关键帧",
     "ocrRun": "识别文字",
     "ocrProgress": "识别中… {{done}} / {{total}}",
-    "ocrDone": "文字识别完成，这些页面现在可被搜索。"
+    "ocrDone": "文字识别完成，这些页面现在可被搜索。",
+    "illustratorStart": "开始讲解"
   },
   "ai": {
     "connections": "连接",
@@ -256,7 +257,7 @@
     "preset": "预设",
     "name": "名称",
     "baseUrl": "Base URL",
-    "baseUrlHint": "通常应包含 …/v1 API 版本路径",
+    "baseUrlHint": "通常以 …/v1 结尾（省略时会自动补上 /v1）",
     "protocolLabel": "API 格式",
     "protocol": {
       "openai": "OpenAI 兼容",
@@ -278,7 +279,12 @@
       "vision": "图像理解",
       "embedding": "检索",
       "organizer": "文本整理"
-    }
+    },
+    "fetchModels": "获取模型",
+    "modelCustom": "手动输入…",
+    "modelsNone": "无法获取模型列表，请直接输入模型 ID。",
+    "modelsFailed": "获取模型列表失败",
+    "modelsSaveFirst": "保存连接后即可获取模型"
   },
   "illustrator": {
     "openADocument": "打开资料即可查看讲解。",
@@ -298,7 +304,11 @@
     "stop": "停止",
     "ask": "提问…",
     "send": "发送",
-    "toStudio": "发送到工作台"
+    "viewLabel": "讲解范围",
+    "viewOverview": "整份资料",
+    "viewPage": "本页",
+    "wholeSource": "整份资料",
+    "overviewHint": "打开后会通俗地讲解整份资料。"
   },
   "studio": {
     "title": "Studio",
@@ -344,7 +354,9 @@
     "download": "下载",
     "downloaded": "已保存到 {{path}}",
     "importFailed": "无法导入该文件。",
-    "cancelled": "已停止。"
+    "cancelled": "已停止。",
+    "pickConversation": "请选择一个会话",
+    "pickConversationBody": "从左侧列表打开会话，或新建一个。过去的会话在打开前不会显示。"
   },
   "mcp": {
     "transportSupport": "支持 stdio 和 MCP Streamable HTTP。连接失败仅影响该服务器。",

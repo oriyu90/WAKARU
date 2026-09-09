@@ -101,6 +101,18 @@
   font-size: var(--fs-sm);
   font-weight: var(--weight-medium);
 }
+.modelField,
+.modelRow {
+  display: flex;
+  gap: var(--space-2xs);
+  align-items: center;
+  min-width: 0;
+}
+.modelField > :first-child,
+.modelRow > :first-child {
+  flex: 1;
+  min-width: 0;
+}
 
 .degrade {
   display: flex;

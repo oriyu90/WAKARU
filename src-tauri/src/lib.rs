@@ -95,6 +95,7 @@ pub fn run() {
             commands::ai_upsert_profile,
             commands::ai_delete_profile,
             commands::ai_test_profile,
+            commands::ai_list_models,
             commands::ai_get_role_bindings,
             commands::ai_set_role_binding,
             commands::ai_clear_role_binding,

@@ -1,9 +1,9 @@
 .drawer {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  inline-size: min(24rem, 100vw);
+  block-size: 100%;
+  min-block-size: 0;
+  inline-size: min(26rem, 100vw);
   max-inline-size: 100%;
 }
 .empty {
@@ -12,23 +12,35 @@
   font-size: var(--fs-sm);
 }
 
+/* One header block, one rule under it — no per-row borders. */
 .head {
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
-  border-bottom: var(--rule-1) solid var(--color-rule);
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-block-end: var(--rule-1) solid var(--color-rule);
 }
-.headRow {
+.headTop {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-sm);
+}
+.title {
+  font-size: var(--fs-md);
+  font-weight: var(--weight-strong);
+}
+.headMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
 }
 .pos {
-  font-family: var(--font-mono);
   font-size: var(--fs-2xs);
-  color: var(--color-neutral);
+  color: var(--color-muted);
 }
 
 .banner {
@@ -40,40 +52,46 @@
   font-size: var(--fs-2xs);
   color: var(--color-warning);
   background: color-mix(in oklab, var(--color-warning) 8%, var(--color-paper));
-  border-bottom: var(--rule-1) solid var(--color-rule);
+  border-block-end: var(--rule-1) solid var(--color-rule);
 }
 
 .body {
   flex: 1;
-  min-height: 0;
+  min-block-size: 0;
   overflow-y: auto;
   padding: var(--space-md);
   font-size: var(--fs-sm);
+  line-height: var(--lh-relaxed);
+}
+.startCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  align-items: flex-start;
+  color: var(--color-muted);
 }
 .thinking {
   color: var(--color-muted);
-  font-size: var(--fs-sm);
 }
 .error {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
   color: var(--color-danger);
-  font-size: var(--fs-sm);
 }
 .cachedNote {
   display: flex;
   align-items: center;
   gap: var(--space-2xs);
+  margin-block-end: var(--space-sm);
   font-size: var(--fs-2xs);
-  color: var(--color-neutral);
-  margin-bottom: var(--space-sm);
+  color: var(--color-muted);
 }
 
 .history {
-  margin-top: var(--space-lg);
-  border-top: var(--rule-1) solid var(--color-rule);
-  padding-top: var(--space-sm);
+  margin-block-start: var(--space-lg);
+  padding-block-start: var(--space-sm);
+  border-block-start: var(--rule-1) solid var(--color-rule);
 }
 .historyToggle {
   border: none;
@@ -89,10 +107,9 @@
   outline-offset: 2px;
 }
 .msg {
-  margin-top: var(--space-sm);
+  margin-block-start: var(--space-sm);
   padding: var(--space-sm);
   border-radius: var(--radius-md);
-  font-size: var(--fs-sm);
 }
 .msg[data-role="user"] {
   background: var(--color-paper-3);
@@ -106,21 +123,22 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
-  border-top: var(--rule-1) solid var(--color-rule);
+  padding: var(--space-md);
+  border-block-start: var(--rule-1) solid var(--color-rule);
 }
-.composerTop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.composerRow {
+.askRow {
   display: flex;
   gap: var(--space-xs);
   align-items: flex-end;
 }
-.composerRow > :first-child {
+.askRow > :first-child {
   flex: 1;
+}
+.composerMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
 }
 .scopeSel {
   height: 1.75rem;

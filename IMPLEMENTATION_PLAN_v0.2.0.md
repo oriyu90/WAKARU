@@ -205,3 +205,28 @@ torn down on unmount; no new `unwrap` on external input; the tools-strip retry
 is bounded to one extra attempt. Memory safety: no new `unsafe`; no Rust
 signature exposed across FFI changes beyond serde-derived types. i18n: every new
 key in ja/en/zh-Hans, enforced by `check-i18n`.
+
+---
+
+# Round 2 (2026-09-10) — folded into the same v0.2.0 tag
+
+Seven further owner reports, audited and fixed the same way. Full rationale:
+`docs/DECISIONS.md` D-32.
+
+| # | Report | Fix |
+|---|--------|-----|
+| 1 | LM Studio logs `Unexpected endpoint (POST /chat/completions, /embeddings)`, no reply | `ensure_api_version_path()` in `client.rs`: append `/v1` **only** when the base URL has no path; applied in `AiClient::new` (covers probe/chat/embeddings and every stored profile, no migration) and in `profiles::normalise_base_url` (honest stored value). External check: LM Studio / Ollama / llama.cpp / vLLM / mlx-bar / `api.anthropic.com` all serve under `/v1`. |
+| 2 | Past Studio conversations visible before opening | `Studio.tsx`: drop the `?? rows[0]` fallback + the pin-to-first effect; unselected → `EmptyState`; history is neither fetched nor shown until a tab is clicked. |
+| 3 | Live Illustrator should explain the whole source on open | `illustrator_generate` handles `locator {t:"whole"}` → bounded whole-source digest (12 head sections + tail, ≤8 000 chars) + a "read 'this page' as 'this document'" prompt prefix. Drawer defaults to the 資料全体 view. |
+| 4 | Live Illustrator must not share context with Studio | Threads already separate (`scope='illustrator'` vs `studio_tabs`). Removed the "→ Studio" button + `importToStudio` call from the panel (backend command kept for compat). phase6 regression: `list_tabs` never returns an illustrator thread. |
+| 5 | Hallmark pass + rebuild the Live Illustrator panel | `IllustratorDrawer` rewritten: one header block + single rule, scope/detail segments, explanation as hero, Q&A collapsed by default, one ask row. Tokens only, no `position:fixed`. `Tabs` gains `disabled` items. |
+| 6 | Auto-show the panel when the enable bar is present | `Viewer`: `illustratorEnabled && a document tab active` → `drawerOpen` auto-true (stays closed after an explicit close until the next document). Enabling from off → panel opens but `autoRun=false`; one "解説をはじめる" tap runs it. |
+| 7 | Pick a model from the server list when available | New `ai_list_models(profileId)` command (`GET /models` only). `AiSettings` role rows: `<Select>` of discovered ids + "type it in" escape + `↻`; connection editor gets a `datalist` + fetch button. No ts-rs change. |
+
+**Wire audit:** OpenAI official (`.../v1`) unchanged; Anthropic with a bare host
+now correctly reaches `/v1/messages` (latent bug fixed); no parameter changes.
+All Rust + phase6 tests re-run green.
+
+**Gates:** FE tsc / eslint / 18 vitest / i18n 375×3 / design-rules / hardcoded /
+build; Rust fmt / clippy `-D warnings` / full test suite (178 pass, 1 ignored) /
+`cargo deny`. ts-rs bindings diff: none.

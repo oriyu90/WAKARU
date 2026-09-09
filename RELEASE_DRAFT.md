@@ -1,16 +1,22 @@
 # v0.2.0 release record
 
-Finalized 2026-09-09. Implementation plan: `IMPLEMENTATION_PLAN_v0.2.0.md`.
-Verification: `QUALITY_REPORT.md`. Release body: `RELEASE_NOTES.md`.
+Finalized 2026-09-09; **round 2 folded in 2026-09-10** (the `v0.2.0` tag was
+moved to the round-2 commit on `main`; seven further owner reports — see
+`docs/DECISIONS.md` D-32). Implementation plan:
+`IMPLEMENTATION_PLAN_v0.2.0.md` (Round 2 section). Verification:
+`QUALITY_REPORT.md`. Release body: `RELEASE_NOTES.md`.
 
-## Verified artifact
+## Verified artifact (round 2 rebuild — current)
 
 - App: `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, version 0.2.0)
 - DMG: `WAKARU_0.2.0_aarch64.dmg`
 - Checksum file: `WAKARU_0.2.0_aarch64.dmg.sha256` (basename only)
-- Size: `23,149,813` bytes
-- SHA-256: `415a7d2f862babd541b08c49cf98ef604be5053296731f82121a6dd385057731`
+- Size: `23,141,084` bytes
+- SHA-256: `139ce4c03dbb8a88ea7404e562806171fc3569b51d49b1a630a1a03d55e2fffc`
 - Platform: macOS 12+, Apple Silicon, ad-hoc signed, not notarized
+
+(The 2026-09-09 build was `23,149,813` bytes / SHA-256
+`415a7d2f862babd541b08c49cf98ef604be5053296731f82121a6dd385057731`; superseded.)
 
 `hdiutil verify` VALID; `codesign --verify --deep --strict` passes for the build
 output and for the app inside the mounted DMG; startup probe reached
@@ -18,6 +24,11 @@ output and for the app inside the mounted DMG; startup probe reached
 
 ## Release scope
 
+- Round 2: a base URL with no path is completed to `…/v1` (LM Studio's
+  "Unexpected endpoint / no reply"); a model can be picked from the server's
+  `GET /models` list; Live Illustrator explains the whole document on open and
+  is decoupled from Studio; the panel is rebuilt; past Studio conversations
+  stay closed until opened; the panel auto-shows when the feature is on.
 - LM Studio / OpenAI-compatible replies return: a stream that ends after a
   terminal `finish_reason` is complete even without `data: [DONE]`.
 - Studio degrades to plain chat (retry once without tools) when the model rejects

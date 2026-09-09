@@ -14,6 +14,8 @@ export const aiApi = {
     call<AiProfile>("ai_upsert_profile", { input }),
   deleteProfile: (id: string) => call<void>("ai_delete_profile", { id }),
   testProfile: (id: string) => call<TestResult>("ai_test_profile", { id }),
+  listModels: (profileId: string) =>
+    call<string[]>("ai_list_models", { profileId }),
   getRoleBindings: () => call<RoleBindings>("ai_get_role_bindings"),
   setRoleBinding: (role: Role, profileId: string, model: string) =>
     call<void>("ai_set_role_binding", { role, profileId, model, params: null }),

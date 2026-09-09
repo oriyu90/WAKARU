@@ -3,6 +3,7 @@
 
 use crate::domain::ai::*;
 use crate::error::{AppError, AppResult};
+use crate::services::ai::client::ensure_api_version_path;
 use crate::storage::migrate::now_iso8601;
 use rusqlite::{params, Connection, OptionalExtension};
 use uuid::Uuid;
@@ -225,7 +226,9 @@ fn normalise_base_url(raw: &str) -> AppResult<String> {
             "base URL must be http(s), without credentials, query, or fragment",
         ));
     }
-    Ok(trimmed.to_string())
+    // Persist the completed form so the stored value matches what is actually
+    // requested and what the Settings list shows (see `ensure_api_version_path`).
+    Ok(ensure_api_version_path(trimmed))
 }
 
 pub fn delete(app_db: &Connection, id: &str) -> AppResult<()> {
@@ -375,6 +378,11 @@ mod tests {
         assert_eq!(
             normalise_base_url(" https://api.example.com/v1/ ").unwrap(),
             "https://api.example.com/v1"
+        );
+        // A bare host is completed to `/v1` (the LM Studio "no reply" fix).
+        assert_eq!(
+            normalise_base_url("http://192.168.0.114:1234").unwrap(),
+            "http://192.168.0.114:1234/v1"
         );
         for invalid in [
             "file:///tmp/api",

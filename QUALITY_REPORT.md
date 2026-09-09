@@ -2,6 +2,99 @@
 
 Cumulative; newest release first.
 
+## v0.2.0 release verification — round 2 — 2026-09-10
+
+Scope: seven further reader-reported problems folded into the same v0.2.0 tag,
+with an OpenAI/Anthropic/LM-Studio wire re-audit and the dangerous-design items
+alongside. No project-format change, no database migration, no ts-rs binding
+change. Rationale: `docs/DECISIONS.md` D-32.
+
+### What changed
+
+- **Base URL `/v1` completion** — `src-tauri/src/services/ai/client.rs`:
+  `ensure_api_version_path()` appends `/v1` only when the parsed URL has no path
+  (`""` / `"/"`); an explicit path is left as typed. Applied in `AiClient::new`
+  (probe + chat + embeddings + every already-stored profile, no migration) and
+  in `profiles::normalise_base_url` (stored value matches the request). Root
+  cause of the LM Studio "Unexpected endpoint / no reply": the profile base was
+  `http://192.168.0.114:1234`. External check: LM Studio, Ollama, llama.cpp,
+  vLLM, mlx-bar and `api.anthropic.com` all serve under `/v1`.
+- **Model list** — new `ai_list_models(profileId)` command (`GET /models` only,
+  no capability probing). `AiSettings.tsx`: role rows render a `<Select>` of
+  discovered ids (current value always selectable) with a "type it in" fallback
+  and a `↻` refresh; the connection editor gets a `datalist` + fetch button.
+- **Studio past conversations** — `Studio.tsx`: removed the `?? rows[0]`
+  fallback and the pin-to-first effect. No active tab → an `EmptyState`; a past
+  conversation is neither fetched nor rendered until the reader clicks it.
+- **Live Illustrator whole-source overview** — `src-tauri/src/services/illustrator.rs`:
+  a `locator {t:"whole"}` builds `build_source_overview_context` (≤12 head
+  sections × 700 chars + tail section, ≤8 000 chars total — bounded regardless
+  of source size) and prepends `overview_system_prefix` so the page prompt reads
+  as a document prompt. `IllustratorDrawer` defaults to the 資料全体 view; a
+  このページ segment (disabled until a page locator exists) switches to per-page.
+- **Live Illustrator ⟂ Studio** — the "→ Studio" button and `importToStudio`
+  call removed from the panel; the backend command stays for compatibility.
+  phase6 asserts `studio::list_tabs` never returns a `scope='illustrator'`
+  thread.
+- **Panel rebuild** — `IllustratorDrawer.tsx` / `.module.css`: one header block
+  with a single rule under it (no per-row borders), scope + detail segments,
+  explanation as the hero, Q&A history collapsed by default, a single ask row
+  with the scope selector. Tokens only; no `position:fixed`. `Tabs` gains
+  `disabled` items.
+- **Auto-show panel** — `Viewer.tsx`: `illustratorEnabled` + a document tab
+  active → `drawerOpen` auto-true (stays closed after an explicit close until
+  the next document). Enabling from off opens the panel but passes
+  `autoRun={false}`; one "解説をはじめる" tap starts generation and clears the
+  flag.
+
+### Automated gates
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck (`tsc --noEmit`) | pass |
+| Frontend lint (eslint + design-rules + hardcoded-strings) | pass (0 warnings) |
+| Frontend unit tests (vitest incl. axe) | 18 passed |
+| i18n parity | 375 keys × 3 languages (ja / en / zh-Hans) |
+| Production web build | pass; pre-existing large-chunk advisory only |
+| ts-rs binding export | regenerated; **no diff** |
+| Rust `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings` | pass |
+| Rust tests (`cargo test`) | 178 passed, 1 ignored; phase6 +1 assertion; client +2 tests |
+| `cargo deny check` | advisories / bans / licenses / sources ok |
+
+### Wire audit (OpenAI / Anthropic)
+
+- OpenAI official base `https://api.openai.com/v1` — path present, untouched.
+- Anthropic official base `https://api.anthropic.com` — path empty, now
+  completed to `/v1`, so the client's `/messages` reaches `/v1/messages`
+  (fixes a latent bug for anyone who stored the bare host). A base already
+  ending `/v1` is untouched.
+- No parameter or body changes. `stream_options` unchanged. Full Rust suite +
+  phase6 re-run green.
+
+### Manual / packaged verification
+
+- P1 (`/v1`), P2 (Studio picker), P3 (whole-source overview), P7 (model list)
+  were verified against the code + unit tests; end-to-end against a live LM
+  Studio still needs the owner's server reachable with a role binding (the
+  configured entry lacks `/v1` — now auto-completed — and the active "M3 Ultra"
+  endpoint was offline during the earlier session).
+
+### Artifact (round 2 rebuild)
+
+| Field | Value |
+|---|---|
+| App | `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, `CFBundleShortVersionString` 0.2.0) |
+| DMG | `WAKARU_0.2.0_aarch64.dmg` |
+| Size | `23,141,084` bytes |
+| SHA-256 | `139ce4c03dbb8a88ea7404e562806171fc3569b51d49b1a630a1a03d55e2fffc` (basename in `WAKARU_0.2.0_aarch64.dmg.sha256`) |
+| `hdiutil verify` | checksum VALID |
+| `codesign --verify --deep --strict` | passes for the build output and for the app inside the mounted DMG |
+| Startup probe | `WAKARU backend ready version="0.2.0"`; log has no secret patterns |
+| Signing | ad-hoc (`APPLE_SIGNING_IDENTITY="-"`), `MACOSX_DEPLOYMENT_TARGET=12.0`; not notarized |
+
+This supersedes the 2026-09-09 artifact below; the `v0.2.0` tag and GitHub
+release were moved to the 2026-09-10 round-2 commit on `main`.
+
 ## v0.2.0 release verification — 2026-09-09
 
 Scope: seven reader-reported problems, an OpenAI/Anthropic/LM-Studio wire audit,

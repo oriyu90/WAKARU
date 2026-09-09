@@ -357,3 +357,26 @@
 - **不変**: IPC 契約（Studio タブ payload の内部変更のみ）・DB スキーマ・プロジェクト形式・`design.md`/トークン・OpenAI/Anthropic ワイヤ。マイグレーションなし。既存 v0.0.0〜v0.1.3 のプロジェクト/設定はそのまま開く。
 - **影響**: `src/features/viewer/{Viewer.tsx,Viewer.module.css,FilePreviews.tsx}`, `src/features/project/{SourceListPanel.tsx,SourceList.module.css}`, `src/features/studio/Studio.tsx`, `src/ipc/studio.ts`, `src/app/Icons.tsx`, `src/main.tsx`, `src/styles/base.css`, `src/i18n/{ja,en,zh-Hans}.json`, `src-tauri/src/services/ai/client.rs`, `src-tauri/src/services/studio.rs`, `src-tauri/src/domain/studio.rs`, `src-tauri/src/commands/studio.rs`, `src-tauri/src/lib.rs`, `src-tauri/tauri.conf.json`, テスト（client 2件 / phase6）。
 - **差し戻し条件**: `[DONE]` 緩和で誤完了が観測されたら、`finish_reason` に加えて「最後のチャンク受信からの経過時間」も要件に加える。垂直レールが特定言語で幅不足なら `--rail-w` を言語別に調整。tools ストリップ再試行が正当な 400 を隠すようなら、tools 由来を示すエラー文言の判定を厳格化する。
+
+## D-32 · `/v1` 補完・モデル一覧選択・ライブ解説の全体解説化と Studio 分離・過去会話の遅延表示・ライブ解説パネル刷新
+
+- **日付**: 2026-09-10（v0.2.0 に追加）
+- **論点（オーナー報告7件＋外部仕様監査＋危険設計）**:
+  1. LM Studio のログに `Unexpected endpoint or method. (POST /chat/completions)` `(POST /embeddings)` が出て応答が返らない。
+  2. 過去の会話は開くまで見えないようにしたい。
+  3. ライブ解説は開いた瞬間、資料全体をわかりやすく解説してほしい。
+  4. ライブ解説は Studio とコンテキストを共有しないようにしたい。
+  5. アプリ UI を Hallmark に沿って見直し、ライブ解説パネルの UI を作り替えたい（わかりにくい）。
+  6. 「ライブ解説を有効にするバー」が出ている時は自動でパネルを出す。オフから有効化した場合はパネルは開くが、指示するまで動かない。
+  7. LM Studio などモデル情報を取得できる場合は、一覧から使えるモデルを選べるようにしたい。
+- **採用1（P1・`/v1` 欠落＝応答不達の主因）**: ユーザの LM Studio プロファイルの Base URL は `http://192.168.0.114:1234`（パス無し）。LM Studio・Ollama・llama.cpp・vLLM・LocalAI・mlx-bar、そして `api.anthropic.com` 自身も全ルートを `/v1` 配下で提供する（外部仕様を再確認）。パス無しだと `/chat/completions` 等が 404、LM Studio は「Unexpected endpoint」を **200 で**返すためストリームとして壊れ「応答なし」に見えた。**`ensure_api_version_path()`（`client.rs`）を新設**し、URL のパスが空／`/` のときだけ `/v1` を付与、明示パス（`/v1`・`/openai/v1`・ゲートウェイ接頭辞）は不変。`AiClient::new` に適用（probe / chat / embeddings / 既存の保存済みプロファイルを一括カバー、マイグレーション不要）。`profiles::normalise_base_url` にも適用し、保存値と Settings 表示を実際のリクエストに一致させる。単体テスト（`ensure_api_version_path` 表・bare host → `/v1/chat/completions` 到達・`normalise_base_url` の bare host ケース）。既存の Anthropic モック（パス無し）は `POST /v1/messages` を期待するようアサート更新。
+- **採用2（P7・モデル一覧選択）**: `ai_list_models(profileId)` コマンドを新設（`GET /models` のみ、能力プローブ無し）。`AiSettings` の役割行のモデル欄は、取得済みモデルがあれば `<Select>`（現在値＋一覧＋「手入力…」の退避口）、無ければ従来の自由入力。各行に `↻` 取得ボタン。接続テストの `models` も流用。プロファイル編集ダイアログの既定モデルは `datalist` ＋「モデル取得」ボタン（保存済みプロファイルのみ）。ts-rs 型追加なし（戻り値 `Vec<String>`）。
+- **採用3（P2・過去会話の遅延表示）**: `Studio.tsx` の「先頭タブへの暗黙フォールバック（`?? rows[0]`）」と「先頭固定 effect」を撤去。`activeId` 初期値 `""`、未選択時は本文・コンポーザを出さず `EmptyState`（`studio.pickConversation`）。新規作成時は新タブを選択、アクティブタブを閉じたら未選択に戻る。過去会話の本文はユーザが開くまでフェッチも表示もされない（v0.2.0 の `studio_get_tab` 遅延化の上に構築）。
+- **採用4（P3・ライブ解説の全体解説）**: `illustrator_generate` が locator `{t:"whole"}` を受けたら、ページ 1 ではなく**資料全体のダイジェスト**（先頭 12 セクション各 700 字＋末尾 1 セクション、総量 8,000 字上限＝900 ページ PDF でもメモと同コスト）を組み、ページ向けプロンプトに「このページ→この資料」と読み替える前置きを付けて概観を生成。キャッシュキーは `illustrations` の `locator_key='whole'` で従来設計のまま成立。`IllustratorDrawer` は開いた時に既定で「資料全体」ビューを生成。セグメントで「このページ」に切替可能（ページ locator が未確定なら無効）。
+- **採用5（P4・Studio 分離）**: ライブ解説の Q&A スレッドは元々 `scope='illustrator'`、Studio タブは `studio_tabs` 由来で DB 上分離済み。刷新パネルから **「Studio へ送る」ボタンと `importToStudio` 呼び出しを削除**（バックエンドのコマンドは互換のため残置、UI から非導線化）。`studio::list_tabs` が `illustrator` スレッドを絶対に返さないことを回帰テスト（phase6）で固定。
+- **採用6（P5/P6・パネル刷新＋自動表示）**: `IllustratorDrawer` を全面書き換え。ヘッダ1ブロック＋下に単一罫線（行ごとの境界線を撤去）、タイトル＋範囲セグメント（資料全体／このページ）＋詳細度セグメント＋位置表示、本文は解説をヒーローに、Q&A 履歴は既定折りたたみ、コンポーザは ask 行＋範囲セレクトのみ。トークンのみ・`position:fixed` 無し。`Viewer` は `illustratorEnabled && 資料タブがアクティブ` で `drawerOpen` を自動 true（閉じても次の資料切替まで閉じたまま）。オフから有効化した直後は `autoRun=false` で「解説をはじめる」ボタンを1回押すまで生成しない（`justEnabled` フラグ）。`Tabs` に `disabled` 項目対応を追加。
+- **採用7（危険設計）**: `build_source_overview_context` は `LIMIT` と文字数上限でメモリを固定。`ai_list_models` は短命 DB 読取後にネットワーク（非ブロッキング）。`Studio` の未選択状態でも `studio://delta` リスナは `activeTabId` ガードで安全。`ensure_api_version_path` は末尾 `/` を除去してから判定するため二重 `/v1` にならない。
+- **外部仕様監査（OpenAI / Anthropic）**: OpenAI 公式（`.../v1`）はパス有りで不変。Anthropic 公式で bare host を設定していた場合、今回 `/v1` が補われ `/v1/messages` に正しく届くようになる（潜在バグの解消）。`.../v1` 設定済みは不変。ワイヤ・パラメータの変更なし。全 Rust テスト＋ phase6 再実行で緑。
+- **不変**: IPC 契約（`ai_list_models` 追加のみ、ts-rs 差分ゼロ）・DB スキーマ・プロジェクト形式・`design.md`/トークン・OpenAI/Anthropic ワイヤ。マイグレーションなし。既存 v0.0.0〜v0.1.3 のプロジェクト/設定はそのまま開く。ライブ解説のページ解説キャッシュ（`illustrations`）も従来キーのまま。
+- **影響**: `src-tauri/src/services/ai/{client.rs,mod.rs,profiles.rs}`, `src-tauri/src/services/illustrator.rs`, `src-tauri/src/commands/ai.rs`, `src-tauri/src/lib.rs`, `src-tauri/tests/phase6.rs`, `src/ipc/ai.ts`, `src/features/settings/AiSettings.{tsx,module.css}`, `src/features/studio/Studio.tsx`, `src/features/viewer/{IllustratorDrawer.tsx,IllustratorDrawer.module.css,Viewer.tsx}`, `src/components/Tabs.tsx`, `src/i18n/{ja,en,zh-Hans}.json`（`ai.fetchModels/modelCustom/modelsNone/modelsFailed/modelsSaveFirst`, `studio.pickConversation(+Body)`, `illustrator.viewLabel/viewOverview/viewPage/wholeSource/overviewHint`, `viewer.illustratorStart`、`illustrator.toStudio` 削除）。
+- **差し戻し条件**: `/v1` 自動補完がルート直下で提供する非標準サーバを壊す報告が出たら、補完をオプトイン（プロファイルに「/v1 を補う」チェック）へ変更する。全体ダイジェストが長大資料で要点を外すなら、`documents` の見出しのみを渡す TOC モードへ切替。過去会話の遅延表示で「最後に開いた会話を復元したい」要望が出たら、`activeId` を `sessionStorage` に退避する。

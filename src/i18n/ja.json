@@ -239,7 +239,8 @@
     "keyframes": "動画のキーフレーム",
     "ocrRun": "テキストを認識",
     "ocrProgress": "認識中… {{done}} / {{total}}",
-    "ocrDone": "文字認識が完了しました。これらのページを検索できます。"
+    "ocrDone": "文字認識が完了しました。これらのページを検索できます。",
+    "illustratorStart": "解説をはじめる"
   },
   "ai": {
     "connections": "接続先",
@@ -256,7 +257,7 @@
     "preset": "プリセット",
     "name": "名前",
     "baseUrl": "Base URL",
-    "baseUrlHint": "通常は …/v1 まで含めます",
+    "baseUrlHint": "通常は …/v1 まで含めます（省略時は自動で /v1 を補います）",
     "protocolLabel": "API 形式",
     "protocol": {
       "openai": "OpenAI 互換",
@@ -278,7 +279,12 @@
       "vision": "画像理解",
       "embedding": "検索",
       "organizer": "テキスト整形"
-    }
+    },
+    "fetchModels": "モデル取得",
+    "modelCustom": "手入力…",
+    "modelsNone": "モデル一覧を取得できませんでした。モデル名を直接入力してください。",
+    "modelsFailed": "モデル一覧の取得に失敗しました",
+    "modelsSaveFirst": "接続を保存するとモデルを取得できます"
   },
   "illustrator": {
     "openADocument": "資料を開くと解説が表示されます。",
@@ -298,7 +304,11 @@
     "stop": "停止",
     "ask": "質問する…",
     "send": "送信",
-    "toStudio": "Studioへ送る"
+    "viewLabel": "解説の範囲",
+    "viewOverview": "資料全体",
+    "viewPage": "このページ",
+    "wholeSource": "資料全体",
+    "overviewHint": "開くと資料全体をやさしく解説します。"
   },
   "studio": {
     "title": "Studio",
@@ -344,7 +354,9 @@
     "download": "ダウンロード",
     "downloaded": "{{path}} に保存しました",
     "importFailed": "そのファイルを取り込めませんでした。",
-    "cancelled": "停止しました。"
+    "cancelled": "停止しました。",
+    "pickConversation": "会話を選んでください",
+    "pickConversationBody": "左の一覧から会話を開くか、新しい会話を始めます。過去の会話は開くまで表示されません。"
   },
   "mcp": {
     "transportSupport": "stdio と MCP Streamable HTTP に対応します。接続失敗はそのサーバだけに隔離されます。",

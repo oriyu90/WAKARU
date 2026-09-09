@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "../../components/Button";
@@ -23,6 +23,9 @@ export function AiSettings() {
   const toast = useToast();
   const [editing, setEditing] = useState<AiProfile | "new" | null>(null);
   const [tested, setTested] = useState<Record<string, TestResult>>({});
+  // Model ids discovered per profile (from a test or an explicit fetch), so the
+  // role rows can offer a list instead of a free-text field.
+  const [models, setModels] = useState<Record<string, string[]>>({});
 
   const profiles = useQuery({ queryKey: ["ai-profiles"], queryFn: aiApi.listProfiles });
   const bindings = useQuery({ queryKey: ["ai-bindings"], queryFn: aiApi.getRoleBindings });
@@ -40,10 +43,20 @@ export function AiSettings() {
     mutationFn: (id: string) => aiApi.testProfile(id),
     onSuccess: (res, id) => {
       setTested((m) => ({ ...m, [id]: res }));
+      if (res.models.length) setModels((m) => ({ ...m, [id]: res.models }));
       void qc.invalidateQueries({ queryKey: ["ai-profiles"] });
       if (!res.ok) toast.push({ tone: "error", message: t("ai.testFailed") });
     },
     onError: () => toast.push({ tone: "error", message: t("ai.testFailed") }),
+  });
+
+  const fetchModels = useMutation({
+    mutationFn: (id: string) => aiApi.listModels(id),
+    onSuccess: (list, id) => {
+      setModels((m) => ({ ...m, [id]: list }));
+      if (!list.length) toast.push({ tone: "info", message: t("ai.modelsNone") });
+    },
+    onError: () => toast.push({ tone: "error", message: t("ai.modelsFailed") }),
   });
 
   const setBinding = useMutation({
@@ -134,13 +147,17 @@ export function AiSettings() {
                     </option>
                   ))}
                 </Select>
-                <Input
-                  placeholder={t("ai.model")}
-                  defaultValue={b?.model ?? ""}
+                <ModelField
                   disabled={!b}
-                  onBlur={(e) => {
-                    if (b && e.target.value !== b.model)
-                      setBinding.mutate({ role, profileId: b.profileId, model: e.target.value });
+                  value={b?.model ?? ""}
+                  options={b ? (models[b.profileId] ?? []) : []}
+                  fetching={
+                    fetchModels.isPending && fetchModels.variables === b?.profileId
+                  }
+                  onFetch={() => b && fetchModels.mutate(b.profileId)}
+                  onChange={(model) => {
+                    if (b && model !== b.model)
+                      setBinding.mutate({ role, profileId: b.profileId, model });
                   }}
                 />
               </div>
@@ -186,6 +203,15 @@ function ProfileDialog({
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState(profile?.defaultModel ?? "");
   const [protocol, setProtocol] = useState<ApiProtocol>(profile?.protocol ?? "openai");
+  const [modelList, setModelList] = useState<string[]>([]);
+  const fetchModels = useMutation({
+    mutationFn: () => aiApi.listModels(profile!.id),
+    onSuccess: (list) => {
+      setModelList(list);
+      if (!list.length) toast.push({ tone: "info", message: t("ai.modelsNone") });
+    },
+    onError: () => toast.push({ tone: "error", message: t("ai.modelsFailed") }),
+  });
 
   const save = useMutation({
     mutationFn: () =>
@@ -264,10 +290,118 @@ function ProfileDialog({
             <Input id={id} type="password" value={apiKey} placeholder={profile?.hasKey ? "••••••••" : ""} onChange={(e) => setApiKey(e.target.value)} />
           )}
         </Field>
-        <Field label={t("ai.defaultModel")}>
-          {({ id }) => <Input id={id} value={model} onChange={(e) => setModel(e.target.value)} />}
+        <Field
+          label={t("ai.defaultModel")}
+          hint={profile ? undefined : t("ai.modelsSaveFirst")}
+        >
+          {({ id }) => (
+            <div className={styles.modelRow}>
+              <Input
+                id={id}
+                value={model}
+                list={modelList.length ? "ai-profile-models" : undefined}
+                onChange={(e) => setModel(e.target.value)}
+              />
+              <Button
+                variant="quiet"
+                size="sm"
+                disabled={!profile}
+                loading={fetchModels.isPending}
+                onClick={() => fetchModels.mutate()}
+              >
+                {t("ai.fetchModels")}
+              </Button>
+              {modelList.length ? (
+                <datalist id="ai-profile-models">
+                  {modelList.map((m) => (
+                    <option key={m} value={m} />
+                  ))}
+                </datalist>
+              ) : null}
+            </div>
+          )}
         </Field>
       </div>
     </Dialog>
+  );
+}
+
+const CUSTOM = "__custom__";
+
+/** Role model chooser: a `<Select>` of discovered model ids (with the current
+ * value always selectable), a "type it in" escape hatch, and a refresh button.
+ * Falls back to a plain text field when nothing has been discovered yet. */
+function ModelField({
+  value,
+  options,
+  disabled,
+  fetching,
+  onChange,
+  onFetch,
+}: {
+  value: string;
+  options: string[];
+  disabled: boolean;
+  fetching: boolean;
+  onChange: (model: string) => void;
+  onFetch: () => void;
+}) {
+  const { t } = useTranslation();
+  const choices = Array.from(new Set([value, ...options].filter(Boolean)));
+  const [typing, setTyping] = useState(false);
+
+  // Drop back to the list when a fetch brings in options and we are not
+  // mid-edit of a genuinely new value.
+  useEffect(() => {
+    if (!value) setTyping(false);
+  }, [value]);
+
+  const refresh = (
+    <IconButton
+      label={t("ai.fetchModels")}
+      size="sm"
+      disabled={disabled || fetching}
+      onClick={onFetch}
+    >
+      ↻
+    </IconButton>
+  );
+
+  if (!choices.length || typing) {
+    return (
+      <div className={styles.modelField}>
+        <Input
+          placeholder={t("ai.model")}
+          defaultValue={value}
+          disabled={disabled}
+          autoFocus={typing}
+          onBlur={(e) => {
+            if (e.target.value !== value) onChange(e.target.value.trim());
+          }}
+        />
+        {refresh}
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.modelField}>
+      <Select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => {
+          if (e.target.value === CUSTOM) setTyping(true);
+          else onChange(e.target.value);
+        }}
+      >
+        {choices.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+        <option value={CUSTOM}>{t("ai.modelCustom")}</option>
+      </Select>
+      {refresh}
+    </div>
   );
 }

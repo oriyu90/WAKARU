@@ -60,6 +60,26 @@ fn ac_6_1_tabs_can_be_created_renamed_reordered_and_closed() {
     assert_eq!(full.messages.len(), 1);
     assert_eq!(full.messages[0].content, "hi");
 
+    // A Live Illustrator thread (scope='illustrator', no studio_tabs row) must
+    // never surface in Studio — the two panes do not share conversation state.
+    pdb.execute(
+        "INSERT INTO threads (id, scope, title, created_at, updated_at)
+         VALUES ('ill-th-1', 'illustrator', '', 'now', 'now')",
+        [],
+    )
+    .unwrap();
+    pdb.execute(
+        "INSERT INTO messages (id, thread_id, role, content, created_at)
+         VALUES ('ill-m1', 'ill-th-1', 'user', 'secret illustrator question', 'now')",
+        [],
+    )
+    .unwrap();
+    let listed = studio::list_tabs(&db).unwrap();
+    assert!(
+        listed.iter().all(|t| t.thread_id != "ill-th-1"),
+        "Studio must not list an Illustrator thread"
+    );
+
     studio::rename_tab(&db, &a.id, "Renamed").unwrap();
     studio::reorder_tabs(&db, &[b.id.clone(), a.id.clone()]).unwrap();
     let tabs = studio::list_tabs(&db).unwrap();

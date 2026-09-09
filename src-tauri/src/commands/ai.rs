@@ -29,6 +29,15 @@ pub async fn ai_test_profile(state: State<'_, AppState>, id: String) -> AppResul
 }
 
 #[tauri::command]
+pub async fn ai_list_models(
+    state: State<'_, AppState>,
+    profile_id: String,
+) -> AppResult<Vec<String>> {
+    let path = state.app_db_path.clone();
+    ai::list_models(&path, &profile_id).await
+}
+
+#[tauri::command]
 pub fn ai_get_role_bindings(state: State<'_, AppState>) -> AppResult<RoleBindings> {
     state.with_db(ai::profiles::get_bindings)
 }

@@ -2,6 +2,29 @@
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
+**2026-09-10 · v0.2.0 round 2 (same tag)** — seven more reader issues + a wire
+re-audit. (1) **LM Studio "Unexpected endpoint / no reply"**: the profile base
+URL had no `/v1`. `ensure_api_version_path()` (`src-tauri/src/services/ai/client.rs`)
+appends `/v1` only when the URL has no path; used in `AiClient::new` (covers
+probe/chat/embeddings + all stored profiles, no migration) and
+`profiles::normalise_base_url`. (2) **Past Studio conversations shown before
+opening**: `Studio.tsx` drops the `?? rows[0]` fallback + pin-to-first effect;
+unselected shows an `EmptyState`, history isn't fetched until a tab is clicked.
+(3) **Live Illustrator explains the whole source on open**: `illustrator_generate`
+handles `locator {t:"whole"}` → bounded whole-source digest (≤8 000 chars) + a
+prompt prefix re-framing "this page" as "this document"; the drawer defaults to
+the 資料全体 view with a このページ segment. (4) **Illustrator ⟂ Studio**: the
+"→ Studio" button + `importToStudio` call removed from the panel (backend command
+kept); phase6 asserts `list_tabs` never returns an illustrator thread. (5)
+**Panel rebuilt** (`IllustratorDrawer.tsx` + css): one header block, scope/detail
+segments, explanation as hero, Q&A collapsed, one ask row; `Tabs` gains
+`disabled` items. (6) **Auto-show**: `Viewer` opens the drawer when Illustrator
+is on and a document tab is active; enabling from off opens it but waits for one
+"解説をはじめる" tap (`autoRun={!justEnabled}`). (7) **Model list**: new
+`ai_list_models(profileId)` command; `AiSettings` role rows offer a `<Select>` of
+discovered model ids + a "type it in" escape + `↻`, and the connection editor
+gets a `datalist` + fetch button. No ts-rs change. See `docs/DECISIONS.md` D-32.
+
 **2026-09-09 · v0.2.0 feature + reliability** — seven reader issues + a wire
 audit + dangerous-design items. (1) **LM Studio replies not returning**:
 `chat_stream_openai` marked a stream `truncated` unless it saw `data: [DONE]`;

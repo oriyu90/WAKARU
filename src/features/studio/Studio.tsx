@@ -64,7 +64,9 @@ export function Studio({
   });
 
   const rows = tabs.data ?? [];
-  const activeRow = rows.find((tb) => tb.id === activeId) ?? rows[0];
+  // No implicit fallback to the first tab: a past conversation stays closed
+  // (and its history off screen) until the reader picks it.
+  const activeRow = rows.find((tb) => tb.id === activeId) ?? null;
   const activeTabId = activeRow?.id ?? "";
 
   // The full conversation for just the active tab.
@@ -88,14 +90,6 @@ export function Studio({
     if (active) setScope(active.scope);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id, active?.scope]);
-
-  // Pin `activeId` to a tab that actually exists. After a refetch (send, close,
-  // create) or a reload, `activeId` can be "" or point at a closed tab; without
-  // this the selection silently falls back to the first tab on every render.
-  useEffect(() => {
-    if (activeRow && activeRow.id !== activeId) setActiveId(activeRow.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRow?.id]);
 
   const messages = useMemo(
     () => conversation.data?.messages ?? [],
@@ -309,6 +303,25 @@ export function Studio({
         </Button>
       </aside>
 
+      {!activeRow ? (
+        <main className={styles.conversation}>
+          <div className={styles.emptyPane}>
+            <EmptyState
+              title={t("studio.pickConversation")}
+              body={t("studio.pickConversationBody")}
+              actions={
+                <Button
+                  variant="primary"
+                  loading={create.isPending}
+                  onClick={() => create.mutate()}
+                >
+                  {t("studio.newTab")}
+                </Button>
+              }
+            />
+          </div>
+        </main>
+      ) : (
       <main className={styles.conversation}>
         <div ref={messagesRef} className={styles.messages} aria-live="polite">
           {messages.map((m) => (
@@ -410,6 +423,7 @@ export function Studio({
           </div>
         </form>
       </main>
+      )}
 
       <aside className={styles.workspace} aria-label={t("studio.workspace")}>
         <div className={styles.wsHead}>

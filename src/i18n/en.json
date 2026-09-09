@@ -241,7 +241,8 @@
     "keyframes": "Video keyframes",
     "ocrRun": "Recognise text",
     "ocrProgress": "Recognising… {{done}} / {{total}}",
-    "ocrDone": "Text recognition finished. The pages are now searchable."
+    "ocrDone": "Text recognition finished. The pages are now searchable.",
+    "illustratorStart": "Start explaining"
   },
   "ai": {
     "connections": "Connections",
@@ -258,7 +259,7 @@
     "preset": "Preset",
     "name": "Name",
     "baseUrl": "Base URL",
-    "baseUrlHint": "Include the API version path, usually …/v1",
+    "baseUrlHint": "Usually ends in …/v1 (WAKARU adds /v1 automatically if you omit it)",
     "protocolLabel": "API format",
     "protocol": {
       "openai": "OpenAI-compatible",
@@ -280,7 +281,12 @@
       "vision": "Image understanding",
       "embedding": "Search",
       "organizer": "Text organizing"
-    }
+    },
+    "fetchModels": "Fetch models",
+    "modelCustom": "Type it in…",
+    "modelsNone": "Could not list models — type the model id instead.",
+    "modelsFailed": "Could not fetch the model list",
+    "modelsSaveFirst": "Save the connection to fetch models"
   },
   "illustrator": {
     "openADocument": "Open a document to see its explanation.",
@@ -300,7 +306,11 @@
     "stop": "Stop",
     "ask": "Ask a question…",
     "send": "Send",
-    "toStudio": "Send to Studio"
+    "viewLabel": "Explanation scope",
+    "viewOverview": "Whole document",
+    "viewPage": "This page",
+    "wholeSource": "Whole document",
+    "overviewHint": "On open, this explains the whole document in plain terms."
   },
   "studio": {
     "title": "Studio",
@@ -348,7 +358,9 @@
     "download": "Download",
     "downloaded": "Saved to {{path}}",
     "importFailed": "Couldn't import that file.",
-    "cancelled": "Stopped."
+    "cancelled": "Stopped.",
+    "pickConversation": "Pick a conversation",
+    "pickConversationBody": "Open a conversation from the list, or start a new one. Past conversations stay hidden until you open them."
   },
   "mcp": {
     "transportSupport": "Supports stdio and MCP Streamable HTTP. A connection failure is isolated to that server.",

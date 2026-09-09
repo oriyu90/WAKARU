@@ -7,6 +7,8 @@ export type TabItem = {
   label: ReactNode;
   /** Icon-only tabs still need a name for SR. */
   ariaLabel?: string;
+  /** A tab that is not currently selectable (e.g. no page in view yet). */
+  disabled?: boolean;
 };
 
 /** WAI-ARIA tablist: arrow keys move, Home/End jump, Tab order matches the eye
@@ -38,8 +40,15 @@ export function Tabs({
     else if (e.key === "End") next = items.length - 1;
     else return;
     e.preventDefault();
+    // Skip over disabled tabs in the direction of travel.
+    const forward = next >= idx && !(idx === items.length - 1 && next === 0);
+    while (items[next]?.disabled && next !== idx) {
+      next = forward
+        ? (next + 1) % items.length
+        : (next - 1 + items.length) % items.length;
+    }
     const target = items[next];
-    if (!target) return;
+    if (!target || target.disabled) return;
     onChange(target.id);
     refs.current[target.id]?.focus();
   }
@@ -66,6 +75,7 @@ export function Tabs({
             aria-controls={`panel-${tab.id}`}
             aria-label={tab.ariaLabel}
             tabIndex={selected ? 0 : -1}
+            disabled={tab.disabled}
             className={styles.tab}
             onClick={() => onChange(tab.id)}
           >
