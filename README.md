@@ -27,8 +27,9 @@ so on first launch right-click WAKARU → **Open**.
   models are handled either way — a `reasoning_content` field or an inline
   `<think>…</think>` block is kept out of the answer.
 - **Real rendering** — PDF via bundled PDF.js, DOCX/PPTX structure, bounded sheet
-  tables, Markdown, images, audio/video with transcripts; rich previews fall back to
-  searchable extracted text, never a blank screen.
+  tables, Markdown, images, audio/video with transcripts. Studio-generated Markdown,
+  PDF and other artifacts can be imported straight into Viewer, and queued imports
+  refresh into their final preview without reopening the project.
 - **OCR** — scanned PDFs and images with text are recognised (pure-Rust `ocrs`,
   models fetched once) and folded into search; a scanned PDF also gets a
   `searchable.pdf` with an invisible, position-matched text layer.
@@ -36,8 +37,9 @@ so on first launch right-click WAKARU → **Open**.
   PDF document from a title and sections; the model supplies structure, not layout.
 - **Hybrid search** — FTS + optional vector search, with a locally cached
   multilingual embedding model as an offline fallback.
-- **Live Illustrator** — plain-language, understanding-oriented explanations of the
-  source you are viewing, with citations.
+- **Live Illustrator** — plain-language, understanding-oriented explanations with
+  citations. Source-level sessions stay intact while pages change, and enter Studio
+  only after the explicit **Hand off to Studio** action.
 - **Studio** — an agentic loop over your sources and a sandboxed workspace, with tool
   approval, iteration limits and artifact export.
 - **MCP** — local stdio servers (a bare `npx` / `uvx` / `node` command is found

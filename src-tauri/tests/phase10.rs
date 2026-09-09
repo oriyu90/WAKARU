@@ -145,3 +145,27 @@ fn ac_10_3_a_future_major_schema_is_rejected() {
     let err = export::import(&env.app_db, &env.root, &zip_path.to_string_lossy()).unwrap_err();
     assert_eq!(err.code, "IMPORT_TOO_NEW");
 }
+
+#[test]
+fn project_import_rejects_parent_directory_entries() {
+    let env = Env::new();
+    let zip_path = env._tmp.path().join("traversal.wakaru.zip");
+    {
+        let file = std::fs::File::create(&zip_path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        use std::io::Write;
+        use zip::write::SimpleFileOptions;
+        zip.start_file("manifest.json", SimpleFileOptions::default())
+            .unwrap();
+        zip.write_all(br#"{"schemaVersion":"1.0.0","project":{"name":"X"}}"#)
+            .unwrap();
+        zip.start_file("../escape.txt", SimpleFileOptions::default())
+            .unwrap();
+        zip.write_all(b"must not escape").unwrap();
+        zip.finish().unwrap();
+    }
+
+    let error = export::import(&env.app_db, &env.root, &zip_path.to_string_lossy()).unwrap_err();
+    assert_eq!(error.code, "IMPORT_BAD_ARCHIVE");
+    assert!(!env._tmp.path().join("escape.txt").exists());
+}

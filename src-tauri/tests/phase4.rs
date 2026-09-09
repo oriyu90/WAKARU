@@ -70,6 +70,12 @@ fn ac_4_5_thread_and_messages_persist_across_reopen() {
     let other = illustrator::get_or_create_thread(&pdb2, "s1", "page:4").unwrap();
     assert_ne!(other.id, tid);
     assert!(other.messages.is_empty());
+
+    // Viewer page navigation continues to request the canonical whole-source
+    // key, so a source-scoped Live session and its explanation are not forked.
+    let whole = illustrator::get_or_create_thread(&pdb2, "s1", "whole").unwrap();
+    let after_page_move = illustrator::get_or_create_thread(&pdb2, "s1", "whole").unwrap();
+    assert_eq!(whole.id, after_page_move.id);
 }
 
 #[test]
@@ -101,6 +107,20 @@ fn fr_l6_import_to_studio_copies_messages_into_a_new_tab() {
             params![format!("m{i}"), th.id, role, body],
         ).unwrap();
     }
+    pdb.execute(
+        "INSERT INTO illustrations
+         (id, source_id, locator_key, lang, level, model, content, created_at)
+         VALUES ('i1', 's1', 'page:1', 'ja', 'standard', 'model', 'page explanation', 'before')",
+        [],
+    )
+    .unwrap();
+
+    // Live activity remains private to Live Illustrator until the explicit
+    // handoff command below is invoked.
+    let before: i64 = pdb
+        .query_row("SELECT count(*) FROM studio_tabs", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(before, 0);
 
     let tab_id = illustrator::import_to_studio(
         &pdb,
@@ -127,7 +147,10 @@ fn fr_l6_import_to_studio_copies_messages_into_a_new_tab() {
             |r| r.get(0),
         )
         .unwrap();
-    assert_eq!(n, 2);
+    assert_eq!(
+        n, 3,
+        "the saved explanation and both chat messages are handed off"
+    );
     // The Illustrator thread is unchanged (copy, not move).
     let orig: i64 = pdb
         .query_row(

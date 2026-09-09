@@ -513,7 +513,27 @@ pub async fn ask(
 
 pub fn import_to_studio(project_db: &Connection, input: &ImportToStudioInput) -> AppResult<String> {
     let src = load_thread(project_db, &input.thread_id)?;
+    if src.scope != "illustrator" {
+        return Err(AppError::new(
+            "ILLUSTRATOR_THREAD_REQUIRED",
+            "error.thread.notFound",
+            "only a Live Illustrator session can be handed off",
+        ));
+    }
+    let explanation: Option<(String, String, String, String)> =
+        match (src.source_id.as_deref(), src.locator_key.as_deref()) {
+            (Some(source_id), Some(locator_key)) => project_db
+                .query_row(
+                    "SELECT content, citations, model, created_at FROM illustrations
+                     WHERE source_id=?1 AND locator_key=?2 ORDER BY created_at DESC LIMIT 1",
+                    params![source_id, locator_key],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                )
+                .optional()?,
+            _ => None,
+        };
     let now = now_iso8601();
+    let tx = project_db.unchecked_transaction()?;
 
     let (studio_thread_id, tab_id) = if input.mode == "append" {
         let tab_id = input.target_tab_id.clone().ok_or_else(|| {
@@ -523,7 +543,7 @@ pub fn import_to_studio(project_db: &Connection, input: &ImportToStudioInput) ->
                 "append needs a target tab",
             )
         })?;
-        let thread_id: String = project_db
+        let thread_id: String = tx
             .query_row(
                 "SELECT thread_id FROM studio_tabs WHERE id=?1",
                 [&tab_id],
@@ -537,27 +557,55 @@ pub fn import_to_studio(project_db: &Connection, input: &ImportToStudioInput) ->
     } else {
         let thread_id = Uuid::now_v7().to_string();
         let tab_id = Uuid::now_v7().to_string();
-        let title = format!("解説: {}", src.title.chars().take(20).collect::<String>());
-        project_db.execute(
+        let source_name: String = src
+            .source_id
+            .as_deref()
+            .and_then(|source_id| {
+                tx.query_row(
+                    "SELECT original_name FROM sources WHERE id=?1",
+                    [source_id],
+                    |row| row.get(0),
+                )
+                .optional()
+                .ok()
+                .flatten()
+            })
+            .unwrap_or_else(|| src.title.clone());
+        let title = format!("解説: {}", source_name.chars().take(20).collect::<String>());
+        tx.execute(
             "INSERT INTO threads (id, scope, title, created_at, updated_at) VALUES (?1, 'studio', ?2, ?3, ?3)",
             params![thread_id, title, now],
         )?;
-        let ord: i64 = project_db
+        let ord: i64 = tx
             .query_row(
                 "SELECT COALESCE(MAX(ordinal),0)+1 FROM studio_tabs",
                 [],
                 |r| r.get(0),
             )
             .unwrap_or(1);
-        project_db.execute(
+        tx.execute(
             "INSERT INTO studio_tabs (id, thread_id, title, ordinal, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
             params![tab_id, thread_id, title, ord, now],
         )?;
         (thread_id, tab_id)
     };
 
+    if let Some((content, citations, model, created_at)) = explanation {
+        tx.execute(
+            "INSERT INTO messages (id, thread_id, role, content, citations, model, status, created_at)
+             VALUES (?1, ?2, 'assistant', ?3, ?4, ?5, 'complete', ?6)",
+            params![
+                Uuid::now_v7().to_string(),
+                studio_thread_id,
+                content,
+                citations,
+                model,
+                created_at
+            ],
+        )?;
+    }
     for m in &src.messages {
-        project_db.execute(
+        tx.execute(
             "INSERT INTO messages (id, thread_id, role, content, citations, model, status, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'complete', ?7)",
             params![
@@ -571,6 +619,7 @@ pub fn import_to_studio(project_db: &Connection, input: &ImportToStudioInput) ->
             ],
         )?;
     }
+    tx.commit()?;
     Ok(tab_id)
 }
 

@@ -14,7 +14,7 @@ import { viewerApi } from "../../ipc/viewer";
 import { aiApi } from "../../ipc/ai";
 import { sourcesApi, pickSourceFiles, pickFolder } from "../../ipc/sources";
 import { IpcError, inTauri } from "../../ipc/client";
-import type { ViewerTab } from "../../ipc/types.gen";
+import type { SourceStatusEvent, ViewerTab } from "../../ipc/types.gen";
 import { SourceListPanel } from "../project/SourceListPanel";
 import { Preview } from "./Preview";
 import { IllustratorDrawer } from "./IllustratorDrawer";
@@ -79,6 +79,34 @@ export function Viewer({
     queryFn: () => viewerApi.getTabs(projectId),
     enabled: inTauri,
   });
+
+  // Studio artifacts can be opened while ingestion is still queued. Refresh
+  // every matching preview cache when the source becomes ready so the final
+  // Markdown/PDF/Office renderer appears without reopening the project.
+  useEffect(() => {
+    if (!inTauri) return;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void import("@tauri-apps/api/event").then(async ({ listen }) => {
+      const stop = await listen<SourceStatusEvent>("source://status", ({ payload }) => {
+        if (payload.projectId !== projectId) return;
+        void Promise.all([
+          qc.invalidateQueries({ queryKey: ["sources", projectId] }),
+          qc.invalidateQueries({ queryKey: ["source-detail", projectId, payload.sourceId] }),
+          qc.invalidateQueries({ queryKey: ["document", projectId, payload.sourceId] }),
+          qc.invalidateQueries({ queryKey: ["asset-buffer", payload.sourceId] }),
+          qc.invalidateQueries({ queryKey: ["asset-text", projectId, payload.sourceId] }),
+          qc.invalidateQueries({ queryKey: ["reader", payload.sourceId] }),
+        ]);
+      });
+      if (disposed) stop();
+      else unlisten = stop;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [projectId, qc]);
 
   const sourcesKey = ["sources", projectId];
   const addFiles = useMutation({

@@ -2,6 +2,16 @@
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
+**2026-09-10 · v0.2.2 document/session reliability** — Studio artifacts open as
+Viewer sources and source-status events refresh their completed document/asset
+caches. PPTX rendering now reacts to a loaded presentation even when its slide
+count already matches metadata. The v0.2.1 whole-source Live session remains
+stable while navigating pages; Studio receives it only through the explicit
+handoff action, which copies the saved explanation and Q&A atomically. Context
+fitting, ZIP extraction, artifact paths, identifiers and cross-project
+search-index ownership are hardened. No database or project-format migration.
+See `IMPLEMENTATION_PLAN_v0.2.2.md` and D-34/D-35.
+
 **2026-09-10 · v0.2.1** — five more reader issues (`docs/DECISIONS.md` D-33).
 (1) **Live Illustrator UI simplified**: `IllustratorDrawer.tsx` drops the
 overview/page and detail-level segmented controls — it always explains the whole

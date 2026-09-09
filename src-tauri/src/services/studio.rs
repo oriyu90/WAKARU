@@ -43,6 +43,7 @@ const MAX_TOOL_ROUNDS: u32 = 10;
 /// chars). Older turns above this are folded into a summary; the latest question
 /// is never dropped (AC-6-9).
 const BUDGET_CHARS: usize = 48_000;
+const SOURCE_CONTEXT_BYTES: usize = 16_000;
 const RAG_TOP_K: usize = 12;
 
 /// Built-in tools that never touch anything outside the project DB / workspace
@@ -385,7 +386,31 @@ pub fn artifact_abs_path(
                 artifact_id,
             )
         })?;
-    Ok(projects::project_dir(root, project_id).join(rel))
+    let rel_path = Path::new(&rel);
+    if rel_path.components().next()
+        != Some(std::path::Component::Normal(std::ffi::OsStr::new(
+            "workspace",
+        )))
+    {
+        return Err(AppError::new(
+            "ARTIFACT_PATH_DENIED",
+            "error.sandbox.pathDenied",
+            "artifact is outside the project workspace",
+        ));
+    }
+    let project_dir = projects::project_dir(root, project_id);
+    let resolved = sandbox::resolve_in_sandbox(&project_dir, &rel)?;
+    // `build_site` artifacts are directories; document artifacts are files.
+    // Both are valid only after sandbox resolution confirms they exist under
+    // this project's workspace.
+    if !resolved.exists() {
+        return Err(AppError::new(
+            "ARTIFACT_NOT_FOUND",
+            "error.studio.artifactNotFound",
+            artifact_id,
+        ));
+    }
+    Ok(resolved)
 }
 
 pub fn mark_artifact_imported(
@@ -439,6 +464,7 @@ fn has_tool_calls(m: &Value) -> bool {
 /// from the last `user` turn onward is kept verbatim; older turns are folded
 /// into one `system` summary message. Returns `(messages_with_system, folded)`.
 pub fn fit_budget(system: &str, context: &str, history: Vec<Value>) -> (Vec<Value>, u32) {
+    let context = truncate_utf8(context, SOURCE_CONTEXT_BYTES);
     let sys = json!({ "role": "system", "content": system });
     let context_msg = json!({
         "role": "user",
@@ -513,6 +539,17 @@ pub fn fit_budget(system: &str, context: &str, history: Vec<Value>) -> (Vec<Valu
     out.extend(head);
     out.extend(tail);
     (out, folded)
+}
+
+fn truncate_utf8(value: &str, max_bytes: usize) -> &str {
+    if value.len() <= max_bytes {
+        return value;
+    }
+    let mut end = max_bytes;
+    while !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    &value[..end]
 }
 
 // ───────────────────────── tool dispatch ─────────────────────────
@@ -1848,6 +1885,60 @@ mod tests {
         assert_eq!(msgs.len(), 4);
         assert_eq!(msgs[0]["role"], "system");
         assert_eq!(msgs[1]["role"], "user");
+    }
+
+    #[test]
+    fn fit_budget_bounds_oversized_untrusted_context() {
+        let context = "資料".repeat(30_000);
+        let history = vec![json!({ "role": "user", "content": "latest" })];
+        let (messages, _) = fit_budget("sys", &context, history);
+        let context_message = messages
+            .iter()
+            .find(|message| {
+                message["content"]
+                    .as_str()
+                    .is_some_and(|text| text.starts_with("[UNTRUSTED_PROJECT_CONTEXT_START]"))
+            })
+            .unwrap();
+        let text = context_message["content"].as_str().unwrap();
+        assert!(text.len() <= SOURCE_CONTEXT_BYTES + 100);
+        assert!(text.ends_with("[UNTRUSTED_PROJECT_CONTEXT_END]"));
+        assert_eq!(messages.last().unwrap()["content"], "latest");
+    }
+
+    #[test]
+    fn artifact_path_is_confined_to_workspace() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("projects");
+        let project = root.join("p1");
+        std::fs::create_dir_all(project.join("workspace")).unwrap();
+        std::fs::write(project.join("workspace/ok.md"), "ok").unwrap();
+        std::fs::write(project.join("secret.md"), "secret").unwrap();
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE artifacts (id TEXT PRIMARY KEY, rel_path TEXT NOT NULL);")
+            .unwrap();
+        db.execute(
+            "INSERT INTO artifacts (id, rel_path) VALUES ('ok', 'workspace/ok.md')",
+            [],
+        )
+        .unwrap();
+        assert_eq!(
+            artifact_abs_path(&root, "p1", &db, "ok").unwrap(),
+            project.join("workspace/ok.md").canonicalize().unwrap()
+        );
+
+        db.execute(
+            "INSERT INTO artifacts (id, rel_path) VALUES ('bad', 'workspace/../secret.md')",
+            [],
+        )
+        .unwrap();
+        assert!(artifact_abs_path(&root, "p1", &db, "bad").is_err());
+        db.execute(
+            "INSERT INTO artifacts (id, rel_path) VALUES ('source', 'sources/private.md')",
+            [],
+        )
+        .unwrap();
+        assert!(artifact_abs_path(&root, "p1", &db, "source").is_err());
     }
 
     #[test]

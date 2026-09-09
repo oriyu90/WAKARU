@@ -33,6 +33,9 @@ pub fn resolve(projects_root: &Path, request_path: &str) -> AppResult<PathBuf> {
     }
     let project_id = &parts[0];
     let source_id = &parts[1];
+    if !safe_id(project_id) || !safe_id(source_id) {
+        return Err(deny("invalid project or source id"));
+    }
     let rel = parts[2..].join("/");
 
     // Only these two trees are ever readable.
@@ -60,6 +63,13 @@ pub fn resolve(projects_root: &Path, request_path: &str) -> AppResult<PathBuf> {
         return Err(deny("asset path escapes the project sandbox"));
     }
     Ok(real)
+}
+
+fn safe_id(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
 }
 
 pub fn content_type(path: &Path) -> &'static str {
@@ -151,5 +161,7 @@ mod tests {
         assert!(resolve(root, "/p1/s1/a.txt").is_ok());
         assert!(resolve(root, "/p1/s1/../../secret.txt").is_err());
         assert!(resolve(root, "/p1/s1/../../../secret.txt").is_err());
+        assert!(resolve(root, "/../p1/s1/a.txt").is_err());
+        assert!(resolve(root, "/p1/../s1/a.txt").is_err());
     }
 }

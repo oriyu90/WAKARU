@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Markdown } from "../../components/Markdown";
 import { Button } from "../../components/Button";
 import { IconButton } from "../../components/IconButton";
@@ -9,6 +9,7 @@ import { AlertIcon, InfoIcon } from "../../app/Icons";
 import { illustratorApi } from "../../ipc/illustrator";
 import { inTauri, IpcError } from "../../ipc/client";
 import { useAppSettings } from "../settings/useAppSettings";
+import { useToast } from "../../components/useToast";
 import type { DetailLevel, Scope, GenerateStarted } from "../../ipc/types.gen";
 import { useStream } from "./useStream";
 import styles from "./IllustratorDrawer.module.css";
@@ -37,6 +38,7 @@ export function IllustratorDrawer({
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const toast = useToast();
   const { settings } = useAppSettings();
   const defaultLevel = (settings?.illustrator.defaultLevel ?? "standard") as DetailLevel;
   // null → follow the Settings default; set → the reader picked a rewrite level.
@@ -144,6 +146,24 @@ export function IllustratorDrawer({
     if (gen?.streamId) void illustratorApi.cancel(gen.streamId);
     if (askStreamId) void illustratorApi.cancel(askStreamId);
   }
+
+  const handoff = useMutation({
+    mutationFn: () => {
+      if (!thread.data) throw new Error("no-live-thread");
+      return illustratorApi.importToStudio({
+        projectId,
+        threadId: thread.data.id,
+        mode: "new_tab",
+        targetTabId: null,
+      });
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["studio-tabs", projectId] });
+      toast.push({ tone: "success", message: t("illustrator.handoffSuccess") });
+    },
+    onError: () =>
+      toast.push({ tone: "error", message: t("illustrator.handoffFailed") }),
+  });
 
   const cached = gen?.cached ?? null;
   const explanation = cached?.content ?? genStream.text;
@@ -306,6 +326,15 @@ export function IllustratorDrawer({
               {t("illustrator.stop")}
             </Button>
           ) : null}
+          <Button
+            size="sm"
+            variant="quiet"
+            disabled={!thread.data || (!explanation && pastMessages.length === 0) || streaming}
+            loading={handoff.isPending}
+            onClick={() => handoff.mutate()}
+          >
+            {t("illustrator.toStudio")}
+          </Button>
         </div>
       </footer>
     </div>

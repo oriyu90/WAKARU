@@ -7,7 +7,7 @@ import { ErrorState } from "../../components/ErrorState";
 import { projectsApi } from "../../ipc/projects";
 import { sourcesApi } from "../../ipc/sources";
 import { inTauri } from "../../ipc/client";
-import type { Citation } from "../../ipc/types.gen";
+import type { Citation, Source } from "../../ipc/types.gen";
 import { Viewer } from "../viewer/Viewer";
 import type { ViewerFocusRequest } from "../viewer/Viewer";
 import { Studio } from "../studio/Studio";
@@ -55,6 +55,11 @@ export function ProjectPage() {
     setPane("viewer");
   };
 
+  const onSourceImported = (source: Source) => {
+    setFocus({ sourceId: source.id, nonce: Date.now() });
+    setPane("viewer");
+  };
+
   return (
     <div className={styles.page}>
       <div className={styles.paneBar}>
@@ -80,6 +85,7 @@ export function ProjectPage() {
             projectName={project.data?.name ?? ""}
             sources={sources.data ?? []}
             onCitation={onCitation}
+            onSourceImported={onSourceImported}
           />
         </div>
       </div>

@@ -315,3 +315,45 @@ fn ac_1_11_ingest_and_search_work_offline() {
     let hits = wakaru_lib::keyword_search(&env.pdb(&id), "value", 5).unwrap();
     assert!(!hits.is_empty());
 }
+
+#[test]
+fn reingest_only_replaces_the_owning_projects_global_index_rows() {
+    let env = Env::new();
+    let first = env.create_project("first");
+    let second = env.create_project("second");
+
+    for (project_id, body) in [(&first, "alpha material"), (&second, "beta material")] {
+        let project_dir = projects::project_dir(&env.projects_dir, project_id);
+        let source_dir = project_dir.join("sources/shared-source");
+        std::fs::create_dir_all(&source_dir).unwrap();
+        let file = source_dir.join("note.md");
+        std::fs::write(&file, body).unwrap();
+        let db = env.pdb(project_id);
+        db.execute(
+            "INSERT INTO sources (id, kind, original_name, rel_path, status, added_at)
+             VALUES ('shared-source', 'markdown', 'note.md',
+                     'sources/shared-source/note.md', 'queued', 'now')",
+            [],
+        )
+        .unwrap();
+        let ctx = IngestCtx {
+            project_db: &db,
+            app_db: &env.app_db,
+            project_id,
+            source_id: "shared-source",
+            source_name: "note.md",
+            project_dir: &project_dir,
+        };
+        ingest::run(&ctx, SourceKind::Markdown, &IngestInput::File(file)).unwrap();
+    }
+
+    let projects: i64 = env
+        .app_db
+        .query_row(
+            "SELECT count(DISTINCT project_id) FROM global_index WHERE source_id='shared-source'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(projects, 2);
+}

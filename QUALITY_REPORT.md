@@ -2,6 +2,61 @@
 
 Cumulative; newest release first.
 
+## v0.2.2 release verification — 2026-09-10
+
+Scope: reliable Studio artifact and PPTX viewing, explicit Live-to-Studio
+handoff, whole-source Live session continuity, and context/project-file boundary
+hardening. No database or project-format migration.
+
+### What changed
+
+- Studio imports open in Viewer, and matching source-status events refresh the
+  detail/document/asset caches needed to replace a queued view with the finished
+  document. PPTX rendering is driven by loaded-presentation state, and binary
+  query keys use a serialized byte count rather than a JavaScript `bigint`.
+- The v0.2.1 whole-source Live design is locked by regression coverage so page
+  navigation reuses one thread and cached explanation. The explicit Studio
+  handoff is atomic and includes the saved explanation and Q&A; ordinary Live
+  activity creates no Studio tab.
+- Studio context fitting bounds untrusted UTF-8 text. Project import uses
+  enclosed ZIP paths and expansion limits with rollback cleanup; file and
+  directory artifacts remain confined to `workspace/`; identifiers are
+  validated; global-index replacement is scoped by both project and source.
+
+### Automated gates
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck / lint / design / hardcoded strings | pass |
+| Frontend unit tests | 19 passed |
+| Contrast / i18n parity / production web build | pass; 387 keys × 3 languages; existing large-chunk advisory only |
+| ts-rs binding export | 81 passed; drift 0 |
+| Rust fmt / clippy / library tests | pass; 187 passed, 1 network/npx test intentionally ignored |
+| Rust phase integration tests | 42 passed |
+| Live endpoint acceptance test | not run; no endpoint or credentials supplied for this release |
+| `cargo deny check` — advisories, bans, licenses, sources | pass |
+
+### Design and failure review
+
+- No stylesheet or design token changed. The handoff control and feedback use
+  the existing compact button, composer metadata row, toast and localization
+  system introduced before this release.
+- Regression coverage includes equal-count PPTX rendering, Studio Markdown/PDF
+  ingestion, whole-source thread identity, explicit-only handoff, oversized
+  multibyte context, ZIP traversal, artifact traversal and cross-project index
+  ownership.
+
+### Bundle
+
+| Item | Value |
+|---|---|
+| App | arm64 `WAKARU.app`, version `0.2.2`; ad-hoc signed; `codesign --verify --deep --strict` passes for the build output and the app inside the mounted DMG |
+| `Info.plist` | `CFBundleShortVersionString` 0.2.2; `LSMinimumSystemVersion` 12.0; `NSLocalNetworkUsageDescription` present |
+| DMG | `WAKARU_0.2.2_aarch64.dmg`, 23,156,939 bytes; `hdiutil verify` VALID |
+| SHA-256 | `1402b35ed07e5eed26593e550ecc8df083cc904dd33231e530a95f413b7bc68c` (basename in `WAKARU_0.2.2_aarch64.dmg.sha256`) |
+| Startup probe | mounted-DMG app reached `WAKARU backend ready version="0.2.2"`; startup log free of secret patterns |
+| Platform | macOS 12+, Apple Silicon; Windows/Linux not built or verified |
+
 ## v0.2.1 release verification — 2026-09-10
 
 Scope: five reader-reported issues (`docs/DECISIONS.md` D-33) — Live Illustrator

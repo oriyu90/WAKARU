@@ -21,6 +21,17 @@ pub fn project_db_path(root: &Path, id: &str) -> PathBuf {
 }
 
 pub fn open_db(root: &Path, id: &str) -> AppResult<Connection> {
+    if id.is_empty()
+        || !id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+    {
+        return Err(AppError::new(
+            "PROJECT_NOT_FOUND",
+            "error.project.notFound",
+            "invalid project id",
+        ));
+    }
     let path = project_db_path(root, id);
     if !path.exists() {
         return Err(AppError::new(

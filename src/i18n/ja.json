@@ -316,7 +316,10 @@
     "send": "送信",
     "wholeSource": "資料全体",
     "overviewHint": "開くと資料全体をやさしく解説します。",
-    "rewriteAs": "別の詳しさで作り直す"
+    "rewriteAs": "別の詳しさで作り直す",
+    "toStudio": "Studioへ引き継ぐ",
+    "handoffSuccess": "ライブ解説をStudioへ引き継ぎました",
+    "handoffFailed": "Studioへの引き継ぎに失敗しました"
   },
   "studio": {
     "title": "Studio",

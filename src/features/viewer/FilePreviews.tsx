@@ -15,7 +15,10 @@ const MAX_INTERACTIVE_BYTES = 200 * 1024 * 1024;
 
 function useAssetBuffer(detail: SourceDetail) {
   return useQuery({
-    queryKey: ["asset-buffer", detail.id, detail.primaryAssetUrl, detail.bytes],
+    // ts-rs maps Rust u64 to bigint. TanStack's default key hash uses
+    // JSON.stringify, which throws on bigint before any PDF/DOCX/PPTX fetch can
+    // start, so keep the exact value as a serializable decimal string.
+    queryKey: ["asset-buffer", detail.id, detail.primaryAssetUrl, detail.bytes.toString()],
     enabled: !!detail.primaryAssetUrl && detail.bytes <= MAX_INTERACTIVE_BYTES,
     queryFn: async ({ signal }) => {
       const response = await fetch(detail.primaryAssetUrl!, { signal });
@@ -394,7 +397,7 @@ export function PptxFilePreview({
   const { t } = useTranslation();
   const asset = useAssetBuffer(detail);
   const host = useRef<HTMLDivElement>(null);
-  const presentation = useRef<Awaited<ReturnType<typeof import("pptx-viewer")["loadPresentation"]>> | null>(null);
+  const [presentation, setPresentation] = useState<Awaited<ReturnType<typeof import("pptx-viewer")["loadPresentation"]>> | null>(null);
   const [page, setPage] = useState(Math.max(1, initialPage));
   const [total, setTotal] = useState(detail.pageCount ?? 1);
   const [error, setError] = useState<unknown>(null);
@@ -405,30 +408,34 @@ export function PptxFilePreview({
   useEffect(() => {
     if (!asset.data) return;
     let cancelled = false;
+    let loadedPresentation: Awaited<ReturnType<typeof import("pptx-viewer")["loadPresentation"]>> | null = null;
+    setError(null);
+    setPresentation(null);
     void import("pptx-viewer").then(async ({ loadPresentation }) => {
       const loaded = await loadPresentation(asset.data.slice(0));
+      loadedPresentation = loaded;
       if (cancelled) return loaded.cleanup();
-      presentation.current = loaded;
+      if (loaded.slides.length === 0) throw new Error("presentation-has-no-slides");
+      setPresentation(loaded);
       setTotal(loaded.slides.length);
-      setPage((current) => Math.min(current, loaded.slides.length));
+      setPage((current) => Math.max(1, Math.min(current, loaded.slides.length)));
     }).catch((reason) => !cancelled && setError(reason));
     return () => {
       cancelled = true;
-      presentation.current?.cleanup();
-      presentation.current = null;
+      loadedPresentation?.cleanup();
     };
   }, [asset.data]);
 
   useEffect(() => {
-    if (!presentation.current || !host.current) return;
+    if (!presentation || !host.current) return;
     host.current.replaceChildren();
     void import("pptx-viewer").then(({ renderSlideToElement }) => {
-      if (!presentation.current || !host.current) return;
-      renderSlideToElement(presentation.current, page - 1, host.current, { width: 1200 });
+      if (!host.current) return;
+      renderSlideToElement(presentation, page - 1, host.current, { width: 1200 });
       sanitizeRenderedOffice(host.current);
       onPageRef.current(page, total);
     }).catch(setError);
-  }, [page, total]);
+  }, [page, presentation, total]);
 
   if (detail.bytes > MAX_INTERACTIVE_BYTES) return <FileLimit detail={detail} fallback={fallback} />;
   if (asset.isError || error) return <div className={styles.previewFallback}><ErrorState error={asset.error ?? error} onRetry={() => { setError(null); void asset.refetch(); }} />{fallback}</div>;

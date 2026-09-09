@@ -316,7 +316,10 @@
     "send": "发送",
     "wholeSource": "整份资料",
     "overviewHint": "打开后会通俗地讲解整份资料。",
-    "rewriteAs": "以其他详细程度重写"
+    "rewriteAs": "以其他详细程度重写",
+    "toStudio": "转交到 Studio",
+    "handoffSuccess": "已将实时讲解转交到 Studio",
+    "handoffFailed": "无法转交到 Studio"
   },
   "studio": {
     "title": "Studio",

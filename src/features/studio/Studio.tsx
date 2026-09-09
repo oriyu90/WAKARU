@@ -31,11 +31,13 @@ export function Studio({
   projectName,
   sources,
   onCitation,
+  onSourceImported,
 }: {
   projectId: string;
   projectName: string;
   sources: Source[];
   onCitation: (c: Citation) => void;
+  onSourceImported: (source: Source) => void;
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -183,11 +185,12 @@ export function Studio({
   const streaming = send.isPending || resolveTool.isPending;
   const importArtifact = useMutation({
     mutationFn: (id: string) => studioApi.importArtifact(projectId, id),
-    onSuccess: async () => {
+    onSuccess: async (source) => {
       await Promise.all([
         refreshArtifacts(),
         qc.invalidateQueries({ queryKey: ["sources", projectId] }),
       ]);
+      onSourceImported(source);
     },
     onError: () => toast.push({ tone: "error", message: t("studio.importFailed") }),
   });

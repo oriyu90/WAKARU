@@ -5,7 +5,8 @@
 
 use rusqlite::params;
 use wakaru_lib::domain::project::CreateProjectInput;
-use wakaru_lib::services::{projects, studio};
+use wakaru_lib::services::ingest::{self, IngestCtx, IngestInput};
+use wakaru_lib::services::{projects, sources, studio, viewer};
 use wakaru_lib::storage;
 
 fn env() -> (tempfile::TempDir, std::path::PathBuf, rusqlite::Connection) {
@@ -318,5 +319,42 @@ fn build_document_writes_a_docx_artifact_and_guards_the_path() {
         assert_eq!(&std::fs::read(&pdf).unwrap()[..5], b"%PDF-");
     } else {
         assert!(out.contains("note.md"), "{out}");
+    }
+
+    // Studio-written Markdown and the PDF (or its documented Markdown
+    // fallback) both complete the same artifact -> source -> Viewer contract.
+    studio::dispatch_tool(
+        &db,
+        &ws,
+        &tab.thread_id,
+        "write_file",
+        r##"{"path":"summary.md","content":"# Summary\n\nViewer-ready body"}"##,
+    )
+    .unwrap();
+    let import_paths = [ws.join("summary.md"), if pdf.is_file() { pdf } else { md }];
+    for artifact_path in import_paths {
+        let added = sources::add_one(&db, &root, &pid, &artifact_path).unwrap();
+        let kind = added.kind.unwrap();
+        let ctx = IngestCtx {
+            project_db: &db,
+            app_db: &app_db,
+            project_id: &pid,
+            source_id: &added.source.id,
+            source_name: &added.source.original_name,
+            project_dir: &projects::project_dir(&root, &pid),
+        };
+        let outcome = ingest::run(&ctx, kind, &IngestInput::File(added.dest)).unwrap();
+        db.execute(
+            "UPDATE sources SET status='ready', page_count=?2 WHERE id=?1",
+            params![added.source.id, outcome.page_count.map(i64::from)],
+        )
+        .unwrap();
+        let detail = viewer::source_detail(&db, &pid, &added.source.id).unwrap();
+        assert_eq!(
+            detail.status,
+            wakaru_lib::domain::source::SourceStatus::Ready
+        );
+        assert!(detail.primary_asset_url.is_some());
+        assert!(viewer::get_document(&db, &root, &pid, &added.source.id, 1).is_ok());
     }
 }

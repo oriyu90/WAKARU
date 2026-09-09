@@ -87,8 +87,8 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput) -> AppResult<
         [ctx.source_id],
     )?;
     ctx.app_db.execute(
-        "DELETE FROM global_index WHERE source_id = ?1",
-        [ctx.source_id],
+        "DELETE FROM global_index WHERE project_id = ?1 AND source_id = ?2",
+        params![ctx.project_id, ctx.source_id],
     )?;
 
     let parsed = parse(ctx, kind, input, &dd)?;

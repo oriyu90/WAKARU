@@ -16,6 +16,21 @@ use walkdir::WalkDir;
 use zip::write::SimpleFileOptions;
 
 const SKIP_DIRS: [&str; 1] = ["thumbs"];
+const MAX_IMPORT_FILES: usize = 100_000;
+const MAX_IMPORT_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+
+struct ImportDirGuard {
+    path: std::path::PathBuf,
+    keep: bool,
+}
+
+impl Drop for ImportDirGuard {
+    fn drop(&mut self) {
+        if !self.keep {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
+}
 
 pub fn estimate(projects_root: &Path, project_ids: &[String]) -> AppResult<Vec<ExportEstimate>> {
     let mut out = Vec::new();
@@ -122,6 +137,13 @@ pub fn import(
     let file = File::open(zip_path)?;
     let mut archive = zip::ZipArchive::new(file)
         .map_err(|e| AppError::new("IMPORT_BAD_ZIP", "error.import.badZip", e.to_string()))?;
+    if archive.len() > MAX_IMPORT_FILES {
+        return Err(AppError::new(
+            "IMPORT_TOO_LARGE",
+            "error.import.badArchive",
+            "archive contains too many files",
+        ));
+    }
 
     // Read manifest first for the version check.
     let manifest: serde_json::Value = {
@@ -165,10 +187,15 @@ pub fn import(
     let new_id = Uuid::now_v7().to_string();
     let dir = projects::project_dir(projects_root, &new_id);
     std::fs::create_dir_all(&dir)?;
+    let mut dir_guard = ImportDirGuard {
+        path: dir.clone(),
+        keep: false,
+    };
     for sub in projects::SUBDIRS {
         std::fs::create_dir_all(dir.join(sub))?;
     }
 
+    let mut extracted_bytes = 0u64;
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).map_err(|e| {
             AppError::new(
@@ -177,14 +204,26 @@ pub fn import(
                 format!("cannot read zip entry {i}: {e}"),
             )
         })?;
-        let name = entry.name().to_string();
-        if name == "manifest.json" || name == "README.txt" || name.ends_with('/') {
+        let enclosed = entry.enclosed_name().ok_or_else(|| {
+            AppError::new(
+                "IMPORT_BAD_ARCHIVE",
+                "error.import.badArchive",
+                format!("unsafe archive entry at index {i}"),
+            )
+        })?;
+        let name = enclosed.to_string_lossy().replace('\\', "/");
+        if name == "manifest.json" || name == "README.txt" || entry.is_dir() {
             continue;
         }
-        let dest = dir.join(&name);
-        if !dest.starts_with(&dir) {
-            continue; // zip-slip guard
+        extracted_bytes = extracted_bytes.saturating_add(entry.size());
+        if extracted_bytes > MAX_IMPORT_BYTES {
+            return Err(AppError::new(
+                "IMPORT_TOO_LARGE",
+                "error.import.badArchive",
+                "archive expands beyond the project import limit",
+            ));
         }
+        let dest = dir.join(enclosed);
         if let Some(parent) = dest.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -219,7 +258,8 @@ pub fn import(
             |r| r.get(0),
         )
         .unwrap_or(1);
-    app_db.execute(
+    let tx = app_db.unchecked_transaction()?;
+    tx.execute(
         "INSERT INTO projects (id, name, description, color, dir_name, schema_version, created_at, updated_at, sort_order)
          VALUES (?1, ?2, ?3, 'accent-1', ?1, ?4, ?5, ?5, ?6)",
         params![
@@ -233,7 +273,9 @@ pub fn import(
     )?;
 
     // Rebuild the cross-project FTS mirror from the imported chunks.
-    rebuild_global_index(app_db, &conn, &new_id)?;
+    rebuild_global_index(&tx, &conn, &new_id)?;
+    tx.commit()?;
+    dir_guard.keep = true;
 
     tracing::info!(project = %new_id, sources = source_count, "imported");
     projects::get(app_db, &new_id)

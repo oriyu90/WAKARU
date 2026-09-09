@@ -318,7 +318,10 @@
     "send": "Send",
     "wholeSource": "Whole document",
     "overviewHint": "On open, this explains the whole document in plain terms.",
-    "rewriteAs": "Rewrite at another level"
+    "rewriteAs": "Rewrite at another level",
+    "toStudio": "Hand off to Studio",
+    "handoffSuccess": "Live explanation handed off to Studio",
+    "handoffFailed": "Could not hand off to Studio"
   },
   "studio": {
     "title": "Studio",

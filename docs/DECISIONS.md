@@ -401,3 +401,19 @@
 - **不変**: IPC 契約（`source_add_folder` / `website_manifest` 追加、ts-rs は `WebsiteFile` / `WebsiteManifest` 追加と `SourceKind` に `"website"` 追加のみ）・DB スキーマ・プロジェクト形式・`design.md`/トークン・OpenAI/Anthropic ワイヤ。マイグレーションなし。既存 v0.0.0〜v0.2.0 のプロジェクト/設定はそのまま開く。
 - **影響**: `src-tauri/src/domain/source.rs`, `src-tauri/src/services/{website.rs(new),sources.rs,studio.rs,mod.rs}`, `src-tauri/src/services/ingest/{mod.rs,web.rs}`, `src-tauri/src/commands/{sources.rs,viewer.rs,studio.rs}`, `src-tauri/src/lib.rs`, `src-tauri/tauri.conf.json`, `src-tauri/tests/phase2.rs`, `src/features/viewer/{IllustratorDrawer.tsx,IllustratorDrawer.module.css,Viewer.tsx,Preview.tsx,FilePreviews.tsx,previews.module.css,WebsitePreview.tsx(new),WebsitePreview.module.css(new)}`, `src/features/studio/{Studio.tsx,Studio.module.css}`, `src/ipc/{sources.ts,viewer.ts,types.gen.ts}`, `src/i18n/{ja,en,zh-Hans}.json`。
 - **差し戻し条件**: サンドボックス iframe でスクリプトを有効にしたことが問題化したら `allow-scripts` を外す（Settings のオプトインへ）。フォルダ取り込みの拡張子許可リストが実サイトで不足するとの報告が出たら許可リストを拡張。`build_site` を弱いモデルが誤用してワークスペースを汚すなら既定を承認必須へ。ライブ解説の「別の詳しさ」ボタンが分かりにくいとの声があれば設定パネルへ戻す。
+
+## D-34 · Live Illustrator と Studio の境界は明示的な引き継ぎ操作に限定する
+
+- **日付**: 2026-09-10（v0.2.2）
+- **論点**: v0.2.1 で自動解説とQ&Aは資料単位の `whole` thread に統一されたが、Liveの内容をStudioへ移す可視操作と、どこまでコピーされるかの契約が不足していた。
+- **採用**: Liveを開く、資料内をページ移動する、自動解説を生成する、質問する、のいずれでもStudio tabを作らない。利用者が **Studioへ引き継ぐ** を押した場合だけ、保存済みの資料全体解説とQ&Aを新しいStudio tabへ1トランザクションでコピーし、完了/失敗を通知する。資料ページ移動時もフロントは canonical locator `whole` を使うため、同じ資料では同じthreadと解説cacheを再利用する。
+- **影響**: DB・プロジェクト形式・AI wireの変更なし。既存 `illustrator_import_to_studio` IPCを利用する。
+- **差し戻し条件**: append先を選べる要件が出た場合も、明示操作とtransaction境界は維持してtarget tab選択だけを追加する。
+
+## D-35 · プロジェクト由来のパス・索引・AI文脈は所有境界で再検証する
+
+- **日付**: 2026-09-10（v0.2.2）
+- **論点**: インポートZIP、プロジェクトDB内のartifact相対パス、IDから作るパス、global index、AIへ渡す自由長テキストは、それぞれ別の入口から同じプロジェクト境界を越え得る。
+- **採用**: ZIPは enclosed path と件数・展開量上限を用い失敗時に作業ディレクトリを除去する。artifactは `workspace/` 配下の実在ファイルまたは `build_site` ディレクトリだけをsandbox解決する。project/source IDをパス成分として検証し、global indexの置換は `(project_id, source_id)` で所有範囲を限定する。AIの非信頼コンテキストはUTF-8境界を守って事前に上限化する。
+- **理由**: DBやアーカイブを信頼済み入力とみなさず、読み込み時にも同じ所有境界を適用するため。
+- **影響**: 既存DBとプロジェクト形式は互換。依存追加なし。
