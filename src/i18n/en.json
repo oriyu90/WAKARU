@@ -11,8 +11,13 @@
     "fileModifier": "File Modifier",
     "search": "Search",
     "settings": "Settings",
+    "settingsClose": "Close settings",
     "projects": "Projects",
-    "noProjects": "No projects yet"
+    "noProjects": "No projects yet",
+    "exportProject": "Export (ZIP)",
+    "deleteProject": "Delete",
+    "deleteProjectTitle": "Delete project",
+    "deleteProjectBody": "Permanently delete \"{{name}}\". This can't be undone."
   },
   "palette": {
     "title": "Command palette",

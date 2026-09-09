@@ -2,6 +2,26 @@
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
+**2026-09-09 · v0.1.3 maintenance** — five reader-reported issues, all fixed
+frontend-only (no IPC / schema / type / routing change; ts-rs bindings identical;
+no migration). (1) The Settings switches were still click-dead in the packaged
+WKWebView build — v0.1.2's `pointer-events:none` only covered Chromium. `Switch`
+is now a `<label>` so any press on it reaches the control in every engine
+(`src/components/Switch.tsx`). (2) New `src/components/ContextMenu.tsx` (portalled
+into `#app`, `position:absolute` for the monochrome filter, roving focus, closes
+on Escape/outside/scroll); wired to the sidebar project links in `AppShell` for
+Export (ZIP) / Delete. (3) The top-bar Settings button is a toggle — press again
+to return to the previous view (`AppShell` keeps the last non-`/settings` path).
+(4) `Viewer.module.css` `.pane > * { flex:1; min-width:0 }` — the "資料を見る"
+pane was collapsing to its content width and leaving the right half blank. (5)
+Live Illustrator Q&A threads are now per-source, not per-page-locator, so a
+conversation survives a page turn (`IllustratorDrawer` query key + stable
+`{t:"whole"}` locator; `illustrator_ask` already ignored the thread locator, so no
+Rust change); page explanations stay per-page in `illustrations`. Studio pins the
+active tab across refetches and no longer double-renders a streamed reply. Backend
+persistence was audited and found correct. See `IMPLEMENTATION_PLAN_v0.1.3.md` and
+`docs/DECISIONS.md` D-30.
+
 **2026-09-09 · v0.1.2 maintenance** — Settings switches (`Switch` component) were
 click-dead: the decorative track/thumb spans painted over the visually hidden
 `<input>` with no `pointer-events: none`, so only keyboard toggled them — reported

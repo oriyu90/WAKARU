@@ -11,8 +11,13 @@
     "fileModifier": "文件转换",
     "search": "搜索",
     "settings": "设置",
+    "settingsClose": "关闭设置",
     "projects": "项目",
-    "noProjects": "还没有项目"
+    "noProjects": "还没有项目",
+    "exportProject": "导出（ZIP）",
+    "deleteProject": "删除",
+    "deleteProjectTitle": "删除项目",
+    "deleteProjectBody": "将永久删除「{{name}}」，无法撤销。"
   },
   "palette": {
     "title": "命令面板",

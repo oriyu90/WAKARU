@@ -2,6 +2,105 @@
 
 Cumulative; newest release first.
 
+## v0.1.3 release verification — 2026-09-09
+
+Scope: five reader-reported issues, fixed frontend-only. No change to the
+application hierarchy, IPC contract, database schema, project format, or design
+tokens. No database migration. ts-rs bindings byte-identical.
+
+### What changed
+
+- **`Switch` is a `<label>`** — `src/components/Switch.tsx`: the wrapper element
+  changed from `<span>` to `<label>`. A `<label>` containing a single labelable
+  control forwards every pointer press on itself to that control regardless of
+  overlays or the rendering engine — v0.1.2's `pointer-events:none` fixed
+  Chromium but not the packaged WKWebView build. The decoration spans keep
+  `pointer-events:none` as defence in depth. No API/CSS/behaviour/a11y change.
+  New regression case: a click on the decorative track toggles the control.
+- **Sidebar context menu** — new `src/components/ContextMenu.tsx` +
+  `ContextMenu.module.css` (portalled into `#app`, `position:absolute` per D-07,
+  viewport-clamped, `role="menu"` with ↑/↓ roving focus, closes on
+  Escape/outside-pointerdown/scroll/resize/blur and restores focus). Wired in
+  `src/app/AppShell.tsx`: right-click (or the context-menu key / Shift+F10) a
+  project link → **Export (ZIP)** (`pickSaveDir` → `exportApi.export`) and
+  **Delete** (confirm `Dialog` → `projectsApi.delete(id, name)` → invalidate
+  `["projects"]`, and leave the project route if it is the one being deleted).
+  Same IPC the Project Management screen already uses.
+- **Settings button toggles** — `src/app/AppShell.tsx`: the top-bar control is a
+  `<button>` that remembers the last non-`/settings` path (default `/`) and
+  navigates there when pressed on `/settings`, else to `/settings`. Active
+  styling and `aria-current` kept; `aria-label` switches between `nav.settings`
+  and `nav.settingsClose`.
+- **Viewer pane fills its width** — `src/features/viewer/Viewer.module.css`:
+  `.pane > * { flex: 1; min-width: 0; }`. The pane holds one child at a time
+  (source list or preview) and it was shrinking to content width, leaving the
+  right half blank and the bottom divider short.
+- **Illustrator conversation continuity** — `src/features/viewer/IllustratorDrawer.tsx`:
+  the Q&A thread query key drops the page locator and `getOrCreateThread` is
+  called with a stable `{ t: "whole" }` locator, so one thread per source
+  accumulates questions across page turns. `illustrator_generate` keeps the exact
+  page locator (page explanations stay per-page in `illustrations`).
+  `illustrator_ask` already ignored the thread's stored locator for retrieval, so
+  no Rust change and retrieval is unchanged. History disclosure defaults to open.
+- **Studio GUI** — `src/features/studio/Studio.tsx`: an effect pins `activeId` to
+  a tab that exists (survives send / close / reload); the streamed provisional
+  text and running-tool label are cleared before the tab refetch resolves, so a
+  reply no longer briefly renders twice.
+
+### Automated gates
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck (`tsc --noEmit`) | pass |
+| Frontend lint (eslint + design-rules + hardcoded-strings) | pass |
+| Frontend unit tests (vitest incl. axe) | 18 passed (12 prior + 1 new `Switch` + 4 new `ContextMenu` + 1 new `AppShell` settings-toggle) |
+| Contrast | pass; all checked light/dark pairs meet their targets |
+| i18n parity | 360 keys × 3 languages (ja / en / zh-Hans) |
+| Production web build | pass; pre-existing large-chunk advisory only |
+| ts-rs binding export | drift 0 (`git diff` empty on `src/ipc/types.gen.ts`) |
+| Rust `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings` | pass |
+| Rust library tests | 173 passed; 1 network test intentionally ignored |
+| Rust phase integration tests | 39 passed |
+| `cargo deny check` — advisories, bans, licenses, sources | pass |
+
+### Design and behaviour review
+
+- One new component (`ContextMenu`) and no design token touched. It uses only
+  existing tokens, respects `prefers-reduced-motion` implicitly (no animation),
+  and paints correctly in light and dark. It is portalled into `#app` and uses
+  `position: absolute` (not `fixed`) so the monochrome `filter` on `#app` does
+  not reparent it (design-rules gate enforces this).
+- Verified in the running app (`npm run dev`, in-browser, 1280×800):
+  - P1 — a real pointer click on "ライブ解説を有効化" toggles it on and off; the
+    change persists to `localStorage` (`wakaru.ui.illustratorEnabled`).
+  - P3 — `/search` → Settings button → `/settings` (label becomes "設定を閉じる",
+    `aria-current="page"`) → Settings button → back to `/search`.
+  - P4 — with Live Illustrator disabled and no document open, the source-list
+    toolbar, the divider under it and the bottom drop hint span the full pane
+    width; DOM check confirms `.panel` is 1280 px, not the previous 544 px.
+  - No console errors across the navigation.
+- P2 (`ContextMenu` open/select/Escape/arrow-nav) and the settings toggle are
+  covered by unit tests; the wired export/delete call the same IPC as the
+  Project Management screen.
+- P5 backend persistence audited: Studio persists the user turn before the AI
+  call and every assistant turn after (statuses complete / cancelled / error /
+  needs_continue / pending_approval) to the project `messages` table; tabs live
+  in `studio_tabs`; Illustrator Q&A persists to `messages` and page explanations
+  upsert into `illustrations`. All survive a restart. No data-loss defect found;
+  the fix is thread identity (per source, not per page) plus the two GUI edges.
+
+### Bundle
+
+| Field | Value |
+|---|---|
+| App | `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, version 0.1.3) |
+| DMG | `WAKARU_0.1.3_aarch64.dmg` |
+| Size | `23,129,085` bytes |
+| SHA-256 | `657c9613d8a7d3d180f440e9421556b6f199b8cef2b3baa50e0724bcc4c1e4ca` |
+| `hdiutil verify` | VALID |
+| Inner-app `codesign --verify --deep --strict` | pass |
+| Startup probe | reached `WAKARU backend ready version="0.1.3"`; log free of secret patterns |
+
 ## v0.1.2 release verification — 2026-09-09
 
 Scope: a Settings switch click-target fix and wider stdio MCP command resolution

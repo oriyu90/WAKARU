@@ -36,6 +36,20 @@ test("a pointer click on the control toggles it", async () => {
   expect(sw.checked).toBe(false);
 });
 
+// Regression (P1 / v0.1.3): the click that reaches the reader is often on the
+// decorative track, not the 0-opacity input. The <label> wrapper must forward it.
+test("a click on the decorative track toggles it", async () => {
+  const user = userEvent.setup();
+  render(<Controlled />);
+  const sw = screen.getByRole("switch") as HTMLInputElement;
+  const wrapper = sw.closest("label");
+  expect(wrapper).not.toBeNull();
+  const track = wrapper!.querySelector("span[aria-hidden='true']") as HTMLElement;
+  expect(sw.checked).toBe(false);
+  await user.click(track);
+  expect(sw.checked).toBe(true);
+});
+
 test("keyboard toggling keeps working", async () => {
   const user = userEvent.setup();
   render(<Controlled />);

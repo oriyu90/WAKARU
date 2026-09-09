@@ -35,14 +35,18 @@ export function IllustratorDrawer({
   const [askStreamId, setAskStreamId] = useState<string | null>(null);
   const [askErr, setAskErr] = useState<string | null>(null);
   const [text, setText] = useState("");
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(true);
 
   const locatorKey = useMemo(() => JSON.stringify(locator ?? {}), [locator]);
 
+  // One Q&A thread per source, not per page: a question asked on one page must
+  // still be there after the reader moves to the next page (FR-L4). Page
+  // *explanations* stay per-locator — those go through `generate` below.
   const thread = useQuery({
-    queryKey: ["ill-thread", projectId, sourceId, locatorKey],
+    queryKey: ["ill-thread", projectId, sourceId],
     enabled: inTauri && !!sourceId,
-    queryFn: () => illustratorApi.getOrCreateThread(projectId, sourceId!, locator),
+    queryFn: () =>
+      illustratorApi.getOrCreateThread(projectId, sourceId!, { t: "whole" }),
   });
   const genStream = useStream(gen?.streamId ?? null);
   const askStream = useStream(askStreamId);
@@ -75,7 +79,7 @@ export function IllustratorDrawer({
       if (askStream.error) {
         setAskErr(t([`errors.${askStream.errorCode ?? "internal"}`, "errors.internal"]));
       }
-      void qc.invalidateQueries({ queryKey: ["ill-thread", projectId, sourceId, locatorKey] });
+      void qc.invalidateQueries({ queryKey: ["ill-thread", projectId, sourceId] });
       setAskStreamId(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

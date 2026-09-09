@@ -13,7 +13,10 @@ export const Switch = forwardRef<HTMLInputElement, SwitchProps>(function Switch(
   ref,
 ) {
   return (
-    <span className={styles.switch}>
+    // A <label> wrapper — not a <span> — so a pointer press anywhere on the
+    // control reaches the input natively, regardless of what the decorative
+    // spans or the engine's hit-testing do (WKWebView differs from Chromium).
+    <label className={styles.switch}>
       <input
         ref={ref}
         type="checkbox"
@@ -23,6 +26,6 @@ export const Switch = forwardRef<HTMLInputElement, SwitchProps>(function Switch(
       />
       <span className={styles.switchTrack} aria-hidden="true" />
       <span className={styles.switchThumb} aria-hidden="true" />
-    </span>
+    </label>
   );
 });

@@ -76,6 +76,14 @@ export function Studio({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id, active?.scope]);
 
+  // Pin `activeId` to a tab that actually exists. After a refetch (send, close,
+  // create) or a reload, `activeId` can be "" or point at a closed tab; without
+  // this the selection silently falls back to the first tab on every render.
+  useEffect(() => {
+    if (active && active.id !== activeId) setActiveId(active.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.id]);
+
   const messages = useMemo(() => active?.messages ?? [], [active]);
   const last = messages.at(-1);
   const awaitingApproval = last?.status === "pending_approval";
@@ -111,10 +119,12 @@ export function Studio({
       setRunningTool("");
     },
     onSuccess: async () => {
+      // Clear the streamed placeholder *before* the refetch resolves, so the
+      // persisted message never renders alongside its own provisional copy.
       setText("");
-      await Promise.all([refreshTabs(), refreshArtifacts()]);
       setProvisional("");
       setRunningTool("");
+      await Promise.all([refreshTabs(), refreshArtifacts()]);
       composerRef.current?.focus();
     },
     onError: (e) => toast.push({ tone: "error", message: (e as Error).message }),
@@ -147,9 +157,9 @@ export function Studio({
     mutationFn: (approved: boolean) => studioApi.resolveTool(projectId, activeTabId, approved),
     onMutate: () => { setProvisional(""); setRunningTool(""); },
     onSuccess: async () => {
-      await Promise.all([refreshTabs(), refreshArtifacts()]);
       setProvisional("");
       setRunningTool("");
+      await Promise.all([refreshTabs(), refreshArtifacts()]);
     },
     onError: (e) => toast.push({ tone: "error", message: (e as Error).message }),
   });

@@ -102,6 +102,13 @@
   display: flex;
   background: var(--color-paper);
 }
+/* The pane holds exactly one child (source list or a preview); make it fill the
+   width instead of collapsing to its content — otherwise short content (empty
+   state, a single row) leaves the right half of the pane blank (bug: v0.1.2). */
+.pane > * {
+  flex: 1;
+  min-width: 0;
+}
 
 .handle {
   flex: none;

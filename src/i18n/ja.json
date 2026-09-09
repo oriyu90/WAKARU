@@ -11,8 +11,13 @@
     "fileModifier": "ファイル変換",
     "search": "検索",
     "settings": "設定",
+    "settingsClose": "設定を閉じる",
     "projects": "プロジェクト",
-    "noProjects": "プロジェクトはまだありません"
+    "noProjects": "プロジェクトはまだありません",
+    "exportProject": "エクスポート（ZIP）",
+    "deleteProject": "削除",
+    "deleteProjectTitle": "プロジェクトを削除",
+    "deleteProjectBody": "「{{name}}」を完全に削除します。元に戻せません。"
   },
   "palette": {
     "title": "コマンドパレット",

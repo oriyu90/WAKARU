@@ -315,3 +315,20 @@
 - **理由**: いずれも既存の型・IPC 契約・DB スキーマ・画面階層に触れない純粋な不具合修正と探索拡張。ts-rs バインディングの差分ゼロ。npx/uvx 系の全 MCP サーバが恩恵を受ける。パスは文字列処理のみで `unsafe`・panic 経路なし。
 - **影響**: `src/components/controls.module.css`, `src/components/Switch.test.tsx`（新規）, `src/features/settings/McpSettings.tsx`, `src/i18n/{ja,en,zh-Hans}.json`（`mcp.preset*` と `mcp.commandHint`）, `src-tauri/src/services/mcp.rs`（`extra_bin_dirs` / `child_path` / `resolve_program` と単体テスト3件）。
 - **差し戻し条件**: 既知ディレクトリの決め打ちが将来の環境で不足/過剰になった場合は、ユーザーが MCP サーバ単位で追加パスを指定できる項目を設ける。Windows/Linux 配布を再開する際は、その OS の慣習パス（`%APPDATA%\npm` 等）を条件付きで加える。
+
+## D-30 · スイッチをlabel化し、サイドバー右クリックメニュー・設定トグル・Viewer幅・ライブ解説スレッド継続を追加
+
+- **日付**: 2026-09-09（v0.1.3）
+- **論点1（P1・機能不全）**: v0.1.2 は `.switchTrack` / `.switchThumb` に `pointer-events:none` を足してクリック不達を直したが、これは Chromium での検証。配布版は WKWebView で動作し、`opacity:0` の `<input>` の上に `pointer-events:none` のオーバーレイが2枚重なる構造では、装飾面へのクリックが input へ再ターゲットされないことがある。`Switch` は `<label>` 関連付けも無いため他に受け手がいない。オーナーから「まだライブ解説を有効化できない」と再報告。
+- **論点2（P2）**: サイドバーのプロジェクト項目に右クリックメニューが無く、Export / 削除は Settings → プロジェクト管理まで行く必要があった。メニュー用プリミティブも未実装。
+- **論点3（P3）**: トップバーの設定ボタンは `<NavLink to="/settings">` で、`/settings` 表示中に押しても無反応。「開く前の画面に戻したい」との要望。
+- **論点4（P4）**: `Viewer` の `.pane` は `display:flex`（行）だが唯一の子（`SourceListPanel` の `.panel` / `Preview` の `.wrap`）に `flex`/`width` が無く、内容幅まで縮んでペイン右半分が空白・下罫線が途中で切れる。ライブ解説ドロワーは無関係（無効時も再現）。
+- **論点5（P5）**: バックエンドの会話永続化は監査の結果いずれも正しい（Studio: user/assistant ターン→プロジェクト `messages`、タブ→`studio_tabs`、再起動耐性あり／ライブ解説 Q&A→`messages`、ページ解説→`illustrations` upsert）。可視の不具合は、ライブ解説の Q&A スレッドが**ページlocator単位**でキーされるため、次ページへ移ると直前の Q&A が別スレッドに残り「保存されていない」ように見えること。加えて Studio のアクティブタブが再フェッチ後に先頭へ戻る／ストリーム中の暫定テキストが確定メッセージと一瞬二重表示される小バグ。
+- **採用1**: `Switch` のラッパ要素を `<span>` から `<label>` へ変更。単一のラベル可能コントロールを内包する `<label>` は、上に何が描画されていても、どのエンジンでも、自身へのポインタ押下をそのコントロールへ転送する。装飾スパンの `pointer-events:none` は多重防御として残す。API・CSS 規則・見た目・フォーカスリング・キーボード操作・a11y 名は不変。回帰テスト（装飾トラックへのクリックでトグル）を追加。
+- **採用2**: `src/components/ContextMenu.tsx` / `.module.css` を新規追加（`#app` 内へ portal、`position:absolute`＝モノクロ filter 対策 D-07、ビューポート clamp、`role="menu"`、↑↓ロービングフォーカス、Escape/外側 pointerdown/scroll/resize/blur で閉じてトリガーへフォーカス復帰、トークンのみ・reduced-motion・light/dark 対応）。`AppShell` のプロジェクト `NavLink` に `onContextMenu` を付け、項目は Export（`pickSaveDir` → `exportApi.export({ids:[id],includeEmbeddings:false})`）と Delete（確認 `Dialog` → `projectsApi.delete(id, name)` → `["projects"]` 無効化、対象プロジェクト表示中なら `/` へ replace 遷移）。Settings のプロジェクト管理と同一 API。
+- **採用3**: `AppShell` で直近の非 `/settings` パスを ref で保持（既定 `/`）。設定ボタンを `<button>` 化し、`/settings` 表示中は保持パスへ、それ以外は `/settings` へ `navigate`。アクティブ表示（`data-active` / `aria-current`）は維持し、aria-label を `nav.settings` / `nav.settingsClose` で切替。
+- **採用4**: `Viewer.module.css` に `.pane > * { flex: 1; min-width: 0; }`。ペインは常に子1つ（ソース一覧かプレビュー）なので幅いっぱいに伸ばす。
+- **採用5**: `IllustratorDrawer` の Q&A スレッドをソース単位に変更（クエリキーから locator を除き、`getOrCreateThread` に安定 locator `{t:"whole"}` を渡す）。`illustrator_generate` は正確なページ locator を保持し、ページ解説は従来どおり `illustrations` にページ単位で残る。`illustrator_ask` は元々スレッドの locator を検索に使っていない（`let _ = (thread_src, thread_loc)`）ため Rust 変更なし・検索結果不変。旧ページ単位スレッドの行は削除せず、単に非表示（非破壊）。履歴の開閉は既定で開く。Studio はアクティブタブを実在タブへ固定する effect を追加し、暫定テキストのクリアを再フェッチ完了前に行う。
+- **理由**: 5件すべて型・IPC 契約・DB スキーマ・プロジェクト形式・ルーティングに触れないフロントエンドのみの修正。ts-rs バインディング差分ゼロ。マイグレーション無し。`ContextMenu` は portal と listener を unmount で確実に解除し、外部入力に対する新規 `unwrap` 無し。i18n はキーを ja/en/zh-Hans に追加し parity ゲートで担保。
+- **影響**: `src/components/Switch.tsx`, `src/components/ContextMenu.tsx`（新規）, `src/components/ContextMenu.module.css`（新規）, `src/app/AppShell.tsx`, `src/features/viewer/Viewer.module.css`, `src/features/viewer/IllustratorDrawer.tsx`, `src/features/studio/Studio.tsx`, `src/i18n/{ja,en,zh-Hans}.json`（`nav.settingsClose` / `nav.exportProject` / `nav.deleteProject` / `nav.deleteProjectTitle` / `nav.deleteProjectBody`）, テスト（`Switch.test.tsx` / `ContextMenu.test.tsx` 新規 / `AppShell.test.tsx`）。
+- **差し戻し条件**: ライブ解説をページ単位の Q&A に戻す必要が出た場合は、スレッドキーに locator を戻したうえで、ページ間の会話引き継ぎ表示を別途用意する。`ContextMenu` に階層メニューやチェック項目が必要になったら、`role="menuitemcheckbox"` とサブメニュー対応へ一般化する。

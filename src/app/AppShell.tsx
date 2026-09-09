@@ -1,12 +1,19 @@
-import { useEffect, useRef } from "react";
-import { NavLink, Outlet, useLocation } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUiStore } from "../stores/ui";
 import { FOCUSABLE, trapTab } from "../components/focus";
 import { IconButton } from "../components/IconButton";
+import { Button } from "../components/Button";
+import { Dialog } from "../components/Dialog";
+import { ContextMenu } from "../components/ContextMenu";
+import { useToast } from "../components/useToast";
 import { projectsApi } from "../ipc/projects";
-import { inTauri } from "../ipc/client";
+import { exportApi } from "../ipc/exportImport";
+import { pickSaveDir } from "../ipc/fileModifier";
+import { IpcError, inTauri } from "../ipc/client";
+import type { ProjectSummary } from "../ipc/types.gen";
 import {
   MenuIcon,
   HomeIcon,
@@ -24,7 +31,13 @@ const isMac =
 export function AppShell() {
   const { t } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
+
+  // Where "settings" should return to when pressed a second time (P3).
+  const onSettings = location.pathname === "/settings";
+  const lastNonSettingsPath = useRef("/");
+  if (!onSettings) lastNonSettingsPath.current = location.pathname + location.search;
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const closeSidebar = useUiStore((s) => s.closeSidebar);
 
@@ -37,6 +50,54 @@ export function AppShell() {
     queryFn: () => projectsApi.list(false),
     enabled: inTauri,
   });
+
+  const qc = useQueryClient();
+  const toast = useToast();
+  // Right-click / context-menu-key on a project link (P2).
+  const [menu, setMenu] = useState<{
+    x: number;
+    y: number;
+    project: ProjectSummary;
+    trigger: HTMLElement | null;
+  } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<ProjectSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function exportProject(p: ProjectSummary) {
+    try {
+      const destDir = await pickSaveDir();
+      if (!destDir) return;
+      const r = await exportApi.export({
+        ids: [p.id],
+        destDir,
+        includeEmbeddings: false,
+      });
+      toast.push({ tone: "success", message: t("pm.exported", { count: r.files.length }) });
+    } catch (e) {
+      if (e instanceof Error && e.message === "cancelled") return;
+      toast.push({ tone: "error", message: t("errors.internal") });
+    }
+  }
+
+  async function deleteProject(p: ProjectSummary) {
+    setDeleting(true);
+    try {
+      await projectsApi.delete(p.id, p.name);
+      await qc.invalidateQueries({ queryKey: ["projects"] });
+      setConfirmDelete(null);
+      if (location.pathname === `/p/${p.id}`) navigate("/", { replace: true });
+    } catch (e) {
+      toast.push({
+        tone: "error",
+        message:
+          e instanceof IpcError
+            ? t([`errors.${e.code}`, "errors.internal"])
+            : t("errors.internal"),
+      });
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   // Cmd/Ctrl+B toggles; Esc closes (docs/06 §3.2).
   useEffect(() => {
@@ -94,15 +155,17 @@ export function AppShell() {
         <span className={styles.tagline}>{t("app.tagline")}</span>
         <span className={styles.spacer} />
         <kbd className={styles.kbd}>{isMac ? "⌘B" : "Ctrl B"}</kbd>
-        <NavLink
-          to="/settings"
-          className={({ isActive }) =>
-            `${styles.topAction} ${isActive ? styles.topActionActive : ""}`
+        <button
+          type="button"
+          className={`${styles.topAction} ${onSettings ? styles.topActionActive : ""}`}
+          aria-current={onSettings ? "page" : undefined}
+          aria-label={onSettings ? t("nav.settingsClose") : t("nav.settings")}
+          onClick={() =>
+            navigate(onSettings ? lastNonSettingsPath.current : "/settings")
           }
-          aria-label={t("nav.settings")}
         >
           <SettingsIcon />
-        </NavLink>
+        </button>
       </header>
 
       <div className={styles.body}>
@@ -135,7 +198,20 @@ export function AppShell() {
 
           <div className={styles.navProjects}>
             {(projects.data ?? []).map((p) => (
-              <NavLink key={p.id} to={`/p/${p.id}`} className={navItem}>
+              <NavLink
+                key={p.id}
+                to={`/p/${p.id}`}
+                className={navItem}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    project: p,
+                    trigger: e.currentTarget as HTMLElement,
+                  });
+                }}
+              >
                 <FileIcon />
                 <span className={styles.projName}>{p.name}</span>
                 <span className={`${styles.projCount} u-mono-nums`}>
@@ -160,6 +236,50 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+
+      {menu ? (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          label={menu.project.name}
+          returnFocus={menu.trigger}
+          onClose={() => setMenu(null)}
+          items={[
+            {
+              label: t("nav.exportProject"),
+              onSelect: () => void exportProject(menu.project),
+            },
+            {
+              label: t("nav.deleteProject"),
+              danger: true,
+              onSelect: () => setConfirmDelete(menu.project),
+            },
+          ]}
+        />
+      ) : null}
+
+      <Dialog
+        open={!!confirmDelete}
+        onClose={() => (deleting ? undefined : setConfirmDelete(null))}
+        title={t("nav.deleteProjectTitle")}
+        footer={
+          <>
+            <Button variant="quiet" onClick={() => setConfirmDelete(null)} disabled={deleting}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="danger"
+              loading={deleting}
+              onClick={() => confirmDelete && void deleteProject(confirmDelete)}
+            >
+              {t("common.delete")}
+            </Button>
+          </>
+        }
+      >
+        <p>{t("nav.deleteProjectBody", { name: confirmDelete?.name ?? "" })}</p>
+      </Dialog>
+
       <FirstRun />
     </div>
   );

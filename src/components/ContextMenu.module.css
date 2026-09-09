@@ -1,0 +1,53 @@
+.menu {
+  /* absolute (not fixed) inside #app — the monochrome filter reparents fixed
+     descendants (docs/07 §3, D-07). #app fills the viewport and never scrolls,
+     so client coordinates map directly. */
+  position: absolute;
+  z-index: var(--z-modal);
+  min-inline-size: 11rem;
+  max-inline-size: 18rem;
+  padding: var(--space-2xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+  border: var(--rule-1) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--overlay-panel);
+  backdrop-filter: blur(24px) saturate(120%);
+  box-shadow: var(--shadow-overlay);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .menu {
+    background: var(--color-paper-2);
+  }
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  min-height: var(--hit-min);
+  padding: var(--space-xs) var(--space-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--color-ink);
+  text-align: start;
+  cursor: pointer;
+}
+.itemDanger {
+  composes: item;
+  color: var(--color-danger);
+}
+@media (hover: hover) {
+  .item:hover,
+  .itemDanger:hover {
+    background: var(--color-paper-3);
+  }
+}
+.item:focus-visible,
+.itemDanger:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: -2px;
+}

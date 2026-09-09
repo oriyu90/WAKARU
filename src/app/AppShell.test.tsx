@@ -4,18 +4,31 @@ import { RouterProvider, createMemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, expect, test } from "vitest";
 import { AppShell } from "./AppShell";
+import { ToastProvider } from "../components/Toast";
 import { useUiStore } from "../stores/ui";
 import "../i18n";
 
-function renderShell() {
+function renderShell(initialEntries: string[] = ["/"]) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter(
-    [{ path: "/", element: <AppShell />, children: [{ index: true, element: <div>home</div> }] }],
-    { initialEntries: ["/"] },
+    [
+      {
+        path: "/",
+        element: <AppShell />,
+        children: [
+          { index: true, element: <div>home</div> },
+          { path: "settings", element: <div>settings-page</div> },
+          { path: "search", element: <div>search-page</div> },
+        ],
+      },
+    ],
+    { initialEntries },
   );
   return render(
     <QueryClientProvider client={qc}>
-      <RouterProvider router={router} />
+      <ToastProvider>
+        <RouterProvider router={router} />
+      </ToastProvider>
     </QueryClientProvider>,
   );
 }
@@ -58,4 +71,17 @@ test("sidebar order is Home → File Modifier → … → Search (FR-N2)", () =>
     "/file-modifier",
     "/search",
   ]);
+});
+
+test("P3 · the settings button opens settings, then returns to the previous view", async () => {
+  const user = userEvent.setup();
+  renderShell(["/search"]);
+  expect(screen.getByText("search-page")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: /settings/i }));
+  expect(screen.getByText("settings-page")).toBeInTheDocument();
+
+  // Same control again — back to where we were, not a no-op.
+  await user.click(screen.getByRole("button", { name: /close settings|設定を閉じる/i }));
+  expect(screen.getByText("search-page")).toBeInTheDocument();
 });
