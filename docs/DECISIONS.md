@@ -449,3 +449,27 @@
 - **採用**: `http://127.0.0.1:11435/v1` のMLXBar presetを追加し、公開 `/v1/models` と `/v1/chat/completions` のみを既存OpenAI adapterで利用する。LAN/任意Bearer token、slashを含むmodel ID、keep-alive comment、`reasoning_content`、tool calls、usage、finish_reason、`[DONE]`を契約テストする。RAGはWAKARUがproject DBから構成し、mlx-bar独自のrag管理endpointへ依存しない。
 - **理由**: モデルサーバを交換可能にし、資料・embedding・引用の所有境界を一箇所に維持するため。
 - **影響**: DB/保存済みAI profile/OpenAI・Anthropic wireに破壊変更なし。依存追加なし。
+
+## D-40 · AIの成功判定はHTTP statusだけでなくstream契約と可視出力で確定する
+
+- **日付**: 2026-09-11（v1.0.0）
+- **論点**: OpenAI互換サーバーは誤ったendpointへHTTP 200の平文を返す場合があり、従来はeventsource parse errorを切断として扱ったため「空応答」または一般的なtruncatedとしてしか見えなかった。正常終了イベントだけで本文・tool callが空の応答も成功扱いになり得た。
+- **採用**: OpenAI streamは少なくとも1件のJSON SSE eventを要求し、parser failureを保持する。terminal `finish_reason`を受けたのに本文・reasoning・tool callが全て空なら `AI_BAD_RESPONSE` とする。`finish_reason`はあるが`[DONE]`がないLM Studio/MLXBar互換は従来どおり成功とする。
+- **理由**: transport成功、protocol成功、model出力成功を別々に判定し、利用者に修正可能な失敗理由を返すため。
+- **影響**: wire format、profile、DBに変更なし。非準拠の空応答だけが従来の曖昧な成功/切断から明示エラーへ変わる。
+
+## D-41 · 文書形式を正とし、承認・拡張子・MIME・保存完了点を一致させる
+
+- **日付**: 2026-09-11（v1.0.0）
+- **論点**: `build_document`はmodelが指定する`format`と`path`を独立に信頼したため、PDF bytesを`.md`へ保存できた。PDF/DOCX MIMEも未登録で、Viewer再importのrenderer選択が不安定だった。直接上書きは中断時に壊れた完成ファイルを残す。
+- **採用**: `format`を正として拡張子を補正し、その実効pathを承認判定にも使用。PDF/DOCX MIMEを登録。同じdirectoryの一意なtemporary fileへ全量write→flush→syncし、renameで最終pathへ置き換え、成功後だけartifact DB行を更新する。
+- **理由**: 弱いmodelの引数ずれを決定論的に吸収し、権限確認と実際の書込先を一致させ、Viewerへ完全なファイルだけを見せるため。
+- **影響**: DB/schema/project formatなし。既存artifactは不変。新規生成時だけ拡張子が形式へ正規化される。
+
+## D-42 · preview能力は必要最小限とし、WebViewの複製メモリを入力上限へ織り込む
+
+- **日付**: 2026-09-11（v1.0.0）
+- **論点**: D-33のwebsite iframeは`allow-scripts allow-same-origin allow-forms`でcommentの「opaque origin」と一致せず、import済み/AI生成HTMLに不要な能力を与えた。Office/PDFの200 MiB上限はArrayBuffer copy、decode canvas、Office DOMを含めると実使用量を過小評価した。PDF toolbarのpage groupも縮小され縦積みになった。
+- **採用**: website iframeは`sandbox="allow-scripts"`のみ。popup/top-navigation/referrerは許可しない。interactive PDF/DOCX/PPTXは96 MiBまでとし、超過時もingest、抽出text、検索、fallback閲覧は維持。page controlsを非縮小、数値labelをnowrapにする。
+- **理由**: プレビューの有用性を維持しつつorigin/form能力とWebView peak memoryを狭め、狭いstageでも操作情報を読めるようにするため。
+- **影響**: 一部の同一origin fetchやform送信を必要とするimportサイトはpreview内で動かなくなる。これは資料previewの安全境界として意図した制約。

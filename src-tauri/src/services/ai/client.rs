@@ -228,6 +228,9 @@ impl AiClient {
                                   // exhausted. `[DONE]` still follows, so the transport alone cannot
                                   // distinguish this from a complete answer.
         let mut output_limit_reached = false;
+        let mut saw_json_event = false;
+        let mut saw_output = false;
+        let mut stream_error: Option<String> = None;
         // LM Studio (several configs), llama.cpp's server, and other
         // OpenAI-compatible servers close the SSE stream cleanly right after a
         // `finish_reason` chunk and never send the `[DONE]` sentinel. Seeing a
@@ -248,13 +251,17 @@ impl AiClient {
                     let Some(ev) = next else { break };
                     let ev = match ev {
                         Ok(e) => e,
-                        Err(_) => break, // connection dropped -> truncated
+                        Err(error) => {
+                            stream_error = Some(error.to_string());
+                            break;
+                        }
                     };
                     if ev.data == "[DONE]" {
                         truncated = output_limit_reached;
                         break;
                     }
                     let Ok(chunk): Result<Value, _> = serde_json::from_str(&ev.data) else { continue };
+                    saw_json_event = true;
                     match chunk.pointer("/choices/0/finish_reason").and_then(Value::as_str) {
                         Some("length") => {
                             output_limit_reached = true;
@@ -273,12 +280,18 @@ impl AiClient {
                     }
                     if let Some(delta) = chunk.pointer("/choices/0/delta") {
                         if let Some(txt) = delta.get("content").and_then(|c| c.as_str()) {
-                            if !txt.is_empty() { think.push(txt, &mut on_delta); }
+                            if !txt.is_empty() {
+                                saw_output = true;
+                                think.push(txt, &mut on_delta);
+                            }
                         }
                         // reasoning models
                         for key in ["reasoning_content", "reasoning"] {
                             if let Some(txt) = delta.get(key).and_then(|c| c.as_str()) {
-                                if !txt.is_empty() { on_delta("reasoning", txt); }
+                                if !txt.is_empty() {
+                                    saw_output = true;
+                                    on_delta("reasoning", txt);
+                                }
                             }
                         }
                         if let Some(calls) = delta.get("tool_calls").and_then(|c| c.as_array()) {
@@ -298,6 +311,9 @@ impl AiClient {
                                     if let Some(args) = f.get("arguments").and_then(|a| a.as_str()) {
                                         slot.arguments.push_str(args);
                                     }
+                                    if !slot.name.is_empty() {
+                                        saw_output = true;
+                                    }
                                 }
                             }
                         }
@@ -307,6 +323,23 @@ impl AiClient {
         }
 
         think.finish(&mut on_delta);
+        if !saw_json_event {
+            let detail = stream_error
+                .map(|message| format!("the response was not a valid SSE stream: {message}"))
+                .unwrap_or_else(|| "the response contained no SSE JSON events".to_string());
+            return Err(AppError::new(
+                "AI_BAD_RESPONSE",
+                "error.ai.badResponse",
+                detail,
+            ));
+        }
+        if !saw_output && saw_terminal_reason {
+            return Err(AppError::new(
+                "AI_BAD_RESPONSE",
+                "error.ai.badResponse",
+                "the model completed without returning text or a tool call",
+            ));
+        }
         // A clean close after a terminal `finish_reason` is a complete response
         // even on servers that omit `[DONE]`. `length` still counts as
         // output-limit-reached (`output_limit_reached` already set).
@@ -1206,6 +1239,46 @@ mod tests {
             .recv()
             .unwrap()
             .starts_with("GET /v1/models HTTP/1.1"));
+    }
+
+    #[tokio::test]
+    async fn openai_200_non_sse_body_is_reported_as_a_bad_response() {
+        let (base, _request_rx) = serve_once("Unexpected endpoint or method");
+        let client = AiClient::new(ApiProtocol::Openai, &base, None, Vec::new(), 5_000).unwrap();
+        let error = client
+            .chat_stream(
+                "test-model",
+                json!([{ "role": "user", "content": "hi" }]),
+                &json!({}),
+                &CancellationToken::new(),
+                |_, _| {},
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, "AI_BAD_RESPONSE");
+        assert!(error.message.contains("SSE"));
+    }
+
+    #[tokio::test]
+    async fn openai_empty_completed_turn_is_reported_as_a_bad_response() {
+        let events = concat!(
+            "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
+            "data: [DONE]\n\n"
+        );
+        let (base, _request_rx) = serve_once(events);
+        let client = AiClient::new(ApiProtocol::Openai, &base, None, Vec::new(), 5_000).unwrap();
+        let error = client
+            .chat_stream(
+                "test-model",
+                json!([{ "role": "user", "content": "hi" }]),
+                &json!({}),
+                &CancellationToken::new(),
+                |_, _| {},
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, "AI_BAD_RESPONSE");
+        assert!(error.message.contains("without returning"));
     }
 
     // A real mid-stream drop (no finish_reason, no [DONE]) is still truncation.

@@ -1,62 +1,58 @@
-# v0.3.0 release record
+# v1.0.0 release record
 
-Prepared 2026-09-10. Implementation plan: `IMPLEMENTATION_PLAN_v0.3.0.md`.
+Prepared 2026-09-11. Audit and plan: `FORMAL_RELEASE_AUDIT_AND_PLAN.md`.
 Verification: `QUALITY_REPORT.md`. Release body: `RELEASE_NOTES.md`.
 
 ## Verified artifact
 
-- App: `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, version 0.3.0)
-- DMG: `WAKARU_0.3.0_aarch64.dmg`
-- Checksum file: `WAKARU_0.3.0_aarch64.dmg.sha256` (basename only)
-- Size: `23,163,604` bytes
-- SHA-256: `61f99d360ad821eb839d98f2c17599e3ab33d7078312001c922e64fa36bf19de`
-- Platform: macOS 12+, Apple Silicon, ad-hoc signed, not notarized
+- App: `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, version 1.0.0)
+- DMG: `WAKARU_1.0.0_aarch64.dmg`
+- Checksum: `WAKARU_1.0.0_aarch64.dmg.sha256` (basename only)
+- Size: `23,163,028` bytes
+- SHA-256: `30fdc74120e2ce48782ac1b1111a36b7f00869b51392b4bcc569e9606adb990b`
+- Platform: macOS 12+, Apple Silicon, ad-hoc signed, not notarised
 
-`codesign --verify --deep --strict` passes for the build output and for the app
-inside the mounted DMG. `hdiutil verify` is VALID. The mounted-DMG startup
-probe reached `WAKARU backend ready version="0.3.0"` and its log contains no
-secret patterns. The packaged UI was exercised for Viewer adjustments, Studio
-edit/cancel and the MLXBar preset.
+`codesign --verify --deep --strict` passes for both the build output and the
+app inside the mounted DMG. `hdiutil verify` is VALID. The mounted app reached
+`WAKARU backend ready version="1.0.0"`; the startup lines contain no credential
+patterns. Packaged-app UI inspection covered PDF correction controls and the
+non-collapsing toolbar with Live Illustrator open.
 
 ## Release scope
 
-- PDF/DOCX/PPTX get view-only invert and clarity controls with bounded PDF
-  sharpening and no mutation of originals or search context.
-- Live follow-ups use bounded conversation-aware RAG filtered by the current
-  page/source/project locator.
-- Studio uses Enter to send, Shift+Enter for newline, preserves IME composition,
-  and transactionally replaces a conversation tail when an earlier user turn is
-  edited and resubmitted.
-- MLXBar is available as a localhost preset and covered across model discovery,
-  Bearer auth, reasoning/content/usage streaming and completion termination.
-- No project-format, database or dependency migration; existing v0.0.0–v0.2.2
-  data remains compatible.
+- Studio document format, filename and MIME now agree; complete files are
+  atomically persisted before artifact metadata is recorded.
+- OpenAI-compatible endpoints report malformed SSE and empty completed turns
+  instead of silently producing a truncated or blank answer.
+- Imported websites execute in an opaque-origin preview without form or
+  same-origin permission.
+- PDF controls stay readable beside Live Illustrator; interactive PDF, DOCX
+  and PPTX rendering uses a safer 96 MiB input ceiling.
+- The four-language product page is rebuilt as a responsive Hallmark-style
+  product workbench with truthful private/ad-hoc distribution messaging.
+- Existing projects and conversations remain compatible; there is no database
+  or archive-format migration.
 
-## Build
+## Verification summary
 
-```bash
-APPLE_SIGNING_IDENTITY="-" MACOSX_DEPLOYMENT_TARGET=12.0 npm run tauri build -- --bundles app
-```
-
-The signed app is staged with an `/Applications` symlink and packaged as a
-UDZO DMG with `hdiutil`. Both the disk image and its mounted app are verified
-before publication.
+- Frontend: typecheck, lint/design/hardcoded, 23 tests, contrast, 395-key i18n
+  parity, production build and npm production audit all pass.
+- Rust: fmt, clippy with warnings denied, 197 library tests plus all phase
+  integration tests pass; one network-dependent test remains intentionally
+  ignored; cargo-deny advisories/bans/licenses/sources all pass.
+- External Live acceptance was not run because no authorised endpoint or
+  credential was supplied; mock HTTP/SSE contract coverage passed.
 
 ## Publication sequence
 
-1. Commit the fixes, version metadata and release documentation on `main`.
-2. Tag the release as `v0.3.0` and push the branch and tag.
-3. Publish the GitHub release with the DMG and basename-only checksum file
-   (`--repo oriyu90/WAKARU --latest`).
-4. Re-download the published assets and verify Latest status, byte size and hash.
-5. Publish the four localized introduction pages and project/news metadata on
-   `oriyu90/studio-rizi`.
-6. Record final commit and release details in
-   `common-rules-document/WAKARU.md`.
+1. Commit and tag `v1.0.0` on `main`.
+2. Publish the GitHub release with the verified DMG and checksum.
+3. Re-download release assets and compare byte size and SHA-256.
+4. Publish four localized Studio RIZI pages and release/news metadata.
+5. Record the release in the private common-rules maintenance document.
 
 ## Explicit limits
 
-- No Developer ID signature or Apple notarization credentials were supplied.
+- No Developer ID signature or Apple notarisation credentials were supplied.
 - Windows and Linux are not built or verified.
-- The live endpoint acceptance test needs an explicitly supplied endpoint and
-  credentials; it remains ignored when those are absent.
+- Repository visibility remains private pending an explicit owner decision.

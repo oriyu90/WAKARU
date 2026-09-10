@@ -30,6 +30,7 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--color-ink);
+  white-space: nowrap;
 }
 
 .body {
@@ -164,6 +165,9 @@ mark.hitActive {
   padding: var(--space-2xs) var(--space-md);
   border-bottom: var(--rule-1) solid var(--color-rule);
   overflow-x: auto;
+}
+.fileControls {
+  flex: none;
 }
 .documentAdjustments,
 .clarityControl {

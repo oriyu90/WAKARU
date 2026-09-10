@@ -1,54 +1,42 @@
-# WAKARU v0.3.0
+# WAKARU v1.0.0
 
-WAKARU v0.3.0 improves document readability, makes Live Illustrator follow-up
-questions reliably grounded, adds editable Studio conversation branches, and
-ships first-class MLXBar compatibility. There is no database or project-format
-migration.
+WAKARU v1.0.0 is the first formal stable release. It consolidates the
+document-centred Viewer, source-grounded Live Illustrator, project RAG and the
+Studio workspace while hardening the failure paths found in the release audit.
 
-This build is for macOS Apple Silicon. It is ad-hoc signed and **not notarized**;
-on first launch, right-click WAKARU and choose **Open**.
+## What changed
 
-## Document viewer
+- Studio document generation now makes the selected format authoritative. PDF
+  and Word output always receives the matching filename and MIME type, so files
+  import back into View materials through the correct renderer.
+- Studio writes artifacts through a flushed same-directory temporary file and
+  atomically replaces the destination, preventing half-written PDF/DOCX files
+  after a crash or disk error.
+- OpenAI-compatible connections now distinguish malformed HTTP 200 responses,
+  invalid SSE and completed-but-empty model turns from ordinary truncation.
+  Valid LM Studio and MLXBar streams without a `[DONE]` marker remain supported.
+- Imported or Studio-authored website previews retain JavaScript but now run in
+  an opaque-origin iframe without same-origin or form permissions.
+- PDF page controls no longer collapse into vertical text beside Live
+  Illustrator. Interactive PDF, Word and PowerPoint rendering is capped at
+  96 MiB to avoid multi-copy WebView memory spikes; larger sources still ingest,
+  search and expose extracted text.
+- The official four-language product page has been rebuilt with a calm Hallmark
+  workbench presentation, clearer Viewer → Live → Studio flow and explicit
+  local-first / distribution boundaries.
 
-- PDF, DOCX and PPTX previews now have a compact black/white invert button and a
-  sharpness/contrast control. Adjustments affect only the current view; imported
-  originals, OCR data, search text and citations are never changed.
-- PDF sharpening uses a bounded 3×3 raster pass and skips oversized canvases,
-  keeping memory and interaction latency predictable. DOCX/PPTX remain vector
-  content and receive contrast/inversion without rasterization.
+## Compatibility
 
-## Live Illustrator
+- Existing projects, settings, Studio conversations and Live Illustrator
+  sessions from v0.0.0 through v0.3.0 remain compatible.
+- No database migration, project archive change or AI profile migration is
+  required.
+- Live Illustrator remains separate from Studio until the reader explicitly
+  chooses the handoff action, and a source-scoped explanation remains one
+  session while its pages change.
 
-- Follow-up questions retrieve source excerpts using the current scope and page
-  locator. The previous user question is included in a bounded retrieval query so
-  pronouns and short follow-ups retain their subject.
-- A bounded recent conversation is sent with the request, while factual grounding
-  remains restricted to the newly retrieved excerpts. Source-level sessions still
-  remain one session across page changes and enter Studio only after explicit handoff.
+## Distribution
 
-## Studio
-
-- Enter sends a message; Shift+Enter inserts a newline; IME composition is not
-  intercepted.
-- Every previous user message offers **Edit from here**, plus a shortcut for the
-  latest user turn. Choosing edit is non-destructive; submitting atomically replaces
-  that user turn and the later chat tail. Existing workspace files and artifacts are
-  retained.
-
-## MLXBar
-
-- Settings includes an MLXBar preset for `http://127.0.0.1:11435/v1`. Local/LAN
-  endpoints and optional Bearer authentication use the normal OpenAI-compatible API.
-- Contract tests cover MLXBar model descriptors, slash-containing model IDs, SSE
-  keep-alives, reasoning deltas, usage, finish reasons and `[DONE]`. WAKARU keeps
-  ownership of project RAG and does not depend on MLXBar private management APIs.
-
-## Compatibility and limits
-
-- Existing v0.0.0–v0.2.2 projects, settings, artifacts and Studio sessions open
-  unchanged. No dependency, database schema or project archive format changed.
-- Japanese, English and Simplified Chinese UI strings remain complete and in parity.
-- macOS 12 or later on Apple Silicon. Windows and Linux are not built or verified.
-- Ad-hoc signed, not Apple-notarized.
-
-See `QUALITY_REPORT.md` for the verification record and artifact checksum.
+Apple Silicon Mac, macOS 12 or later. The application is MIT licensed. This
+build is ad-hoc signed and is not Apple-notarised. Distribution remains
+invite-only while the GitHub repository is private.

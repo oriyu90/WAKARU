@@ -2,6 +2,17 @@
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
+**2026-09-11 · v1.0.0 formal stable hardening** — The formal-release audit is
+recorded in `FORMAL_RELEASE_AUDIT_AND_PLAN.md`. Studio now normalises generated
+document extensions to the selected format before approval and write, records
+PDF/DOCX MIME, and atomically replaces complete artifacts. OpenAI-compatible
+HTTP 200 non-SSE and completed-empty turns return `AI_BAD_RESPONSE` instead of
+appearing as an empty/truncated answer. Authored-site frames keep JavaScript but
+lose same-origin/form permissions. Viewer page controls cannot shrink into
+vertical text and interactive Office/PDF rendering is capped at 96 MiB. No DB,
+project archive or AI-profile migration; v0.0.0–v0.3.0 data stays compatible.
+See D-40–D-42.
+
 **2026-09-10 · v0.3.0 viewer/conversation/MLXBar** — PDF, DOCX and PPTX previews
 gain non-destructive invert plus clarity controls; only bounded-size PDF canvases
 run the 3×3 sharpening pass. Live follow-up questions now RAG-search within the

@@ -91,10 +91,24 @@ fn classify_call(ctx: &LoopCtx, name: &str, arguments: &str) -> Approval {
         // programs and reach the network.
         "run_command" => Approval::Ask,
         "write_file" | "build_document" | "build_site" => {
-            let path = serde_json::from_str::<Value>(arguments)
-                .ok()
+            let parsed = serde_json::from_str::<Value>(arguments).ok();
+            let mut path = parsed
+                .as_ref()
                 .and_then(|v| v.get("path").and_then(|p| p.as_str()).map(str::to_string))
                 .unwrap_or_default();
+            // `build_document` normalises the extension before writing. Apply
+            // the same rule here or a model could propose `report.md` with
+            // `format: pdf` and bypass overwrite approval for `report.pdf`.
+            if name == "build_document" {
+                let format = parsed
+                    .as_ref()
+                    .and_then(|v| v.get("format"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("md");
+                if let Some(normalised) = document_output_path(&path, format) {
+                    path = normalised;
+                }
+            }
             let exists = sandbox::resolve_in_sandbox(&ctx.workspace, &path)
                 .map(|p| p.exists())
                 .unwrap_or(false);
@@ -804,8 +818,13 @@ pub fn dispatch_tool(
             write_artifact(db, workspace, thread_id, &path, content.as_bytes())
         }
         "build_document" => {
-            let path = s("path").ok_or_else(|| tool_arg("path"))?;
-            let format = s("format").unwrap_or_else(|| "md".into());
+            let requested_path = s("path").ok_or_else(|| tool_arg("path"))?;
+            let format = s("format")
+                .unwrap_or_else(|| "md".into())
+                .trim()
+                .to_ascii_lowercase();
+            let path = document_output_path(&requested_path, &format)
+                .unwrap_or_else(|| requested_path.trim().to_string());
             let title = s("title").unwrap_or_default();
             let toc = args.get("toc").and_then(Value::as_bool).unwrap_or(false);
             let sections: Vec<doc_builder::DocSection> = args
@@ -1014,7 +1033,37 @@ fn write_artifact(
     if let Some(parent) = abs.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    std::fs::write(&abs, bytes)?;
+    // Write into the destination directory, flush to disk, then rename. A
+    // crash can now leave either the old complete artifact or the new complete
+    // artifact, never a half-written PDF/DOCX that the Viewer later rejects.
+    let parent = abs.parent().ok_or_else(|| {
+        AppError::new(
+            "STUDIO_PATH_INVALID",
+            "error.studio.pathInvalid",
+            "artifact path has no parent directory",
+        )
+    })?;
+    let file_name = abs
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("artifact");
+    let pending_path = parent.join(format!(".{file_name}.{}.tmp", Uuid::now_v7()));
+    let write_result = (|| -> std::io::Result<()> {
+        use std::io::Write as _;
+        let mut pending = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&pending_path)?;
+        pending.write_all(bytes)?;
+        pending.flush()?;
+        pending.sync_all()?;
+        std::fs::rename(&pending_path, &abs)?;
+        Ok(())
+    })();
+    if let Err(error) = write_result {
+        let _ = std::fs::remove_file(&pending_path);
+        return Err(error.into());
+    }
     let rel_path = format!("workspace/{}", path.trim_start_matches("./"));
     let mime = mime_guess_ext(&abs);
     db.execute(
@@ -1041,6 +1090,27 @@ fn swap_ext(path: &str, new_ext: &str) -> String {
         Some((stem, _)) => format!("{stem}.{new_ext}"),
         None => format!("{path}.{new_ext}"),
     }
+}
+
+/// Keep the model-selected document format authoritative while ensuring the
+/// filename carries the matching extension. Returns `None` for an unsupported
+/// format so the renderer can produce the canonical validation error.
+fn document_output_path(path: &str, format: &str) -> Option<String> {
+    let ext = match format.trim().to_ascii_lowercase().as_str() {
+        "md" | "markdown" => "md",
+        "docx" => "docx",
+        "pdf" => "pdf",
+        _ => return None,
+    };
+    let trimmed = path.trim();
+    if std::path::Path::new(trimmed)
+        .extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case(ext))
+    {
+        return Some(trimmed.to_string());
+    }
+    Some(swap_ext(trimmed, ext))
 }
 
 fn walk_workspace(root: &Path, dir: &Path, out: &mut Vec<String>) {
@@ -1070,6 +1140,10 @@ fn mime_guess_ext(path: &Path) -> Option<String> {
         Some("json") => Some("application/json".into()),
         Some("csv") => Some("text/csv".into()),
         Some("html") => Some("text/html".into()),
+        Some("pdf") => Some("application/pdf".into()),
+        Some("docx") => {
+            Some("application/vnd.openxmlformats-officedocument.wordprocessingml.document".into())
+        }
         _ => None,
     }
 }
@@ -1991,6 +2065,78 @@ mod tests {
         )
         .unwrap();
         assert!(artifact_abs_path(&root, "p1", &db, "source").is_err());
+    }
+
+    #[test]
+    fn document_format_controls_extension_and_mime() {
+        assert_eq!(
+            document_output_path("reports/quarterly.md", "pdf").as_deref(),
+            Some("reports/quarterly.pdf")
+        );
+        assert_eq!(
+            document_output_path("reports/quarterly", "DOCX").as_deref(),
+            Some("reports/quarterly.docx")
+        );
+        assert_eq!(
+            document_output_path("reports/quarterly.PDF", "pdf").as_deref(),
+            Some("reports/quarterly.PDF")
+        );
+        assert!(document_output_path("report.bin", "pages").is_none());
+        assert_eq!(
+            mime_guess_ext(Path::new("report.pdf")).as_deref(),
+            Some("application/pdf")
+        );
+        assert_eq!(
+            mime_guess_ext(Path::new("report.docx")).as_deref(),
+            Some("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        );
+    }
+
+    #[test]
+    fn artifact_write_atomically_replaces_the_complete_file_then_records_it() {
+        let temp = tempfile::tempdir().unwrap();
+        let workspace = temp.path().join("workspace");
+        std::fs::create_dir_all(&workspace).unwrap();
+        std::fs::write(workspace.join("report.pdf"), b"old complete file").unwrap();
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch(
+            "CREATE TABLE artifacts (
+              id TEXT PRIMARY KEY,
+              thread_id TEXT,
+              rel_path TEXT NOT NULL UNIQUE,
+              bytes INTEGER NOT NULL,
+              mime TEXT,
+              created_at TEXT NOT NULL
+            );",
+        )
+        .unwrap();
+
+        write_artifact(
+            &db,
+            &workspace,
+            "thread-1",
+            "report.pdf",
+            b"%PDF-new-complete",
+        )
+        .unwrap();
+        assert_eq!(
+            std::fs::read(workspace.join("report.pdf")).unwrap(),
+            b"%PDF-new-complete"
+        );
+        let (bytes, mime): (i64, String) = db
+            .query_row(
+                "SELECT bytes, mime FROM artifacts WHERE rel_path='workspace/report.pdf'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(bytes, 17);
+        assert_eq!(mime, "application/pdf");
+        assert!(std::fs::read_dir(&workspace).unwrap().all(|entry| !entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .ends_with(".tmp")));
     }
 
     #[test]

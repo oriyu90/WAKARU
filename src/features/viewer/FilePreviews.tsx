@@ -11,7 +11,11 @@ import { useToast } from "../../components/useToast";
 import type { DocumentPayload, SourceDetail } from "../../ipc/types.gen";
 import styles from "./previews.module.css";
 
-const MAX_INTERACTIVE_BYTES = 200 * 1024 * 1024;
+// Office/PDF renderers duplicate the ArrayBuffer and then allocate decoded
+// canvases/DOM. A 200 MiB source could therefore push a WebView past a safe
+// working set. Keep ingestion and extracted-text reading available, but bound
+// the interactive renderer to a release-safe ceiling.
+const MAX_INTERACTIVE_BYTES = 96 * 1024 * 1024;
 const MAX_SHARPEN_PIXELS = 4_000_000;
 
 export function documentContrast(clarity: number) {

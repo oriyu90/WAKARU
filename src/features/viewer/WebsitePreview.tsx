@@ -12,8 +12,9 @@ const HTML_RE = /\.html?($|[?#])/i;
 
 /** Preview for an imported / Studio-authored static site (issues 4 & 5).
  * Files are served through the project-scoped `wakaru-asset://` scheme into a
- * sandboxed <iframe>: JS runs, but the frame has its own opaque origin and
- * cannot reach the app window. */
+ * sandboxed <iframe>. The frame deliberately has an opaque origin: combining
+ * `allow-scripts` and `allow-same-origin` would let authored HTML escape the
+ * effective sandbox and is never necessary for a local preview. */
 export function WebsitePreview({
   projectId,
   detail,
@@ -119,7 +120,7 @@ export function WebsitePreview({
               className={styles.frame}
               src={src.data}
               title={t("viewer.websitePreview")}
-              sandbox="allow-scripts allow-same-origin allow-forms"
+              sandbox="allow-scripts"
               referrerPolicy="no-referrer"
             />
           ) : null}

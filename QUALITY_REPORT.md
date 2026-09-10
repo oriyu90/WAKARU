@@ -2,6 +2,55 @@
 
 Cumulative; newest release first.
 
+## v1.0.0 formal release verification — 2026-09-11
+
+Scope: formal-release audit and hardening of Viewer safety/memory behavior,
+Studio document persistence, OpenAI-compatible streaming failure handling, and
+the four-language product experience. No database or project-format migration.
+
+### Resolved findings
+
+- Studio now normalises the requested document extension before approval and
+  write, assigns PDF/DOCX MIME correctly, writes through a flushed and synced
+  same-directory temporary file, atomically replaces the destination, and only
+  then records the artifact.
+- OpenAI-compatible HTTP 200 responses must contain valid SSE JSON; parser
+  failures and completed empty turns now return `AI_BAD_RESPONSE`, while valid
+  LM Studio/MLXBar streams without `[DONE]` remain compatible.
+- Authored website previews keep JavaScript in an opaque-origin sandbox but no
+  longer receive same-origin or form permission.
+- PDF page controls no longer wrap vertically beside Live Illustrator.
+  Interactive PDF/DOCX/PPTX input is capped at 96 MiB to bound WebView copies;
+  extraction, search and reading fallback remain available above the limit.
+- The localized website was rebuilt around a Hallmark workbench hierarchy,
+  responsive tokens, actual Viewer/Live/Studio workflow and explicit private,
+  ad-hoc distribution boundaries.
+
+### Automated gates
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck / lint / design / hardcoded strings | pass |
+| Frontend unit tests | 23 passed |
+| Contrast / i18n parity / production build | pass; 395 keys × 3 languages; existing large-chunk advisory only |
+| Rust fmt / clippy / library tests | pass; 197 passed, 1 network-dependent test intentionally ignored |
+| Rust phase integration tests | all passed |
+| Live endpoint acceptance test | not run; no authorised endpoint or credentials supplied |
+| `cargo deny check` — advisories, bans, licenses, sources | pass |
+| npm production audit | 0 vulnerabilities |
+
+### Runtime and artifact
+
+| Item | Value |
+|---|---|
+| App | arm64 `WAKARU.app`, version `1.0.0`; ad-hoc signed; strict deep signature verification passes for build output and mounted image |
+| `Info.plist` | `CFBundleShortVersionString` 1.0.0; `LSMinimumSystemVersion` 12.0; local-network description present |
+| DMG | `WAKARU_1.0.0_aarch64.dmg`, 23,163,028 bytes; `hdiutil verify` VALID |
+| SHA-256 | `30fdc74120e2ce48782ac1b1111a36b7f00869b51392b4bcc569e9606adb990b` |
+| Startup probe | mounted app stayed healthy and reached `WAKARU backend ready version="1.0.0"`; startup lines contain no credential patterns |
+| Packaged UI | PDF inversion toggled; correction slider exposed; page count remained horizontal with Live Illustrator open |
+| Platform | macOS 12+, Apple Silicon; Windows/Linux not built or verified; not notarised |
+
 ## v0.3.0 release verification — 2026-09-10
 
 Scope: non-destructive document viewing adjustments, conversation-aware and
