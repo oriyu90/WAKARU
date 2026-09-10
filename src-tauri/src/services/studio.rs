@@ -319,6 +319,39 @@ fn tab_thread(db: &Connection, tab_id: &str) -> AppResult<String> {
     .ok_or_else(|| AppError::new("STUDIO_TAB_NOT_FOUND", "error.studio.tabNotFound", tab_id))
 }
 
+fn persist_user_branch(
+    db: &Connection,
+    tab_id: &str,
+    thread_id: &str,
+    scope: &str,
+    text: &str,
+    replace_target: Option<(String, String)>,
+) -> AppResult<()> {
+    let tx = db.unchecked_transaction()?;
+    tx.execute(
+        "UPDATE studio_tabs SET scope = ?2 WHERE id = ?1",
+        params![tab_id, scope],
+    )?;
+    if let Some((created_at, message_id)) = replace_target {
+        tx.execute(
+            "DELETE FROM messages WHERE thread_id=?1
+             AND (created_at > ?2 OR (created_at = ?2 AND id >= ?3))",
+            params![thread_id, created_at, message_id],
+        )?;
+    }
+    tx.execute(
+        "INSERT INTO messages (id, thread_id, role, content, created_at)
+         VALUES (?1, ?2, 'user', ?3, ?4)",
+        params![Uuid::now_v7().to_string(), thread_id, text, now_iso8601()],
+    )?;
+    tx.execute(
+        "UPDATE threads SET updated_at = ?2 WHERE id = ?1",
+        params![thread_id, now_iso8601()],
+    )?;
+    tx.commit()?;
+    Ok(())
+}
+
 fn load_messages(db: &Connection, thread_id: &str) -> AppResult<Vec<ChatMessage>> {
     let mut stmt = db.prepare(
         "SELECT id, role, content, citations, model, status, created_at, tool_calls
@@ -653,7 +686,7 @@ pub fn dispatch_tool(
                 return Ok("(no query)".into());
             }
             let k = n("k").unwrap_or(8).clamp(1, 20) as usize;
-            let hits = retrieval::hybrid_search(db, &query, None, None, k)?;
+            let hits = retrieval::hybrid_search(db, &query, None, None, None, k)?;
             if hits.is_empty() {
                 return Ok("No matches.".into());
             }
@@ -1110,6 +1143,7 @@ async fn send_impl(
         tab_id,
         text,
         scope,
+        replace_from_message_id,
     } = input;
     let text = text.trim().to_string();
 
@@ -1157,10 +1191,39 @@ async fn send_impl(
             ));
         }
 
-        db.execute(
-            "UPDATE studio_tabs SET scope = ?2 WHERE id = ?1",
-            params![tab_id, scope],
-        )?;
+        let replace_target = if let Some(message_id) = replace_from_message_id.as_deref() {
+            if last_status.as_deref().is_some_and(|status| {
+                matches!(status, "pending_approval" | "needs_continue" | "streaming")
+            }) {
+                return Err(AppError::new(
+                    "STUDIO_REWIND_LOCKED",
+                    "error.studio.rewindLocked",
+                    "finish or cancel the active turn before editing history",
+                ));
+            }
+            Some(
+                db.query_row(
+                    "SELECT created_at, id FROM messages
+                     WHERE id=?1 AND thread_id=?2 AND role='user'",
+                    params![message_id, thread_id],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                )
+                .optional()?
+                .ok_or_else(|| {
+                    AppError::new(
+                        "STUDIO_MESSAGE_NOT_FOUND",
+                        "error.studio.messageNotFound",
+                        message_id,
+                    )
+                })?,
+            )
+        } else {
+            None
+        };
+
+        if !resume_only {
+            persist_user_branch(&db, &tab_id, &thread_id, &scope, &text, replace_target)?;
+        }
 
         let source_filter = scope.strip_prefix("source:").map(str::to_string);
 
@@ -1220,24 +1283,12 @@ async fn send_impl(
                 &query_text,
                 qvec.as_deref(),
                 source_filter.as_deref(),
+                None,
                 RAG_TOP_K,
             )?;
             drop(db2);
             hits
         };
-
-        // Persist the user's turn (unless this is a bare "続行").
-        if !resume_only {
-            db.execute(
-                "INSERT INTO messages (id, thread_id, role, content, created_at)
-                 VALUES (?1, ?2, 'user', ?3, ?4)",
-                params![Uuid::now_v7().to_string(), thread_id, text, now_iso8601()],
-            )?;
-            db.execute(
-                "UPDATE threads SET updated_at = ?2 WHERE id = ?1",
-                params![thread_id, now_iso8601()],
-            )?;
-        }
 
         let system = format!(
             "{}\n\n{}\n\n[Workspace] Files you write go to `{}/workspace/`. Use relative paths.",
@@ -1421,6 +1472,7 @@ async fn resolve_tool_impl(
                 &query_text,
                 qvec.as_deref(),
                 source_filter.as_deref(),
+                None,
                 RAG_TOP_K,
             )?;
             drop(db2);
@@ -2002,5 +2054,49 @@ mod tests {
         ] {
             assert!(INJECTION_GUARD.contains(word));
         }
+    }
+
+    #[test]
+    fn editing_a_past_user_turn_replaces_the_tail_in_one_transaction() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch(
+            "CREATE TABLE threads (id TEXT PRIMARY KEY, updated_at TEXT NOT NULL);
+             CREATE TABLE studio_tabs (id TEXT PRIMARY KEY, scope TEXT NOT NULL);
+             CREATE TABLE messages (
+               id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, role TEXT NOT NULL,
+               content TEXT NOT NULL, created_at TEXT NOT NULL
+             );
+             INSERT INTO threads VALUES ('thread', '0');
+             INSERT INTO studio_tabs VALUES ('tab', 'project');
+             INSERT INTO messages VALUES ('01', 'thread', 'user', 'first', '1');
+             INSERT INTO messages VALUES ('02', 'thread', 'assistant', 'old answer', '2');
+             INSERT INTO messages VALUES ('03', 'thread', 'user', 'later', '3');",
+        )
+        .unwrap();
+
+        persist_user_branch(
+            &db,
+            "tab",
+            "thread",
+            "source:s1",
+            "edited first",
+            Some(("1".into(), "01".into())),
+        )
+        .unwrap();
+
+        let messages: Vec<(String, String)> = db
+            .prepare("SELECT role, content FROM messages ORDER BY created_at, id")
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(messages, vec![("user".into(), "edited first".into())]);
+        let scope: String = db
+            .query_row("SELECT scope FROM studio_tabs WHERE id='tab'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(scope, "source:s1");
     }
 }

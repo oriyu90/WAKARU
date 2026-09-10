@@ -26,12 +26,14 @@ const LEVELS: DetailLevel[] = ["simple", "standard", "detailed"];
 export function IllustratorDrawer({
   projectId,
   sourceId,
+  locator,
   visionSupported,
   autoRun = true,
   onStarted,
 }: {
   projectId: string;
   sourceId: string | null;
+  locator: unknown;
   visionSupported: boolean;
   autoRun?: boolean;
   onStarted?: () => void;
@@ -134,6 +136,7 @@ export function IllustratorDrawer({
         threadId: thread.data.id,
         text: text.trim(),
         scope,
+        locator,
       });
       setText("");
       setAskStreamId(sid);

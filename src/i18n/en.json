@@ -216,10 +216,14 @@
       "pdfUnavailable": "PDF output is not available in this build; a Markdown version was saved instead."
     },
     "WEBSITE_INVALID": "The folder could not be imported as a website.",
-    "STUDIO_SITE_INVALID": "The site could not be built (check the file set)."
+    "STUDIO_SITE_INVALID": "The site could not be built (check the file set).",
+    "STUDIO_REWIND_LOCKED": "Finish or stop the active response before editing history.",
+    "STUDIO_MESSAGE_NOT_FOUND": "The message to edit could not be found."
   },
   "viewer": {
     "readonly": "Read-only",
+    "invertDocument": "Invert black & white",
+    "clarity": "Sharpness / contrast",
     "find": "Find…",
     "wrap": "Wrap",
     "nowrap": "No wrap",
@@ -263,7 +267,8 @@
     "addTitle": "Add AI connection",
     "editTitle": "Edit AI connection",
     "noneTitle": "No AI connections",
-    "noneBody": "Add an OpenAI- or Anthropic-compatible endpoint, including cloud APIs, LM Studio and Ollama.",
+    "noneBody": "Add an OpenAI- or Anthropic-compatible endpoint, including cloud APIs, LM Studio, MLXBar and Ollama.",
+    "mlxBarHint": "This is MLXBar's default URL. If LAN access and authentication are enabled, enter the connection URL and API token shown by MLXBar. WAKARU's own source retrieval remains available.",
     "roles": "Role assignments",
     "roleNone": "(none)",
     "model": "Model",
@@ -341,7 +346,10 @@
     "message": "Message",
     "messagePlaceholder": "Ask about this project…",
     "send": "Send",
-    "sendHint": "Cmd/Ctrl + Enter to send",
+    "sendHint": "Enter to send · Shift+Enter for a new line",
+    "editFromHere": "Edit from here",
+    "editPrevious": "Edit previous message",
+    "editingFromHere": "This will branch the conversation here. History stays intact until you send.",
     "messageRequired": "Type a message first",
     "stop": "Stop",
     "thinking": "Working…",

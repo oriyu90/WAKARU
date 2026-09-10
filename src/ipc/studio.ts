@@ -22,9 +22,9 @@ export const studioApi = {
     call<void>("studio_close_tab", { projectId, tabId }),
   reorderTabs: (projectId: string, orderedIds: string[]) =>
     call<void>("studio_reorder_tabs", { projectId, orderedIds }),
-  send: (projectId: string, tabId: string, text: string, scope: string) =>
+  send: (projectId: string, tabId: string, text: string, scope: string, replaceFromMessageId?: string) =>
     call<StudioSendResult>("studio_send", {
-      input: { projectId, tabId, text, scope },
+      input: { projectId, tabId, text, scope, replaceFromMessageId: replaceFromMessageId ?? null },
       uiLang: lang(),
     }),
   cancel: (tabId: string) => call<void>("studio_cancel", { tabId }),

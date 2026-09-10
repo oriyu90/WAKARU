@@ -1,31 +1,36 @@
-# v0.2.2 release record
+# v0.3.0 release record
 
-Prepared 2026-09-10. Implementation plan: `IMPLEMENTATION_PLAN_v0.2.2.md`.
+Prepared 2026-09-10. Implementation plan: `IMPLEMENTATION_PLAN_v0.3.0.md`.
 Verification: `QUALITY_REPORT.md`. Release body: `RELEASE_NOTES.md`.
 
 ## Verified artifact
 
-- App: `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, version 0.2.2)
-- DMG: `WAKARU_0.2.2_aarch64.dmg`
-- Checksum file: `WAKARU_0.2.2_aarch64.dmg.sha256` (basename only)
-- Size: `23,156,939` bytes
-- SHA-256: `1402b35ed07e5eed26593e550ecc8df083cc904dd33231e530a95f413b7bc68c`
+- App: `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, version 0.3.0)
+- DMG: `WAKARU_0.3.0_aarch64.dmg`
+- Checksum file: `WAKARU_0.3.0_aarch64.dmg.sha256` (basename only)
+- Size: `23,163,604` bytes
+- SHA-256: `61f99d360ad821eb839d98f2c17599e3ab33d7078312001c922e64fa36bf19de`
 - Platform: macOS 12+, Apple Silicon, ad-hoc signed, not notarized
 
 `codesign --verify --deep --strict` passes for the build output and for the app
-inside the mounted DMG. `hdiutil verify` is VALID. The startup probe reached
-`WAKARU backend ready version="0.2.2"` and the log contains no secret patterns.
+inside the mounted DMG. `hdiutil verify` is VALID. The mounted-DMG startup
+probe reached `WAKARU backend ready version="0.3.0"` and its log contains no
+secret patterns. The packaged UI was exercised for Viewer adjustments, Studio
+edit/cancel and the MLXBar preset.
 
 ## Release scope
 
-- Studio-generated Markdown/PDF artifacts open as Viewer sources; queued-source
-  cache refresh and PPTX loaded-state rendering are fixed.
-- Whole-source Live Illustrator stays on one session across page navigation.
-  Nothing enters Studio without the explicit handoff action.
-- AI context, artifact paths, ZIP extraction, project/source identifiers and
-  cross-project search-index ownership are bounded and validated.
-- No project-format or database migration; existing v0.0.0–v0.2.1 projects and
-  settings remain compatible. v0.2.1 website artifacts remain valid.
+- PDF/DOCX/PPTX get view-only invert and clarity controls with bounded PDF
+  sharpening and no mutation of originals or search context.
+- Live follow-ups use bounded conversation-aware RAG filtered by the current
+  page/source/project locator.
+- Studio uses Enter to send, Shift+Enter for newline, preserves IME composition,
+  and transactionally replaces a conversation tail when an earlier user turn is
+  edited and resubmitted.
+- MLXBar is available as a localhost preset and covered across model discovery,
+  Bearer auth, reasoning/content/usage streaming and completion termination.
+- No project-format, database or dependency migration; existing v0.0.0–v0.2.2
+  data remains compatible.
 
 ## Build
 
@@ -33,21 +38,21 @@ inside the mounted DMG. `hdiutil verify` is VALID. The startup probe reached
 APPLE_SIGNING_IDENTITY="-" MACOSX_DEPLOYMENT_TARGET=12.0 npm run tauri build -- --bundles app
 ```
 
-The signed app is staged with an `/Applications` symlink and packaged as a UDZO
-DMG with `hdiutil`. Both the disk image and its mounted app are verified before
-publication.
+The signed app is staged with an `/Applications` symlink and packaged as a
+UDZO DMG with `hdiutil`. Both the disk image and its mounted app are verified
+before publication.
 
 ## Publication sequence
 
 1. Commit the fixes, version metadata and release documentation on `main`.
-2. Tag the release as `v0.2.2` and push the branch and tag.
+2. Tag the release as `v0.3.0` and push the branch and tag.
 3. Publish the GitHub release with the DMG and basename-only checksum file
-   (`--repo oriyu90/WAKARU --latest`). The repository is private.
+   (`--repo oriyu90/WAKARU --latest`).
 4. Re-download the published assets and verify Latest status, byte size and hash.
 5. Publish the four localized introduction pages and project/news metadata on
    `oriyu90/studio-rizi`.
-6. Record final commit and release details in the maintenance repository
-   (`common-rules-document/WAKARU.md`).
+6. Record final commit and release details in
+   `common-rules-document/WAKARU.md`.
 
 ## Explicit limits
 

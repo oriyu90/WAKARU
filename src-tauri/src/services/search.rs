@@ -130,6 +130,7 @@ async fn project_scoped(
         &q.q,
         query_vec.as_deref(),
         q.source_id.as_deref(),
+        None,
         q.limit as usize,
     )?
     .into_iter()

@@ -214,10 +214,14 @@
       "pdfUnavailable": "このビルドでは PDF 出力を利用できないため、代わりに Markdown 版を保存しました。"
     },
     "WEBSITE_INVALID": "フォルダを Web サイトとして取り込めませんでした。",
-    "STUDIO_SITE_INVALID": "サイトの生成に失敗しました（ファイル構成を確認してください）。"
+    "STUDIO_SITE_INVALID": "サイトの生成に失敗しました（ファイル構成を確認してください）。",
+    "STUDIO_REWIND_LOCKED": "処理中の応答を完了または停止してから履歴を編集してください。",
+    "STUDIO_MESSAGE_NOT_FOUND": "編集するメッセージが見つかりません。"
   },
   "viewer": {
     "readonly": "閲覧専用",
+    "invertDocument": "白黒反転",
+    "clarity": "シャープネス / コントラスト",
     "find": "検索…",
     "wrap": "折り返し",
     "nowrap": "折り返し解除",
@@ -261,7 +265,8 @@
     "addTitle": "AI 接続を追加",
     "editTitle": "AI 接続を編集",
     "noneTitle": "AI 接続がありません",
-    "noneBody": "OpenAI 互換または Anthropic 互換のエンドポイント（クラウド API・LM Studio・Ollama）を登録します。",
+    "noneBody": "OpenAI 互換または Anthropic 互換のエンドポイント（クラウド API・LM Studio・MLXBar・Ollama）を登録します。",
+    "mlxBarHint": "MLXBar の既定URLです。LAN公開で認証を有効にした場合は、MLXBarに表示された接続URLとAPIトークンを入力してください。WAKARU側の資料検索はそのまま利用できます。",
     "roles": "役割の割り当て",
     "roleNone": "（なし）",
     "model": "モデル名",
@@ -338,7 +343,10 @@
     "message": "メッセージ",
     "messagePlaceholder": "このプロジェクトについて質問…",
     "send": "送信",
-    "sendHint": "Cmd/Ctrl + Enter で送信",
+    "sendHint": "Enter で送信 · Shift+Enter で改行",
+    "editFromHere": "ここから編集",
+    "editPrevious": "前のメッセージを編集",
+    "editingFromHere": "このメッセージから会話を分岐します。再送信するまで履歴は変更されません。",
     "messageRequired": "メッセージを入力してください",
     "stop": "停止",
     "thinking": "処理中…",

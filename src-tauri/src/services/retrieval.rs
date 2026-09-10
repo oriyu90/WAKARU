@@ -89,14 +89,18 @@ pub fn keyword_search(
     Ok(hits)
 }
 
-/// Build an FTS5 MATCH expression: bi-gram the query, then AND the tokens so a
-/// multi-word / multi-character query behaves like "contains all".
+/// Build a recall-oriented, bounded FTS5 MATCH expression. Natural questions
+/// contain particles and follow-up wording that rarely all occur in one chunk;
+/// OR lets BM25 rank partial matches while embeddings provide semantic recall.
 pub fn fts_match_expr(query: &str) -> String {
+    let mut seen = std::collections::HashSet::new();
     let tokens: Vec<String> = cjk_bigram(query)
         .split_whitespace()
+        .filter(|token| seen.insert((*token).to_string()))
+        .take(32)
         .map(|t| format!("\"{}\"", t.replace('"', "")))
         .collect();
-    tokens.join(" AND ")
+    tokens.join(" OR ")
 }
 
 /// Reciprocal Rank Fusion (docs/05 §3.1). `k` is fixed at 60 — no per-list
@@ -137,29 +141,28 @@ pub fn hybrid_search(
     query: &str,
     query_vec: Option<&[f32]>,
     source_id: Option<&str>,
+    document_ordinal: Option<i64>,
     top_k: usize,
 ) -> crate::error::AppResult<Vec<HybridHit>> {
     // ── A. FTS ──
     let match_expr = fts_match_expr(query);
     let mut fts_ids: Vec<String> = Vec::new();
     if !match_expr.is_empty() {
-        let sql = format!(
-            "SELECT c.id FROM chunks_fts
+        let sql = "SELECT c.id FROM chunks_fts
              JOIN chunks c ON c.rowid = chunks_fts.rowid
-             WHERE chunks_fts MATCH ?1 {}
-             ORDER BY bm25(chunks_fts) LIMIT 50",
-            source_id.map(|_| "AND c.source_id = ?2").unwrap_or("")
-        );
-        let mut stmt = project_db.prepare(&sql)?;
+             JOIN documents d ON d.id = c.document_id
+             WHERE chunks_fts MATCH ?1
+               AND (?2 IS NULL OR c.source_id = ?2)
+               AND (?3 IS NULL OR d.ordinal = ?3)
+             ORDER BY bm25(chunks_fts) LIMIT 50";
+        let mut stmt = project_db.prepare(sql)?;
         let map = |r: &rusqlite::Row| r.get::<_, String>(0);
-        fts_ids = match source_id {
-            Some(sid) => stmt
-                .query_map(rusqlite::params![match_expr, sid], map)?
-                .collect::<Result<_, _>>()?,
-            None => stmt
-                .query_map(rusqlite::params![match_expr], map)?
-                .collect::<Result<_, _>>()?,
-        };
+        fts_ids = stmt
+            .query_map(
+                rusqlite::params![match_expr, source_id, document_ordinal],
+                map,
+            )?
+            .collect::<Result<_, _>>()?;
     }
 
     // ── B. Vector KNN ──
@@ -177,23 +180,18 @@ pub fn hybrid_search(
                 .iter()
                 .flat_map(|x| x.to_le_bytes())
                 .collect();
-            let sql = format!(
-                "SELECT c.id FROM chunk_vectors v
+            let sql = "SELECT c.id FROM chunk_vectors v
                  JOIN chunks c ON c.rowid = v.chunk_rowid
-                 WHERE v.embedding MATCH ?1 AND k = 50 {}
-                 ORDER BY distance",
-                source_id.map(|_| "AND c.source_id = ?2").unwrap_or("")
-            );
-            let mut stmt = project_db.prepare(&sql)?;
+                 JOIN documents d ON d.id = c.document_id
+                 WHERE v.embedding MATCH ?1 AND k = 50
+                   AND (?2 IS NULL OR c.source_id = ?2)
+                   AND (?3 IS NULL OR d.ordinal = ?3)
+                 ORDER BY distance";
+            let mut stmt = project_db.prepare(sql)?;
             let map = |r: &rusqlite::Row| r.get::<_, String>(0);
-            vec_ids = match source_id {
-                Some(sid) => stmt
-                    .query_map(rusqlite::params![bytes, sid], map)?
-                    .collect::<Result<_, _>>()?,
-                None => stmt
-                    .query_map(rusqlite::params![bytes], map)?
-                    .collect::<Result<_, _>>()?,
-            };
+            vec_ids = stmt
+                .query_map(rusqlite::params![bytes, source_id, document_ordinal], map)?
+                .collect::<Result<_, _>>()?;
         }
     }
 
@@ -270,6 +268,18 @@ mod tests {
         let doc = cjk_bigram("量子計算の講義です");
         let q = cjk_bigram("量子");
         assert!(doc.split(' ').any(|t| t == q));
+    }
+
+    #[test]
+    fn natural_question_uses_bounded_or_for_follow_up_recall() {
+        let expr = fts_match_expr("量子計算はなぜ速いのですか");
+        assert!(expr.contains(" OR "));
+        assert!(!expr.contains(" AND "));
+        let long = (0..100)
+            .map(|n| format!("term{n}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert_eq!(fts_match_expr(&long).matches('"').count(), 64);
     }
 
     #[test]

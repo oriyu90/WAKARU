@@ -417,3 +417,35 @@
 - **採用**: ZIPは enclosed path と件数・展開量上限を用い失敗時に作業ディレクトリを除去する。artifactは `workspace/` 配下の実在ファイルまたは `build_site` ディレクトリだけをsandbox解決する。project/source IDをパス成分として検証し、global indexの置換は `(project_id, source_id)` で所有範囲を限定する。AIの非信頼コンテキストはUTF-8境界を守って事前に上限化する。
 - **理由**: DBやアーカイブを信頼済み入力とみなさず、読み込み時にも同じ所有境界を適用するため。
 - **影響**: 既存DBとプロジェクト形式は互換。依存追加なし。
+
+## D-36 · 資料の視認補正は原本と検索表現から分離する
+
+- **日付**: 2026-09-10（v0.3.0）
+- **論点**: 白黒反転・シャープネス・コントラストを資料へ適用しつつ、原本、OCR、RAG、引用位置を壊さず、巨大PDFでメモリを急増させない必要がある。
+- **採用**: PDF/DOCX/PPTXの各preview内だけに非永続の反転・明瞭度stateを持つ。反転とcontrastはCSS filter、PDFのsharpnessだけcanvasの3×3畳み込みで行い、4,000,000 pixelを超える面は畳み込みを省略する。alphaは保持し、原本bytes・抽出text・OCR・locator・citationは一切更新しない。
+- **理由**: 表示調整を派生表現に限定すれば、取り消し可能で検索・再取り込み・exportとの互換性を保てる。DOCX/PPTXをrasterizeしないため文字品質も維持できる。
+- **差し戻し条件**: 永続化が必要になった場合もproject/sourceの内容ではなく、ユーザ別viewer preferenceとして別保存する。
+
+## D-37 · Liveの追加質問は現在の範囲で再検索し、短い会話だけを補助文脈にする
+
+- **日付**: 2026-09-10（v0.3.0）
+- **論点**: 従来の追加質問は質問文だけでRAGし、ページ範囲もthread作成時のlocatorに依存したため、「それは？」のような追質問やページ移動後の質問が適切な抜粋に届かない。
+- **採用**: ask IPCに現在locatorを追加し、page scopeはそのordinal、source scopeはsource ID、project scopeはproject全体に絞ってhybrid searchする。検索queryは直前のuser質問500文字＋現在質問800文字に制限。モデルには最新12 message／合計12,000 UTF-8 bytes以内の完了済み会話を渡すが、事実根拠は今回取得したuntrusted excerptsだけとsystem指示する。FTS語は重複除去した最大32語のORにして追質問のrecallを確保する。
+- **理由**: 会話照応と資料根拠を分離し、古い回答の誤りを根拠として再利用せずに短い追質問を解決できる。
+- **影響**: AskInputへのoptional/default locator追加のみ。既存callerはwholeとして動き、DB migrationなし。
+
+## D-38 · Studioの過去編集は選択時でなく送信時に会話末尾を原子的に分岐する
+
+- **日付**: 2026-09-10（v0.3.0）
+- **論点**: 過去messageを編集する際、誤操作で履歴を即時消去せず、AIに矛盾した旧末尾を渡さず、クラッシュ時に半端な履歴を残さない必要がある。
+- **採用**: user messageの「ここから編集」はcomposerへ内容をコピーするだけとする。送信時にtargetが同一threadのuser roleであることを再検証し、pending/continuation/streaming中は拒否する。1 transaction内でtarget以降のmessagesを削除し、編集後user messageを挿入し、tab scopeとthread timestampを更新してから通常のRAG/agent loopを開始する。workspace filesとartifactsは削除しない。Enter送信、Shift+Enter改行、IME composing中はEnterを横取りしない。
+- **理由**: 選択は完全に取消可能、確定はDBとしてall-or-nothingになり、会話と生成物の寿命も混同しない。
+- **差し戻し条件**: branchを複数保存する要件が出たらthreadを複製する方式へ拡張するが、送信時transaction境界は維持する。
+
+## D-39 · MLXBarは公開OpenAI互換面だけに接続し、RAG所有権をWAKARUに保つ
+
+- **日付**: 2026-09-10（v0.3.0）
+- **論点**: LM Studio相当の簡単な接続とmlx-bar固有のSSE/model metadataへの互換が必要だが、mlx-barの私有管理APIやRAG lifecycleへ結合すると互換性とプロジェクト隔離が崩れる。
+- **採用**: `http://127.0.0.1:11435/v1` のMLXBar presetを追加し、公開 `/v1/models` と `/v1/chat/completions` のみを既存OpenAI adapterで利用する。LAN/任意Bearer token、slashを含むmodel ID、keep-alive comment、`reasoning_content`、tool calls、usage、finish_reason、`[DONE]`を契約テストする。RAGはWAKARUがproject DBから構成し、mlx-bar独自のrag管理endpointへ依存しない。
+- **理由**: モデルサーバを交換可能にし、資料・embedding・引用の所有境界を一箇所に維持するため。
+- **影響**: DB/保存済みAI profile/OpenAI・Anthropic wireに破壊変更なし。依存追加なし。

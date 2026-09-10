@@ -24,7 +24,7 @@ export const illustratorApi = {
       input: { ...input, force: input.force ?? false },
       uiLang: lang(),
     }),
-  ask: (input: { projectId: string; threadId: string; text: string; scope: Scope }) =>
+  ask: (input: { projectId: string; threadId: string; text: string; scope: Scope; locator?: unknown }) =>
     call<string>("illustrator_ask", { input, uiLang: lang() }),
   cancel: (streamId: string) => call<void>("illustrator_cancel", { streamId }),
   importToStudio: (input: ImportToStudioInput) =>

@@ -1,7 +1,7 @@
 {
   "name": "wakaru",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.3.0",
   "type": "module",
   "license": "MIT",
   "author": "Yuki Orita",

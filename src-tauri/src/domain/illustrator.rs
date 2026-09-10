@@ -99,6 +99,11 @@ pub struct AskInput {
     pub thread_id: String,
     pub text: String,
     pub scope: Scope,
+    /// Current viewer position. Kept separate from the source-scoped thread so
+    /// page navigation never forks the Live conversation.
+    #[serde(default)]
+    #[ts(type = "unknown")]
+    pub locator: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Deserialize, ts_rs::TS)]

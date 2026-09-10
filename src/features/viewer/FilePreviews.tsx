@@ -12,6 +12,69 @@ import type { DocumentPayload, SourceDetail } from "../../ipc/types.gen";
 import styles from "./previews.module.css";
 
 const MAX_INTERACTIVE_BYTES = 200 * 1024 * 1024;
+const MAX_SHARPEN_PIXELS = 4_000_000;
+
+export function documentContrast(clarity: number) {
+  return 1 + Math.min(Math.max(clarity, 0), 100) * 0.006;
+}
+
+/** Bounded unsharp-style convolution for raster PDF pages. */
+export function sharpenRgba(data: Uint8ClampedArray, width: number, height: number, amount: number) {
+  const strength = Math.min(Math.max(amount, 0), 100) * 0.005;
+  if (!strength || width < 3 || height < 3 || width * height > MAX_SHARPEN_PIXELS) return false;
+  const source = data.slice();
+  for (let y = 1; y < height - 1; y += 1) {
+    for (let x = 1; x < width - 1; x += 1) {
+      const i = (y * width + x) * 4;
+      for (let channel = 0; channel < 3; channel += 1) {
+        const value = source[i + channel]! * (1 + 4 * strength)
+          - strength * (source[i - 4 + channel]! + source[i + 4 + channel]!
+            + source[i - width * 4 + channel]! + source[i + width * 4 + channel]!);
+        data[i + channel] = Math.min(255, Math.max(0, Math.round(value)));
+      }
+    }
+  }
+  return true;
+}
+
+function DocumentAdjustments({
+  inverted,
+  clarity,
+  onInverted,
+  onClarity,
+}: {
+  inverted: boolean;
+  clarity: number;
+  onInverted: (value: boolean) => void;
+  onClarity: (value: number) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.documentAdjustments}>
+      <Button
+        size="sm"
+        variant={inverted ? "secondary" : "quiet"}
+        aria-pressed={inverted}
+        onClick={() => onInverted(!inverted)}
+      >
+        {t("viewer.invertDocument")}
+      </Button>
+      <label className={styles.clarityControl}>
+        <span>{t("viewer.clarity")}</span>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="5"
+          value={clarity}
+          aria-label={t("viewer.clarity")}
+          onChange={(event) => onClarity(Number(event.target.value))}
+        />
+        <output className={`${styles.pageLabel} u-mono-nums`}>{clarity}</output>
+      </label>
+    </div>
+  );
+}
 
 function useAssetBuffer(detail: SourceDetail) {
   return useQuery({
@@ -181,6 +244,8 @@ export function PdfFilePreview({
   const [pdf, setPdf] = useState<Awaited<ReturnType<typeof import("pdfjs-dist")["getDocument"]>["promise"]> | null>(null);
   const [page, setPage] = useState(Math.max(1, initialPage));
   const [zoom, setZoom] = useState(1);
+  const [inverted, setInverted] = useState(false);
+  const [clarity, setClarity] = useState(0);
   const [error, setError] = useState<unknown>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   usePageKeys((d) =>
@@ -251,6 +316,12 @@ export function PdfFilePreview({
       const task = pdfPage.render({ canvas, canvasContext: context, viewport });
       renderTask.current = task;
       await task.promise;
+      if (clarity > 0 && canvas.width * canvas.height <= MAX_SHARPEN_PIXELS) {
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+        if (sharpenRgba(pixels.data, canvas.width, canvas.height, clarity)) {
+          context.putImageData(pixels, 0, 0);
+        }
+      }
       onPageRef.current(page, pdf.numPages);
     })().catch((reason) => {
       if (!cancelled && !(reason instanceof Error && reason.name === "RenderingCancelledException")) setError(reason);
@@ -259,7 +330,7 @@ export function PdfFilePreview({
       cancelled = true;
       renderTask.current?.cancel();
     };
-  }, [page, pdf, zoom, availWidth]);
+  }, [page, pdf, zoom, availWidth, clarity]);
 
   const qc = useQueryClient();
   const toast = useToast();
@@ -320,6 +391,12 @@ export function PdfFilePreview({
     <div className={styles.filePreview}>
       <div className={styles.fileToolbar}>
         <PageControls page={page} total={pdf?.numPages ?? detail.pageCount ?? 1} onPage={setPage} />
+        <DocumentAdjustments
+          inverted={inverted}
+          clarity={clarity}
+          onInverted={setInverted}
+          onClarity={setClarity}
+        />
         <span className={styles.toolbarSpacer} />
         {ocr ? (
           <span className={styles.pageLabel}>{t("viewer.ocrProgress", { done: ocr.done, total: ocr.total })}</span>
@@ -334,7 +411,12 @@ export function PdfFilePreview({
       </div>
       <div ref={viewportRef} className={styles.canvasViewport} aria-label={t("viewer.pdfPreview")}>
         {!pdf && !error ? <div className={styles.centered}>{t("states.analyzing")}…</div> : null}
-        <canvas ref={canvasRef} className={styles.pdfCanvas} />
+        <canvas
+          ref={canvasRef}
+          className={styles.pdfCanvas}
+          data-inverted={inverted}
+          style={{ filter: `${inverted ? "invert(1) " : ""}contrast(${documentContrast(clarity)})` }}
+        />
         {pdf && pdf.numPages > 1 ? (
           <EdgeNav page={page} total={pdf.numPages} onPage={setPage} />
         ) : null}
@@ -348,6 +430,8 @@ export function DocxFilePreview({ detail, fallback }: { detail: SourceDetail; fa
   const asset = useAssetBuffer(detail);
   const host = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<unknown>(null);
+  const [inverted, setInverted] = useState(false);
+  const [clarity, setClarity] = useState(0);
 
   useEffect(() => {
     if (!asset.data || !host.current) return;
@@ -377,7 +461,16 @@ export function DocxFilePreview({ detail, fallback }: { detail: SourceDetail; fa
   if (asset.isError || error) return <div className={styles.previewFallback}><ErrorState error={asset.error ?? error} onRetry={() => { setError(null); void asset.refetch(); }} />{fallback}</div>;
   return (
     <div className={styles.filePreview}>
-      <div className={styles.officeViewport} aria-label={t("viewer.docxPreview")} ref={host} />
+      <div className={styles.fileToolbar}>
+        <DocumentAdjustments inverted={inverted} clarity={clarity} onInverted={setInverted} onClarity={setClarity} />
+      </div>
+      <div
+        className={styles.officeViewport}
+        aria-label={t("viewer.docxPreview")}
+        ref={host}
+        data-inverted={inverted}
+        style={{ "--document-contrast": documentContrast(clarity) } as React.CSSProperties}
+      />
       <ScrollNav targetRef={host} />
     </div>
   );
@@ -401,6 +494,8 @@ export function PptxFilePreview({
   const [page, setPage] = useState(Math.max(1, initialPage));
   const [total, setTotal] = useState(detail.pageCount ?? 1);
   const [error, setError] = useState<unknown>(null);
+  const [inverted, setInverted] = useState(false);
+  const [clarity, setClarity] = useState(0);
   const onPageRef = useRef(onPage);
   onPageRef.current = onPage;
   usePageKeys((d) => setPage((p) => Math.min(Math.max(p + d, 1), total)));
@@ -441,9 +536,18 @@ export function PptxFilePreview({
   if (asset.isError || error) return <div className={styles.previewFallback}><ErrorState error={asset.error ?? error} onRetry={() => { setError(null); void asset.refetch(); }} />{fallback}</div>;
   return (
     <div className={styles.filePreview}>
-      <div className={styles.fileToolbar}><PageControls page={page} total={total} onPage={setPage} /></div>
+      <div className={styles.fileToolbar}>
+        <PageControls page={page} total={total} onPage={setPage} />
+        <DocumentAdjustments inverted={inverted} clarity={clarity} onInverted={setInverted} onClarity={setClarity} />
+        <span className={styles.toolbarSpacer} />
+      </div>
       <div className={styles.slideViewport} aria-label={t("viewer.pptxPreview")}>
-        <div ref={host} className={styles.slideHost} />
+        <div
+          ref={host}
+          className={styles.slideHost}
+          data-inverted={inverted}
+          style={{ filter: `${inverted ? "invert(1) " : ""}contrast(${documentContrast(clarity)})` }}
+        />
         {total > 1 ? <EdgeNav page={page} total={total} onPage={setPage} /> : null}
       </div>
     </div>

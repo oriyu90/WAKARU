@@ -71,9 +71,62 @@ fn ac_3_fts_only_hybrid_search_still_returns_hits_without_vectors() {
 
     let pdb = projects::open_db(&root, &pid).unwrap();
     // No chunk_vectors table exists -> query_vec None -> FTS path only.
-    let hits = retrieval::hybrid_search(&pdb, "量子", None, None, 10).unwrap();
+    let hits = retrieval::hybrid_search(&pdb, "量子", None, None, None, 10).unwrap();
     assert!(!hits.is_empty());
     assert!(hits[0].snippet.contains("量子"));
+}
+
+#[test]
+fn live_page_scope_filters_retrieval_to_the_current_ordinal() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().join("projects");
+    std::fs::create_dir_all(&root).unwrap();
+    let app_db = storage::open_app_db(&tmp.path().join("app.db")).unwrap();
+    let pid = projects::create(
+        &app_db,
+        &root,
+        CreateProjectInput {
+            name: "p".into(),
+            description: None,
+            color: None,
+        },
+    )
+    .unwrap()
+    .id;
+    let pdb = projects::open_db(&root, &pid).unwrap();
+    pdb.execute(
+        "INSERT INTO sources (id,kind,original_name,rel_path,status,added_at)
+         VALUES ('s','pdf','pages.pdf','sources/s/pages.pdf','ready','now')",
+        [],
+    )
+    .unwrap();
+    for page in 1..=2 {
+        let doc = format!("d{page}");
+        let chunk = format!("c{page}");
+        let text = format!("shared topic on page {page}");
+        pdb.execute(
+            "INSERT INTO documents (id,source_id,ordinal,kind,text,locator)
+             VALUES (?1,'s',?2,'page',?3,?4)",
+            rusqlite::params![
+                doc,
+                page,
+                text,
+                format!("{{\"t\":\"page\",\"page\":{page}}}")
+            ],
+        )
+        .unwrap();
+        pdb.execute(
+            "INSERT INTO chunks (id,source_id,document_id,ordinal,text,text_bigram,locator,created_at)
+             VALUES (?1,'s',?2,0,?3,?4,?5,'now')",
+            rusqlite::params![chunk, doc, text, retrieval::cjk_bigram("shared topic"), format!("{{\"t\":\"page\",\"page\":{page}}}")],
+        )
+        .unwrap();
+    }
+
+    let hits =
+        retrieval::hybrid_search(&pdb, "shared topic", None, Some("s"), Some(2), 10).unwrap();
+    assert!(!hits.is_empty());
+    assert!(hits.iter().all(|hit| hit.ordinal == 2));
 }
 
 #[tokio::test]

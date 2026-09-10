@@ -357,6 +357,7 @@ export function Viewer({
             <IllustratorDrawer
               projectId={projectId}
               sourceId={ctx?.sourceId ?? activeTab?.sourceId ?? null}
+              locator={ctx?.locator ?? activeTab?.locator ?? { t: "whole" }}
               visionSupported={visionSupported}
               autoRun={!justEnabled}
               onStarted={() => setJustEnabled(false)}

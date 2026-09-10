@@ -1,51 +1,54 @@
-# WAKARU v0.2.2
+# WAKARU v0.3.0
 
-WAKARU v0.2.2 makes Studio artifacts and presentation files dependable in
-Viewer, makes the Live Illustrator → Studio boundary explicit, and hardens
-AI-context and project-file handling. There is no database or project-format
+WAKARU v0.3.0 improves document readability, makes Live Illustrator follow-up
+questions reliably grounded, adds editable Studio conversation branches, and
+ships first-class MLXBar compatibility. There is no database or project-format
 migration.
 
 This build is for macOS Apple Silicon. It is ad-hoc signed and **not notarized**;
 on first launch, right-click WAKARU and choose **Open**.
 
-## Viewer and Studio
+## Document viewer
 
-- Studio-generated Markdown, PDF and other document artifacts now import as
-  project sources and open directly in Viewer. Generated website folders from
-  v0.2.1 remain supported.
-- Viewer refreshes a queued source's detail, document and asset caches when
-  ingestion completes, so the final preview appears without reopening it.
-- PPTX previews now render even when the parser's slide count already matches
-  the source metadata. Binary preview queries also serialize file sizes safely.
+- PDF, DOCX and PPTX previews now have a compact black/white invert button and a
+  sharpness/contrast control. Adjustments affect only the current view; imported
+  originals, OCR data, search text and citations are never changed.
+- PDF sharpening uses a bounded 3×3 raster pass and skips oversized canvases,
+  keeping memory and interaction latency predictable. DOCX/PPTX remain vector
+  content and receive contrast/inversion without rasterization.
 
 ## Live Illustrator
 
-- A whole-source Live Illustrator session remains the same session when you
-  move between pages of that source. Its automatic explanation is generated
-  once from bounded whole-source context.
-- Live sessions are not added to Studio automatically. The explicit **Hand off
-  to Studio** action is awaited, reports success or failure, and transfers the
-  saved explanation plus the conversation atomically.
+- Follow-up questions retrieve source excerpts using the current scope and page
+  locator. The previous user question is included in a bounded retrieval query so
+  pronouns and short follow-ups retain their subject.
+- A bounded recent conversation is sent with the request, while factual grounding
+  remains restricted to the newly retrieved excerpts. Source-level sessions still
+  remain one session across page changes and enter Studio only after explicit handoff.
 
-## Context and project safety
+## Studio
 
-- Untrusted source and mention context is UTF-8-safely bounded before an AI
-  request is assembled.
-- Project ZIP import rejects traversal paths, caps entry count and expanded
-  size, and cleans up incomplete imports on failure.
-- Artifact paths and project/source identifiers are revalidated at filesystem
-  boundaries. Re-ingestion updates the global search index by project and
-  source, avoiding collisions between projects.
+- Enter sends a message; Shift+Enter inserts a newline; IME composition is not
+  intercepted.
+- Every previous user message offers **Edit from here**, plus a shortcut for the
+  latest user turn. Choosing edit is non-destructive; submitting atomically replaces
+  that user turn and the later chat tail. Existing workspace files and artifacts are
+  retained.
+
+## MLXBar
+
+- Settings includes an MLXBar preset for `http://127.0.0.1:11435/v1`. Local/LAN
+  endpoints and optional Bearer authentication use the normal OpenAI-compatible API.
+- Contract tests cover MLXBar model descriptors, slash-containing model IDs, SSE
+  keep-alives, reasoning deltas, usage, finish reasons and `[DONE]`. WAKARU keeps
+  ownership of project RAG and does not depend on MLXBar private management APIs.
 
 ## Compatibility and limits
 
-- Existing v0.0.0–v0.2.1 projects and settings open unchanged. There is no
-  database migration in this release.
-- No dependency was added or removed. The v0.2.1 website-source, document
-  navigation, Studio `build_site`, OCR, search, local/LAN model, and MCP
-  workflows remain available.
-- macOS 12 or later on Apple Silicon. Windows and Linux are not built or
-  verified in this release.
+- Existing v0.0.0–v0.2.2 projects, settings, artifacts and Studio sessions open
+  unchanged. No dependency, database schema or project archive format changed.
+- Japanese, English and Simplified Chinese UI strings remain complete and in parity.
+- macOS 12 or later on Apple Silicon. Windows and Linux are not built or verified.
 - Ad-hoc signed, not Apple-notarized.
 
 See `QUALITY_REPORT.md` for the verification record and artifact checksum.

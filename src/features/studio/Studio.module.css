@@ -106,6 +106,33 @@
   color: var(--color-neutral);
   font-weight: var(--weight-medium);
 }
+.messageHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+.editTurn {
+  border: 0;
+  background: transparent;
+  color: var(--color-neutral);
+  font: inherit;
+  font-size: var(--fs-2xs);
+  cursor: pointer;
+  padding: var(--space-3xs) var(--space-2xs);
+  border-radius: var(--radius-sm);
+}
+.editTurn:hover:not(:disabled) {
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+}
+.editTurn:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: 2px;
+}
+.editTurn:disabled {
+  opacity: 0.45;
+}
 .message[data-role="user"] .role {
   color: var(--color-muted);
 }
@@ -281,6 +308,7 @@
 }
 .composerRow {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-xs);
   align-items: flex-end;
   padding: var(--space-xs);
@@ -289,7 +317,19 @@
   background: var(--color-paper-3);
   box-shadow: var(--shadow-whisper);
 }
-.composerRow > :first-child {
+.editingBanner {
+  inline-size: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  min-height: 2rem;
+  padding-inline: var(--space-2xs);
+  border-block-end: var(--rule-1) solid var(--color-rule);
+  color: var(--color-neutral);
+  font-size: var(--fs-xs);
+}
+.composerRow > textarea {
   flex: 1;
   min-width: 0;
   min-height: 3rem;
@@ -317,6 +357,13 @@
 .hint {
   font-size: var(--fs-2xs);
   color: var(--color-neutral);
+}
+.composerActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-xs);
+  min-width: 0;
 }
 
 /* ── workspace ─────────────────────────────────────────────────── */
@@ -417,6 +464,9 @@
   .scopeSel {
     max-width: none;
     width: 100%;
+  }
+  .composerActions {
+    justify-content: space-between;
   }
 }
 

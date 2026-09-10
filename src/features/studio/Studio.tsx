@@ -26,6 +26,10 @@ type StudioToolCall = { id: string; name: string; arguments: unknown };
 type StudioDelta = { tabId: string; kind: string; text: string };
 type StudioToolEvent = { tabId: string; name: string; state: "running" | "complete" };
 
+export function shouldSubmitStudioKey(key: string, shiftKey: boolean, isComposing: boolean) {
+  return key === "Enter" && !shiftKey && !isComposing;
+}
+
 export function Studio({
   projectId,
   projectName,
@@ -50,6 +54,7 @@ export function Studio({
   const [title, setTitle] = useState("");
   const [provisional, setProvisional] = useState("");
   const [runningTool, setRunningTool] = useState("");
+  const [editingTurn, setEditingTurn] = useState<{ id: string; content: string } | null>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
 
@@ -93,6 +98,11 @@ export function Studio({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id, active?.scope]);
 
+  useEffect(() => {
+    setEditingTurn(null);
+    setText("");
+  }, [activeTabId]);
+
   const messages = useMemo(
     () => conversation.data?.messages ?? [],
     [conversation.data],
@@ -125,7 +135,8 @@ export function Studio({
     },
   });
   const send = useMutation({
-    mutationFn: (payload: string) => studioApi.send(projectId, activeTabId, payload, scope),
+    mutationFn: ({ payload, replaceFrom }: { payload: string; replaceFrom?: string }) =>
+      studioApi.send(projectId, activeTabId, payload, scope, replaceFrom),
     onMutate: () => {
       // The turn is persisted before the model call, so clearing the composer
       // now can't lose it — and it stops the sent text lingering in the box
@@ -133,6 +144,7 @@ export function Studio({
       setText("");
       setProvisional("");
       setRunningTool("");
+      setEditingTurn(null);
     },
     onSuccess: async () => {
       setProvisional("");
@@ -215,7 +227,16 @@ export function Studio({
 
   function submit() {
     if (!text.trim() || !active || locked || send.isPending) return;
-    send.mutate(text.trim());
+    send.mutate({ payload: text.trim(), replaceFrom: editingTurn?.id });
+  }
+
+  function editFrom(message: ChatMessage) {
+    setEditingTurn({ id: message.id, content: message.content });
+    setText(message.content);
+    requestAnimationFrame(() => {
+      composerRef.current?.focus();
+      composerRef.current?.setSelectionRange(message.content.length, message.content.length);
+    });
   }
 
   function mention(tab: StudioTab) {
@@ -334,7 +355,8 @@ export function Studio({
               onCitation={onCitation}
               onAllow={() => resolveTool.mutate(true)}
               onDeny={() => resolveTool.mutate(false)}
-              onContinue={() => send.mutate("")}
+              onContinue={() => send.mutate({ payload: "" })}
+              onEdit={() => editFrom(m)}
               busy={resolveTool.isPending || send.isPending}
             />
           ))}
@@ -376,6 +398,21 @@ export function Studio({
           ) : null}
 
           <div className={styles.composerRow}>
+            {editingTurn ? (
+              <div className={styles.editingBanner} role="status">
+                <span>{t("studio.editingFromHere")}</span>
+                <Button
+                  size="sm"
+                  variant="quiet"
+                  onClick={() => {
+                    setEditingTurn(null);
+                    setText("");
+                  }}
+                >
+                  {t("common.cancel")}
+                </Button>
+              </div>
+            ) : null}
             <Textarea
               ref={composerRef}
               rows={2}
@@ -385,7 +422,7 @@ export function Studio({
               disabled={locked}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                if (shouldSubmitStudioKey(e.key, e.shiftKey, e.nativeEvent.isComposing)) {
                   e.preventDefault();
                   submit();
                 }
@@ -422,7 +459,22 @@ export function Studio({
                   </option>
                 ))}
             </select>
-            <span className={styles.hint}>{t("studio.sendHint")}</span>
+            <div className={styles.composerActions}>
+              {!editingTurn && messages.some((message) => message.role === "user") ? (
+                <Button
+                  size="sm"
+                  variant="quiet"
+                  disabled={locked || streaming}
+                  onClick={() => {
+                    const previous = [...messages].reverse().find((message) => message.role === "user");
+                    if (previous) editFrom(previous);
+                  }}
+                >
+                  {t("studio.editPrevious")}
+                </Button>
+              ) : null}
+              <span className={styles.hint}>{t("studio.sendHint")}</span>
+            </div>
           </div>
         </form>
       </main>
@@ -476,6 +528,7 @@ function MessageRow({
   onAllow,
   onDeny,
   onContinue,
+  onEdit,
   busy,
 }: {
   message: ChatMessage;
@@ -483,6 +536,7 @@ function MessageRow({
   onAllow: () => void;
   onDeny: () => void;
   onContinue: () => void;
+  onEdit: () => void;
   busy: boolean;
 }) {
   const { t } = useTranslation();
@@ -511,7 +565,14 @@ function MessageRow({
 
   return (
     <article className={styles.message} data-role={message.role}>
-      <span className={styles.role}>{role}</span>
+      <div className={styles.messageHead}>
+        <span className={styles.role}>{role}</span>
+        {message.role === "user" && message.status === "complete" ? (
+          <button type="button" className={styles.editTurn} disabled={busy} onClick={onEdit}>
+            {t("studio.editFromHere")}
+          </button>
+        ) : null}
+      </div>
       {message.content ? <Markdown>{message.content}</Markdown> : null}
 
       {message.status === "pending_approval" && calls.length ? (

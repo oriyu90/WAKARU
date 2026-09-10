@@ -1145,6 +1145,69 @@ mod tests {
         assert!(calls.is_empty());
     }
 
+    #[tokio::test]
+    async fn mlxbar_stream_contract_handles_keepalive_reasoning_usage_and_done() {
+        let events = concat!(
+            ": mlxbar keep-alive\n\n",
+            "data: {\"id\":\"chatcmpl-test\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"reasoning_content\":\"checking\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"id\":\"chatcmpl-test\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Grounded answer\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"id\":\"chatcmpl-test\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
+            "data: {\"id\":\"chatcmpl-test\",\"choices\":[],\"usage\":{\"prompt_tokens\":23,\"completion_tokens\":4,\"total_tokens\":27}}\n\n",
+            "data: [DONE]\n\n"
+        );
+        let (base, request_rx) = serve_once(events);
+        let client = AiClient::new(
+            ApiProtocol::Openai,
+            &base,
+            Some("mlxbar-token".into()),
+            Vec::new(),
+            5_000,
+        )
+        .unwrap();
+        let mut answer = String::new();
+        let mut reasoning = String::new();
+        let (usage, truncated, calls) = client
+            .chat_stream(
+                "Qwen3.5-9B-MLX",
+                json!([{ "role": "user", "content": "question" }]),
+                &json!({ "max_tokens": 128 }),
+                &CancellationToken::new(),
+                |kind, delta| match kind {
+                    "reasoning" => reasoning.push_str(delta),
+                    _ => answer.push_str(delta),
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(answer, "Grounded answer");
+        assert_eq!(reasoning, "checking");
+        assert_eq!(usage.unwrap().prompt_tokens, 23);
+        assert!(!truncated);
+        assert!(calls.is_empty());
+        let request = request_rx.recv().unwrap();
+        assert!(request.starts_with("POST /v1/chat/completions HTTP/1.1"));
+        assert!(request
+            .to_ascii_lowercase()
+            .contains("authorization: bearer mlxbar-token"));
+        assert!(request.contains("\"stream_options\":{\"include_usage\":true}"));
+    }
+
+    #[tokio::test]
+    async fn mlxbar_model_descriptors_are_accepted_without_guessing_from_metadata() {
+        let body = r#"{"object":"list","data":[{"id":"Qwen3.5-9B-MLX","object":"model","owned_by":"mlxbar","loaded":true,"max_tokens":8192,"context_window":32768,"modalities":["text"]},{"id":"VLM/model","object":"model","owned_by":"mlxbar","loaded":false,"modalities":["text","image"]}]}"#;
+        let (base, request_rx) = serve_once(body);
+        let client = AiClient::new(ApiProtocol::Openai, &base, None, Vec::new(), 5_000).unwrap();
+        assert_eq!(
+            client.list_models().await.unwrap(),
+            vec!["Qwen3.5-9B-MLX", "VLM/model"]
+        );
+        assert!(request_rx
+            .recv()
+            .unwrap()
+            .starts_with("GET /v1/models HTTP/1.1"));
+    }
+
     // A real mid-stream drop (no finish_reason, no [DONE]) is still truncation.
     #[tokio::test]
     async fn openai_stream_dropped_without_finish_reason_is_truncated() {

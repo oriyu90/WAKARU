@@ -2,6 +2,64 @@
 
 Cumulative; newest release first.
 
+## v0.3.0 release verification — 2026-09-10
+
+Scope: non-destructive document viewing adjustments, conversation-aware and
+scope-correct Live RAG, Studio keyboard/edit branching, and public-API MLXBar
+compatibility. No database, project-format or dependency migration.
+
+### What changed
+
+- PDF/DOCX/PPTX previews expose localized invert and clarity controls. PDF
+  sharpening is a bounded 3×3 pass with alpha preservation and a four-million
+  pixel ceiling; originals, OCR, search text and citations remain unchanged.
+- Live ask carries the current locator, filters page/source/project retrieval,
+  expands short follow-ups with one bounded prior question, and sends a bounded
+  completed dialogue while grounding facts only in fresh excerpts.
+- Studio's Enter/Shift+Enter/IME keyboard contract is explicit. Editing is
+  deferred until submit, then one transaction validates the target and replaces
+  its message tail; pending runs are protected and artifacts are retained.
+- MLXBar has a default localhost preset and localized LAN/auth guidance. Mock
+  HTTP contract coverage verifies model metadata and IDs, Bearer auth, SSE
+  comments, reasoning deltas, content, usage, finish reason and DONE.
+
+### Automated gates
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck / lint / design / hardcoded strings | pass |
+| Frontend unit tests | 23 passed |
+| Contrast / i18n parity / production web build | pass; 395 keys × 3 languages; existing large-chunk advisory only |
+| ts-rs binding export | 81 passed; drift 0 |
+| Rust fmt / clippy / library tests | pass; 193 passed, 1 network/npx test intentionally ignored |
+| Rust phase integration tests | 43 passed |
+| Live endpoint acceptance test | not run; no endpoint or credentials supplied for this release |
+| `cargo deny check` — advisories, bans, licenses, sources | pass |
+| npm audit | 0 vulnerabilities |
+
+### Design and failure review
+
+- The new compact toolbar controls use the established tokens, native range
+  semantics and pressed state. The packaged app was visually checked in dark
+  mode: controls fit with the Live drawer open, inversion changes the canvas,
+  and the slider value updates. Studio edit selection/cancel was exercised
+  without changing history, and the MLXBar preset populated its exact URL and
+  help text. i18n parity covers Japanese, English and Simplified Chinese.
+- Regression coverage includes sharpen bounds/alpha, page-scoped retrieval,
+  bounded follow-up expansion/history, transactional rewind, pending-run guard,
+  Enter/Shift+Enter/IME behavior and the MLXBar wire contract.
+
+### Bundle
+
+| Item | Value |
+|---|---|
+| App | arm64 `WAKARU.app`, version `0.3.0`; ad-hoc signed; `codesign --verify --deep --strict` passes for the build output and the app inside the mounted DMG |
+| `Info.plist` | `CFBundleShortVersionString` 0.3.0; `LSMinimumSystemVersion` 12.0; `NSLocalNetworkUsageDescription` present |
+| DMG | `WAKARU_0.3.0_aarch64.dmg`, 23,163,604 bytes; `hdiutil verify` VALID |
+| SHA-256 | `61f99d360ad821eb839d98f2c17599e3ab33d7078312001c922e64fa36bf19de` (basename in `WAKARU_0.3.0_aarch64.dmg.sha256`) |
+| Startup probe | mounted-DMG app reached `WAKARU backend ready version="0.3.0"`; startup log free of secret patterns |
+| Platform | macOS 12+, Apple Silicon; Windows/Linux not built or verified |
+
 ## v0.2.2 release verification — 2026-09-10
 
 Scope: reliable Studio artifact and PPTX viewing, explicit Live-to-Studio

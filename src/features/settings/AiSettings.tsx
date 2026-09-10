@@ -260,6 +260,7 @@ function ProfileDialog({
                 if (p) {
                   setProtocol(p.protocol);
                   if (p.baseUrl) setBaseUrl(p.baseUrl);
+                  if (!name.trim() && !p.label.startsWith("Custom")) setName(p.label);
                 }
               }}
             >
@@ -285,6 +286,7 @@ function ProfileDialog({
             <Input id={id} value={baseUrl} placeholder="http://localhost:1234/v1" onChange={(e) => setBaseUrl(e.target.value)} />
           )}
         </Field>
+        {baseUrl.includes(":11435") ? <p className={styles.providerHint}>{t("ai.mlxBarHint")}</p> : null}
         <Field label={t("ai.apiKey")} hint={profile?.hasKey ? t("ai.keyStored") : t("ai.optional")}>
           {({ id }) => (
             <Input id={id} type="password" value={apiKey} placeholder={profile?.hasKey ? "••••••••" : ""} onChange={(e) => setApiKey(e.target.value)} />

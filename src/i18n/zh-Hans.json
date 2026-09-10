@@ -214,10 +214,14 @@
       "pdfUnavailable": "此版本暂不支持 PDF 输出，已改为保存 Markdown 版本。"
     },
     "WEBSITE_INVALID": "无法将该文件夹作为网站导入。",
-    "STUDIO_SITE_INVALID": "无法生成站点（请检查文件集）。"
+    "STUDIO_SITE_INVALID": "无法生成站点（请检查文件集）。",
+    "STUDIO_REWIND_LOCKED": "请先完成或停止当前回复，再编辑历史记录。",
+    "STUDIO_MESSAGE_NOT_FOUND": "找不到要编辑的消息。"
   },
   "viewer": {
     "readonly": "只读",
+    "invertDocument": "黑白反转",
+    "clarity": "锐度 / 对比度",
     "find": "查找…",
     "wrap": "自动换行",
     "nowrap": "取消换行",
@@ -261,7 +265,8 @@
     "addTitle": "添加 AI 连接",
     "editTitle": "编辑 AI 连接",
     "noneTitle": "没有 AI 连接",
-    "noneBody": "添加 OpenAI 或 Anthropic 兼容端点，包括云 API、LM Studio 和 Ollama。",
+    "noneBody": "添加 OpenAI 或 Anthropic 兼容端点，包括云 API、LM Studio、MLXBar 和 Ollama。",
+    "mlxBarHint": "这是 MLXBar 的默认地址。若已启用局域网访问和认证，请输入 MLXBar 显示的连接地址与 API 令牌。WAKARU 自身的资料检索仍可使用。",
     "roles": "角色分配",
     "roleNone": "（无）",
     "model": "模型",
@@ -338,7 +343,10 @@
     "message": "消息",
     "messagePlaceholder": "询问关于本项目的问题…",
     "send": "发送",
-    "sendHint": "Cmd/Ctrl + Enter 发送",
+    "sendHint": "Enter 发送 · Shift+Enter 换行",
+    "editFromHere": "从这里编辑",
+    "editPrevious": "编辑上一条消息",
+    "editingFromHere": "将从此消息处分支对话；发送之前不会更改历史记录。",
     "messageRequired": "请先输入消息",
     "stop": "停止",
     "thinking": "处理中…",

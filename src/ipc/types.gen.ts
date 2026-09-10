@@ -32,7 +32,12 @@ export type AppInfo = { version: string, buildDate: string, dataDir: string, lic
  */
 export type Artifact = { id: string, threadId: string | null, relPath: string, bytes: number, mime: string | null, importedSourceId: string | null, createdAt: string, };
 
-export type AskInput = { projectId: string, threadId: string, text: string, scope: Scope, };
+export type AskInput = { projectId: string, threadId: string, text: string, scope: Scope,
+/**
+ * Current viewer position. Kept separate from the source-scoped thread so
+ * page navigation never forks the Live conversation.
+ */
+locator: unknown, };
 
 export type ChatMessage = { id: string, role: string, content: string, citations: Citation[], model: string | null, status: string, createdAt: string, 
 /**
@@ -325,7 +330,12 @@ export type StudioSendInput = { projectId: string, tabId: string, text: string,
 /**
  * `"project"` or `"source:<id>"`.
  */
-scope: string, };
+scope: string,
+/**
+ * When set, replace this user turn and discard later turns atomically
+ * before generating the new branch.
+ */
+replaceFromMessageId: string | null, };
 
 /**
  * Returned by `studio_send` / `studio_resolve_tool`. The frontend refetches

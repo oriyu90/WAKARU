@@ -23,13 +23,14 @@ so on first launch right-click WAKARU → **Open**.
 
 - **Bring your own model** — per-connection OpenAI-compatible (`/chat/completions`,
   Bearer) or Anthropic-compatible (`/messages`, `x-api-key`) wire format. Cloud APIs,
-  LM Studio, Ollama, a local MLX server, or a model host on your LAN. Reasoning
+  LM Studio, Ollama, MLXBar (built-in preset), or another model host on your LAN. Reasoning
   models are handled either way — a `reasoning_content` field or an inline
   `<think>…</think>` block is kept out of the answer.
 - **Real rendering** — PDF via bundled PDF.js, DOCX/PPTX structure, bounded sheet
   tables, Markdown, images, audio/video with transcripts. Studio-generated Markdown,
   PDF and other artifacts can be imported straight into Viewer, and queued imports
-  refresh into their final preview without reopening the project.
+  refresh into their final preview without reopening the project. PDF, DOCX and PPTX
+  views include non-destructive invert, contrast and bounded PDF sharpening controls.
 - **OCR** — scanned PDFs and images with text are recognised (pure-Rust `ocrs`,
   models fetched once) and folded into search; a scanned PDF also gets a
   `searchable.pdf` with an invisible, position-matched text layer.
@@ -38,10 +39,12 @@ so on first launch right-click WAKARU → **Open**.
 - **Hybrid search** — FTS + optional vector search, with a locally cached
   multilingual embedding model as an offline fallback.
 - **Live Illustrator** — plain-language, understanding-oriented explanations with
-  citations. Source-level sessions stay intact while pages change, and enter Studio
-  only after the explicit **Hand off to Studio** action.
+  citations. Follow-up questions use bounded conversation-aware RAG in the selected
+  page/source/project scope. Source-level sessions stay intact while pages change,
+  and enter Studio only after the explicit **Hand off to Studio** action.
 - **Studio** — an agentic loop over your sources and a sandboxed workspace, with tool
-  approval, iteration limits and artifact export.
+  approval, iteration limits and artifact export. Enter sends, Shift+Enter inserts a
+  newline, and any earlier user turn can be edited to create a new conversation tail.
 - **MCP** — local stdio servers (a bare `npx` / `uvx` / `node` command is found
   in the usual install locations; a SearXNG web-search preset is built in) and
   policy-checked Streamable HTTP servers.

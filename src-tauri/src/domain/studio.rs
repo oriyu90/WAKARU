@@ -68,4 +68,8 @@ pub struct StudioSendInput {
     pub text: String,
     /// `"project"` or `"source:<id>"`.
     pub scope: String,
+    /// When set, replace this user turn and discard later turns atomically
+    /// before generating the new branch.
+    #[serde(default)]
+    pub replace_from_message_id: Option<String>,
 }

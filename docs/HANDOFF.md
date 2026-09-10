@@ -2,6 +2,19 @@
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
+**2026-09-10 · v0.3.0 viewer/conversation/MLXBar** — PDF, DOCX and PPTX previews
+gain non-destructive invert plus clarity controls; only bounded-size PDF canvases
+run the 3×3 sharpening pass. Live follow-up questions now RAG-search within the
+current page/source/project locator using a bounded previous-question expansion
+and recent dialogue, while facts remain constrained to the fresh excerpts.
+Studio sends with Enter (Shift+Enter newline, IME safe) and can atomically replace
+the conversation tail from any previous user message; selecting edit alone changes
+nothing and artifacts remain. Settings includes an MLXBar preset at
+`127.0.0.1:11435/v1`; contract tests cover model metadata, slash IDs, SSE
+keep-alives, reasoning, usage and DONE without coupling to private MLXBar APIs.
+No database, project-format or dependency change. See
+`IMPLEMENTATION_PLAN_v0.3.0.md` and D-36–D-39.
+
 **2026-09-10 · v0.2.2 document/session reliability** — Studio artifacts open as
 Viewer sources and source-status events refresh their completed document/asset
 caches. PPTX rendering now reacts to a loaded presentation even when its slide
