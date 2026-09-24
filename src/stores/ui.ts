@@ -12,6 +12,9 @@ type UiState = {
   readingFont: ReadingFont;
   /** Live Illustrator global toggle (FR-L1). Backed by app settings in Phase 9. */
   illustratorEnabled: boolean;
+  /** Settings overlay visibility. Session-only: opening settings never
+   * navigates, so the current screen stays exactly as it was. */
+  settingsOpen: boolean;
   /** Document rendering adjustments (PDF/DOCX/PPTX). Session-only: they
    * describe how the current preview looks, not a saved preference. */
   docInverted: boolean;
@@ -24,6 +27,7 @@ type UiState = {
   setMonochrome: (v: boolean) => void;
   setReadingFont: (f: ReadingFont) => void;
   setIllustratorEnabled: (v: boolean) => void;
+  setSettingsOpen: (v: boolean) => void;
   setDocInverted: (v: boolean) => void;
   setDocClarity: (v: number) => void;
 };
@@ -66,6 +70,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   sidebarOpen: false,
   docInverted: false,
   docClarity: 0,
+  settingsOpen: false,
   ...initial,
   openSidebar: () => set({ sidebarOpen: true }),
   closeSidebar: () => set({ sidebarOpen: false }),
@@ -90,6 +95,7 @@ export const useUiStore = create<UiState>((set, get) => ({
     set({ illustratorEnabled });
     persist(get);
   },
+  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setDocInverted: (docInverted) => set({ docInverted }),
   setDocClarity: (docClarity) =>
     set({ docClarity: Math.min(100, Math.max(0, docClarity)) }),

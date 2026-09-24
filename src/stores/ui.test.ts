@@ -16,6 +16,14 @@ describe("document rendering adjustments", () => {
     expect(useUiStore.getState().docInverted).toBe(true);
   });
 
+  it("opens settings as session-only overlay state", () => {
+    expect(useUiStore.getState().settingsOpen).toBe(false);
+    useUiStore.getState().setSettingsOpen(true);
+    expect(useUiStore.getState().settingsOpen).toBe(true);
+    useUiStore.getState().setSettingsOpen(false);
+    expect(useUiStore.getState().settingsOpen).toBe(false);
+  });
+
   it("clamps clarity to 0–100", () => {
     useUiStore.getState().setDocClarity(40);
     expect(useUiStore.getState().docClarity).toBe(40);

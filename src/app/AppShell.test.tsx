@@ -73,15 +73,18 @@ test("sidebar order is Home → File Modifier → … → Search (FR-N2)", () =>
   ]);
 });
 
-test("P3 · the settings button opens settings, then returns to the previous view", async () => {
+test("P3 · the settings button overlays settings without leaving the view", async () => {
   const user = userEvent.setup();
   renderShell(["/search"]);
   expect(screen.getByText("search-page")).toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: /settings/i }));
-  expect(screen.getByText("settings-page")).toBeInTheDocument();
+  // Overlay opens on top: the previous view stays mounted underneath.
+  expect(screen.getByRole("dialog", { name: /settings|設定/i })).toBeInTheDocument();
+  expect(screen.getByText("search-page")).toBeInTheDocument();
 
-  // Same control again — back to where we were, not a no-op.
+  // Same control again — the overlay closes, the view never moved.
   await user.click(screen.getByRole("button", { name: /close settings|設定を閉じる/i }));
+  expect(screen.queryByRole("dialog", { name: /settings|設定/i })).toBeNull();
   expect(screen.getByText("search-page")).toBeInTheDocument();
 });

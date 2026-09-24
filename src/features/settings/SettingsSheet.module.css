@@ -1,0 +1,53 @@
+/* Settings overlay sheet — floats over the current screen (never navigates).
+ * Absolute inside #app (monochrome filter rule); tokens only. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: calc(var(--z-dropdown) - 1);
+  border: none;
+  padding: 0;
+  background: var(--overlay-scrim);
+  cursor: default;
+}
+.sheet {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: var(--z-dropdown);
+  inline-size: min(52rem, 100%);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--color-paper);
+  border-inline-start: var(--rule-1) solid var(--color-rule);
+  box-shadow: var(--shadow-overlay);
+}
+.head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-height: var(--toolbar-height);
+  padding-inline: var(--space-md) var(--space-sm);
+  border-block-end: var(--rule-1) solid var(--color-rule);
+}
+.title {
+  font-size: var(--fs-md);
+  font-weight: var(--weight-strong);
+}
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.body > * {
+  flex: 1;
+  min-width: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .scrim {
+    transition-duration: var(--dur-reduced);
+  }
+}

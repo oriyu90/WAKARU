@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { SettingsSheet } from "../features/settings/SettingsSheet";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -34,15 +35,15 @@ export function AppShell() {
   const navigate = useNavigate();
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
 
-  // Where "settings" should return to when pressed a second time (P3).
-  const onSettings = location.pathname === "/settings";
-  const lastNonSettingsPath = useRef("/");
-  if (!onSettings) lastNonSettingsPath.current = location.pathname + location.search;
+  // Settings opens as an overlay sheet: the current screen never moves.
+  const settingsOpen = useUiStore((s) => s.settingsOpen);
+  const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const closeSidebar = useUiStore((s) => s.closeSidebar);
 
   const sidebarRef = useRef<HTMLElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const settingsBtnRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLElement>(null);
 
   const projects = useQuery({
@@ -157,12 +158,16 @@ export function AppShell() {
         <kbd className={styles.kbd}>{isMac ? "⌘B" : "Ctrl B"}</kbd>
         <button
           type="button"
-          className={`${styles.topAction} ${onSettings ? styles.topActionActive : ""}`}
-          aria-current={onSettings ? "page" : undefined}
-          aria-label={onSettings ? t("nav.settingsClose") : t("nav.settings")}
-          onClick={() =>
-            navigate(onSettings ? lastNonSettingsPath.current : "/settings")
-          }
+          ref={settingsBtnRef}
+          className={`${styles.topAction} ${settingsOpen ? styles.topActionActive : ""}`}
+          aria-expanded={settingsOpen}
+          aria-label={settingsOpen ? t("nav.settingsClose") : t("nav.settings")}
+          onClick={() => {
+            // One overlay at a time: the sidebar scrim must not stack under
+            // the settings sheet.
+            if (!settingsOpen) closeSidebar();
+            setSettingsOpen(!settingsOpen);
+          }}
         >
           <SettingsIcon />
         </button>
@@ -235,6 +240,13 @@ export function AppShell() {
         <main ref={contentRef} className={styles.content}>
           <Outlet />
         </main>
+
+        {settingsOpen ? (
+          <SettingsSheet
+            onClose={() => setSettingsOpen(false)}
+            returnFocus={settingsBtnRef.current}
+          />
+        ) : null}
       </div>
 
       {menu ? (
