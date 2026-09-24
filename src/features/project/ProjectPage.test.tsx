@@ -29,16 +29,16 @@ beforeEach(() => {
   useUiStore.setState({ docInverted: false, docClarity: 0 });
 });
 
-test("pane bar shows document adjustments beside the pane tabs", () => {
+test("pane bar shows only the pane tabs when no document is previewed", () => {
   renderPage();
-  // Pane tabs.
+  // Pane tabs are always there.
   expect(screen.getByRole("tab", { name: "Sources" })).toBeTruthy();
   expect(screen.getByRole("tab", { name: "Studio" })).toBeTruthy();
-  // Adjustment controls sit next to them (disabled until a document opens).
-  const invert = screen.getByRole("button", { name: "Invert black & white" });
-  expect(invert.getAttribute("disabled")).not.toBeNull();
-  expect(invert.getAttribute("aria-pressed")).toBe("false");
+  // Without an open document preview, the adjustment controls stay hidden.
   expect(
-    screen.getByRole("slider", { name: "Sharpness / contrast" }),
-  ).toBeTruthy();
+    screen.queryByRole("button", { name: "Invert black & white" }),
+  ).toBeNull();
+  expect(
+    screen.queryByRole("slider", { name: "Sharpness / contrast" }),
+  ).toBeNull();
 });

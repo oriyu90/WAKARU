@@ -18,8 +18,8 @@ import styles from "./ProjectPage.module.css";
 type Pane = "viewer" | "studio";
 
 /** Document rendering adjustments (PDF/DOCX/PPTX) beside the pane tabs.
- * Enabled only while a document preview is on screen. */
-function DocAdjustControls({ disabled }: { disabled: boolean }) {
+ * Rendered only while a document preview is on screen. */
+function DocAdjustControls() {
   const { t } = useTranslation();
   const inverted = useUiStore((s) => s.docInverted);
   const clarity = useUiStore((s) => s.docClarity);
@@ -31,7 +31,6 @@ function DocAdjustControls({ disabled }: { disabled: boolean }) {
         size="sm"
         variant={inverted ? "secondary" : "quiet"}
         aria-pressed={inverted}
-        disabled={disabled}
         onClick={() => setInverted(!inverted)}
       >
         {t("viewer.invertDocument")}
@@ -44,7 +43,6 @@ function DocAdjustControls({ disabled }: { disabled: boolean }) {
           max="100"
           step="5"
           value={clarity}
-          disabled={disabled}
           aria-label={t("viewer.clarity")}
           onChange={(e) => setClarity(Number(e.target.value))}
         />
@@ -113,9 +111,7 @@ export function ProjectPage() {
             { id: "studio", label: t("project.pane.studio") },
           ]}
         />
-        {pane === "viewer" ? (
-          <DocAdjustControls disabled={!previewing} />
-        ) : null}
+        {pane === "viewer" && previewing ? <DocAdjustControls /> : null}
       </div>
 
       <div className={styles.paneBody}>
