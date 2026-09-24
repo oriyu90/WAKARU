@@ -90,6 +90,20 @@ mark.hitActive {
   margin-inline: auto;
 }
 
+/* ─ Live web view (JS-rendered weblink, opt-in) ─ */
+.liveWrap {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+}
+.liveFrame {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  border: none;
+  background: var(--color-paper);
+}
+
 /* ─ Image ─ */
 .imageBody {
   display: grid;

@@ -25,7 +25,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' wakaru-asset: http://wakaru-asset.localhost data: blob:; media-src 'self' wakaru-asset: http://wakaru-asset.localhost blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self' wakaru-asset: http://wakaru-asset.localhost; connect-src 'self' ipc: http://ipc.localhost wakaru-asset: http://wakaru-asset.localhost"
+      "csp": "default-src 'self'; img-src 'self' wakaru-asset: http://wakaru-asset.localhost data: blob:; media-src 'self' wakaru-asset: http://wakaru-asset.localhost blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self' wakaru-asset: http://wakaru-asset.localhost https: http:; connect-src 'self' ipc: http://ipc.localhost wakaru-asset: http://wakaru-asset.localhost"
     }
   },
   "bundle": {

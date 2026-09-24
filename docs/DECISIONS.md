@@ -473,3 +473,11 @@
 - **採用**: website iframeは`sandbox="allow-scripts"`のみ。popup/top-navigation/referrerは許可しない。interactive PDF/DOCX/PPTXは96 MiBまでとし、超過時もingest、抽出text、検索、fallback閲覧は維持。page controlsを非縮小、数値labelをnowrapにする。
 - **理由**: プレビューの有用性を維持しつつorigin/form能力とWebView peak memoryを狭め、狭いstageでも操作情報を読めるようにするため。
 - **影響**: 一部の同一origin fetchやform送信を必要とするimportサイトはpreview内で動かなくなる。これは資料previewの安全境界として意図した制約。
+
+## D-43 · weblinkのJS描画は明示選択のライブ表示で行い抜粋表示を既定に保つ
+
+- **日付**: 2026-09-25
+- **論点**: weblink種別は抽出textのMarkdown表示と外部browser誘導だけで、JS描画を要するpageの観覧に向かない。website種別は`sandbox="allow-scripts"`の不透明origin iframeで既にJS描画する。
+- **採用**: `ReadingPreview`に抜粋表示/ライブ表示の切替を設け、originalUrlがあるweblinkにだけ出す。既定は抜粋表示（RAG根拠と一致）のままにし、remote scriptは明示tapの後だけ、websiteと同一隔離（allow-scriptsのみ、popupなし、no-referrer）で動かす。CSP `frame-src`へ`https: http:`を追加する。
+- **理由**: 根拠の一致とremote code実行の最小化を両立し、取込・DB・RAGに触れずviewer層だけで完結させるため。
+- **影響**: Rust・DB・IPC・bindingsに変更なし。http(s)以外のoriginalUrlには切替を出さない。残存riskはD-33と同一 posture として保守memoへ記録する。

@@ -352,26 +352,63 @@ function ReadingPreview({
   const text = detail.primaryAssetUrl ? direct.data : viaDerived.data;
   const loading = detail.primaryAssetUrl ? direct.isLoading : viaDerived.isLoading;
   const bodyRef = useRef<HTMLDivElement>(null);
+  // Opt-in JS rendering for weblinks (docs/05 §4 lineage): the extracted
+  // reader view stays the default so RAG grounding never changes, and remote
+  // scripts run only after an explicit tap, inside the same opaque-origin
+  // sandbox (`allow-scripts` only, no popups, no referrer) as site previews.
+  const liveUrl =
+    detail.kind === "weblink" && originalUrl && /^https?:\/\//i.test(originalUrl)
+      ? originalUrl
+      : null;
+  const [live, setLive] = useState(false);
 
   return (
     <div className={styles.wrap}>
       <Toolbar>
-        {detail.kind === "weblink" && originalUrl ? (
-          <Button
-            size="sm"
-            variant="quiet"
-            onClick={() =>
-              void import("@tauri-apps/plugin-opener").then((m) =>
-                m.openUrl(originalUrl),
-              )
-            }
-          >
-            {t("viewer.openOriginal")}
-          </Button>
+        {liveUrl ? (
+          <>
+            <Button
+              size="sm"
+              variant={live ? "quiet" : "secondary"}
+              aria-pressed={!live}
+              onClick={() => setLive(false)}
+            >
+              {t("viewer.webReader")}
+            </Button>
+            <Button
+              size="sm"
+              variant={live ? "secondary" : "quiet"}
+              aria-pressed={live}
+              onClick={() => setLive(true)}
+            >
+              {t("viewer.webLive")}
+            </Button>
+            <Button
+              size="sm"
+              variant="quiet"
+              onClick={() =>
+                void import("@tauri-apps/plugin-opener").then((m) =>
+                  m.openUrl(liveUrl),
+                )
+              }
+            >
+              {t("viewer.openOriginal")}
+            </Button>
+          </>
         ) : null}
       </Toolbar>
       <div className={styles.body} ref={bodyRef}>
-        {loading ? (
+        {live && liveUrl ? (
+          <div className={styles.liveWrap}>
+            <iframe
+              className={styles.liveFrame}
+              src={liveUrl}
+              title={liveUrl}
+              sandbox="allow-scripts"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+        ) : loading ? (
           <LoadingRows />
         ) : (
           <>
