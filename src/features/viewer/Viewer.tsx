@@ -57,10 +57,13 @@ export function Viewer({
   projectId,
   focusRequest,
   onCitation,
+  onPreviewingChange,
 }: {
   projectId: string;
   focusRequest?: ViewerFocusRequest | null;
   onCitation?: (c: Citation) => void;
+  /** True while a document tab (not the source list) is open. */
+  onPreviewingChange?: (previewing: boolean) => void;
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -250,6 +253,12 @@ export function Viewer({
 
   const list: ViewerTab[] = tabs.data ?? [];
   const activeTab = list.find((tb) => tb.id === active);
+
+  // Tell the project pane bar whether a document is on screen so the
+  // document adjustment controls can enable themselves.
+  useEffect(() => {
+    onPreviewingChange?.(active !== HOME && !!activeTab);
+  }, [active, activeTab, onPreviewingChange]);
 
   function toggleIllustrator() {
     if (!illustratorEnabled) {

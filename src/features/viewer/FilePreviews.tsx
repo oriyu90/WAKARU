@@ -8,6 +8,7 @@ import { ChevronRightIcon } from "../../app/Icons";
 import { documentApi } from "../../ipc/viewer";
 import { ocrApi } from "../../ipc/ocr";
 import { useToast } from "../../components/useToast";
+import { useUiStore } from "../../stores/ui";
 import type { DocumentPayload, SourceDetail } from "../../ipc/types.gen";
 import styles from "./previews.module.css";
 
@@ -41,45 +42,8 @@ export function sharpenRgba(data: Uint8ClampedArray, width: number, height: numb
   return true;
 }
 
-function DocumentAdjustments({
-  inverted,
-  clarity,
-  onInverted,
-  onClarity,
-}: {
-  inverted: boolean;
-  clarity: number;
-  onInverted: (value: boolean) => void;
-  onClarity: (value: number) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div className={styles.documentAdjustments}>
-      <Button
-        size="sm"
-        variant={inverted ? "secondary" : "quiet"}
-        aria-pressed={inverted}
-        onClick={() => onInverted(!inverted)}
-      >
-        {t("viewer.invertDocument")}
-      </Button>
-      <label className={styles.clarityControl}>
-        <span>{t("viewer.clarity")}</span>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          step="5"
-          value={clarity}
-          aria-label={t("viewer.clarity")}
-          onChange={(event) => onClarity(Number(event.target.value))}
-        />
-        <output className={`${styles.pageLabel} u-mono-nums`}>{clarity}</output>
-      </label>
-    </div>
-  );
-}
-
+/** Document rendering adjustments live in the project pane bar now; the
+ * previews below only consume the shared `ui` store values. */
 function useAssetBuffer(detail: SourceDetail) {
   return useQuery({
     // ts-rs maps Rust u64 to bigint. TanStack's default key hash uses
@@ -248,8 +212,8 @@ export function PdfFilePreview({
   const [pdf, setPdf] = useState<Awaited<ReturnType<typeof import("pdfjs-dist")["getDocument"]>["promise"]> | null>(null);
   const [page, setPage] = useState(Math.max(1, initialPage));
   const [zoom, setZoom] = useState(1);
-  const [inverted, setInverted] = useState(false);
-  const [clarity, setClarity] = useState(0);
+  const inverted = useUiStore((s) => s.docInverted);
+  const clarity = useUiStore((s) => s.docClarity);
   const [error, setError] = useState<unknown>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   usePageKeys((d) =>
@@ -395,12 +359,6 @@ export function PdfFilePreview({
     <div className={styles.filePreview}>
       <div className={styles.fileToolbar}>
         <PageControls page={page} total={pdf?.numPages ?? detail.pageCount ?? 1} onPage={setPage} />
-        <DocumentAdjustments
-          inverted={inverted}
-          clarity={clarity}
-          onInverted={setInverted}
-          onClarity={setClarity}
-        />
         <span className={styles.toolbarSpacer} />
         {ocr ? (
           <span className={styles.pageLabel}>{t("viewer.ocrProgress", { done: ocr.done, total: ocr.total })}</span>
@@ -434,8 +392,8 @@ export function DocxFilePreview({ detail, fallback }: { detail: SourceDetail; fa
   const asset = useAssetBuffer(detail);
   const host = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<unknown>(null);
-  const [inverted, setInverted] = useState(false);
-  const [clarity, setClarity] = useState(0);
+  const inverted = useUiStore((s) => s.docInverted);
+  const clarity = useUiStore((s) => s.docClarity);
 
   useEffect(() => {
     if (!asset.data || !host.current) return;
@@ -465,9 +423,6 @@ export function DocxFilePreview({ detail, fallback }: { detail: SourceDetail; fa
   if (asset.isError || error) return <div className={styles.previewFallback}><ErrorState error={asset.error ?? error} onRetry={() => { setError(null); void asset.refetch(); }} />{fallback}</div>;
   return (
     <div className={styles.filePreview}>
-      <div className={styles.fileToolbar}>
-        <DocumentAdjustments inverted={inverted} clarity={clarity} onInverted={setInverted} onClarity={setClarity} />
-      </div>
       <div
         className={styles.officeViewport}
         aria-label={t("viewer.docxPreview")}
@@ -498,8 +453,8 @@ export function PptxFilePreview({
   const [page, setPage] = useState(Math.max(1, initialPage));
   const [total, setTotal] = useState(detail.pageCount ?? 1);
   const [error, setError] = useState<unknown>(null);
-  const [inverted, setInverted] = useState(false);
-  const [clarity, setClarity] = useState(0);
+  const inverted = useUiStore((s) => s.docInverted);
+  const clarity = useUiStore((s) => s.docClarity);
   const onPageRef = useRef(onPage);
   onPageRef.current = onPage;
   usePageKeys((d) => setPage((p) => Math.min(Math.max(p + d, 1), total)));
@@ -542,7 +497,6 @@ export function PptxFilePreview({
     <div className={styles.filePreview}>
       <div className={styles.fileToolbar}>
         <PageControls page={page} total={total} onPage={setPage} />
-        <DocumentAdjustments inverted={inverted} clarity={clarity} onInverted={setInverted} onClarity={setClarity} />
         <span className={styles.toolbarSpacer} />
       </div>
       <div className={styles.slideViewport} aria-label={t("viewer.pptxPreview")}>

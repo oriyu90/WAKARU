@@ -9,9 +9,47 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
   padding: var(--space-xs) var(--space-md);
   border-bottom: var(--rule-1) solid var(--color-rule);
   background: var(--color-paper);
+}
+/* Document adjustments beside the pane tabs (PDF/DOCX/PPTX only). */
+.docAdjust {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+.clarity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  min-height: 2rem;
+  font-size: var(--fs-xs);
+  color: var(--color-muted);
+}
+.clarity input[type="range"] {
+  inline-size: clamp(5.5rem, 11vw, 8rem);
+  accent-color: var(--color-accent);
+}
+.clarity input[type="range"]:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: 2px;
+}
+.clarity output {
+  inline-size: 2ch;
+  text-align: end;
+}
+@media (max-width: 42rem) {
+  .clarity span:first-child {
+    position: absolute;
+    inline-size: 0;
+    block-size: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
 }
 .paneBody {
   flex: 1;

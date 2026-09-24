@@ -12,6 +12,10 @@ type UiState = {
   readingFont: ReadingFont;
   /** Live Illustrator global toggle (FR-L1). Backed by app settings in Phase 9. */
   illustratorEnabled: boolean;
+  /** Document rendering adjustments (PDF/DOCX/PPTX). Session-only: they
+   * describe how the current preview looks, not a saved preference. */
+  docInverted: boolean;
+  docClarity: number;
   openSidebar: () => void;
   closeSidebar: () => void;
   toggleSidebar: () => void;
@@ -20,6 +24,8 @@ type UiState = {
   setMonochrome: (v: boolean) => void;
   setReadingFont: (f: ReadingFont) => void;
   setIllustratorEnabled: (v: boolean) => void;
+  setDocInverted: (v: boolean) => void;
+  setDocClarity: (v: number) => void;
 };
 
 const KEY = "wakaru.ui";
@@ -58,6 +64,8 @@ const initial = load();
 
 export const useUiStore = create<UiState>((set, get) => ({
   sidebarOpen: false,
+  docInverted: false,
+  docClarity: 0,
   ...initial,
   openSidebar: () => set({ sidebarOpen: true }),
   closeSidebar: () => set({ sidebarOpen: false }),
@@ -82,6 +90,9 @@ export const useUiStore = create<UiState>((set, get) => ({
     set({ illustratorEnabled });
     persist(get);
   },
+  setDocInverted: (docInverted) => set({ docInverted }),
+  setDocClarity: (docClarity) =>
+    set({ docClarity: Math.min(100, Math.max(0, docClarity)) }),
 }));
 
 function persist(get: () => UiState) {
