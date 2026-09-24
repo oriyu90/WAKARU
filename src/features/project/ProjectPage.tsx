@@ -77,7 +77,11 @@ export function ProjectPage() {
 
       <div className={styles.paneBody}>
         <div hidden={pane !== "viewer"} className={styles.paneFill}>
-          <Viewer projectId={projectId} focusRequest={focus} />
+          <Viewer
+            projectId={projectId}
+            focusRequest={focus}
+            onCitation={onCitation}
+          />
         </div>
         <div hidden={pane !== "studio"} className={styles.paneFill}>
           <Studio

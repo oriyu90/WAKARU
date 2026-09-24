@@ -3,7 +3,8 @@
   flex-direction: column;
   block-size: 100%;
   min-block-size: 0;
-  inline-size: min(26rem, 100vw);
+  /* The outer Drawer owns the width (resizable); fill it. */
+  inline-size: 100%;
   max-inline-size: 100%;
 }
 .empty {
@@ -71,6 +72,9 @@
   padding: var(--space-md);
   font-size: var(--fs-sm);
   line-height: var(--lh-relaxed);
+  /* AI answers are selectable (copy/drag) — never disable selection here. */
+  user-select: text;
+  -webkit-user-select: text;
 }
 .startCard {
   display: flex;
@@ -92,7 +96,37 @@
   display: flex;
   align-items: center;
   gap: var(--space-2xs);
+  margin: 0;
+  font-size: var(--fs-2xs);
+  color: var(--color-muted);
+}
+
+/* The auto explanation: open reading surface with a copy affordance. */
+.explanation {
+  user-select: text;
+  -webkit-user-select: text;
+}
+.explanationHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
   margin-block-end: var(--space-sm);
+}
+
+/* This session's Q&A — always expanded, in message format. */
+.live {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-block-start: var(--space-lg);
+}
+/* Gap already spaces the column; drop the stacked margin inside it. */
+.live .msg {
+  margin-block-start: 0;
+}
+.liveLabel {
+  margin: 0;
   font-size: var(--fs-2xs);
   color: var(--color-muted);
 }
@@ -119,12 +153,80 @@
   margin-block-start: var(--space-sm);
   padding: var(--space-sm);
   border-radius: var(--radius-md);
+  user-select: text;
+  -webkit-user-select: text;
 }
+/* User turns: compact end-aligned bubble (design.md §Studio). */
 .msg[data-role="user"] {
+  margin-inline-start: auto;
+  width: fit-content;
+  max-width: min(85%, 100%);
+  background: var(--color-paper-3);
+  border-radius: var(--radius-lg);
+  overflow-wrap: break-word;
+}
+/* Assistant turns: open on the canvas for long-form readability. */
+.msg[data-role="assistant"] {
+  background: transparent;
+  border-inline-start: var(--rule-1) solid transparent;
+  padding-inline-start: var(--space-sm);
+}
+.msg[data-role="assistant"][data-streaming] {
+  border-inline-start-color: var(--color-accent);
+}
+.msgHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  margin-block-end: var(--space-2xs);
+}
+.role {
+  font-size: var(--fs-2xs);
+  color: var(--color-neutral);
+  font-weight: var(--weight-medium);
+}
+.copyBtn {
+  flex: none;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-2xs);
+  color: var(--color-muted);
+  cursor: pointer;
+  padding: var(--space-3xs) var(--space-2xs);
+  border-radius: var(--radius-sm);
+}
+.copyBtn:hover {
+  color: var(--color-ink);
   background: var(--color-paper-3);
 }
-.msg[data-role="assistant"] {
+.copyBtn:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: 2px;
+}
+.citations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+  margin-block-start: var(--space-xs);
+}
+.citation {
+  border: var(--rule-1) solid var(--color-rule-strong);
+  border-radius: var(--radius-sm);
   background: var(--color-paper-2);
+  font: inherit;
+  font-size: var(--fs-2xs);
+  color: var(--color-ink);
+  padding: var(--space-3xs) var(--space-2xs);
+  cursor: pointer;
+}
+.citation:disabled {
+  cursor: default;
+}
+.citation:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .composer {

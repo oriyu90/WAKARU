@@ -1,4 +1,5 @@
 .drawer {
+  position: relative;
   flex: none;
   block-size: 100%;
   inline-size: 0;
@@ -15,6 +16,36 @@
 }
 .drawer[data-open="true"] {
   inline-size: min(24rem, 100%);
+}
+/* While dragging, follow the pointer instead of easing behind it. */
+.drawer[data-resizing] {
+  transition: none;
+}
+/* Drag handle on the leading edge. A generous hit area with a 1px visual
+ * so narrow drawers stay usable at 80–150% display scales. */
+.handle {
+  position: absolute;
+  inset-block: 0;
+  inline-size: 0.75rem;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: var(--z-raised);
+}
+.handle[data-side="right"] {
+  inset-inline-start: 0;
+  border-inline-start: var(--rule-1) solid transparent;
+}
+.handle[data-side="left"] {
+  inset-inline-end: 0;
+  border-inline-end: var(--rule-1) solid transparent;
+}
+.handle:hover {
+  border-inline-start-color: var(--color-rule-strong);
+  border-inline-end-color: var(--color-rule-strong);
+}
+.handle:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: -2px;
 }
 @media (prefers-reduced-motion: reduce) {
   .drawer {

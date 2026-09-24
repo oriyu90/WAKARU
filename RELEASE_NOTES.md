@@ -1,3 +1,52 @@
+# WAKARU v1.1.0
+
+WAKARU v1.1.0 reworks the Live Illustrator panel around five reader requests:
+selectable answers, an honest past-vs-session split, a proper message UI, a
+freely resizable panel, and citations only when they are wanted.
+
+## What changed
+
+- Live answers are selectable. The auto explanation, every question and every
+  answer can be drag-selected, and each carries a small copy button for exact
+  retrieval. Following the conversation no longer steals an active selection.
+- Past conversation works as named. Turns from before the current Live session
+  stay collapsed under "Past conversation"; turns asked in this session stay
+  expanded under "This session", so the newest exchange is never buried in the
+  past. The detail-level rewrite buttons now consider this session only.
+- The Live chat is a real message thread. User turns are end-aligned bubbles
+  and assistant turns stay open on the canvas with a role label, matching the
+  Studio reading contract in a drawer-compact form.
+- The Live panel resizes. Drag its leading edge (or use Left/Right/Home/End
+  on the handle) between 24 rem and 44 rem. The current design width is the
+  minimum; widening the panel narrows the document pane, and PDF pages refit
+  to the available width automatically. The width persists across restarts.
+- Citations are on demand. Everyday answers carry no sources unless the reader
+  asks for them; when an answer relies on excerpts, or the reader explicitly
+  requests sources, `[S1]`-style citations with jump buttons appear as before.
+  Small-talk turns skip retrieval entirely, and Live retrieval now uses six
+  excerpts instead of twelve to suit small local models.
+- Dependency maintenance: `rustls` 0.23.43 to 0.23.45 (RUSTSEC-2026-0285).
+
+## Compatibility
+
+- Existing projects, settings, Studio conversations and Live Illustrator
+  sessions from v0.0.0 through v1.0.0 remain compatible.
+- No database migration, project archive change or AI profile migration is
+  required.
+- Live Illustrator remains separate from Studio until the reader explicitly
+  chooses the handoff action, and a source-scoped explanation remains one
+  session while its pages change.
+
+## Distribution
+
+Apple Silicon Mac, macOS 12 or later. The application is MIT licensed. This
+build is ad-hoc signed and is not Apple-notarised: on first launch,
+right-click WAKARU → Open (or allow it in System Settings → Privacy &
+Security). Distribution remains invite-only while the GitHub repository is
+private.
+
+---
+
 # WAKARU v1.0.0
 
 WAKARU v1.0.0 is the first formal stable release. It consolidates the

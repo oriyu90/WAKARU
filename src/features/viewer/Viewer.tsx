@@ -14,7 +14,7 @@ import { viewerApi } from "../../ipc/viewer";
 import { aiApi } from "../../ipc/ai";
 import { sourcesApi, pickSourceFiles, pickFolder } from "../../ipc/sources";
 import { IpcError, inTauri } from "../../ipc/client";
-import type { SourceStatusEvent, ViewerTab } from "../../ipc/types.gen";
+import type { Citation, SourceStatusEvent, ViewerTab } from "../../ipc/types.gen";
 import { SourceListPanel } from "../project/SourceListPanel";
 import { Preview } from "./Preview";
 import { IllustratorDrawer } from "./IllustratorDrawer";
@@ -37,12 +37,30 @@ export type ViewerFocusRequest = {
   nonce: number;
 };
 
+const ILL_WIDTH_KEY = "wakaru.illustrator.widthRem";
+const ILL_WIDTH_MIN = 24;
+const ILL_WIDTH_MAX = 44;
+const ILL_WIDTH_DEFAULT = 24;
+
+function loadIllustratorWidth(): number {
+  try {
+    const raw = localStorage.getItem(ILL_WIDTH_KEY);
+    const v = raw == null ? NaN : Number.parseFloat(raw);
+    if (!Number.isFinite(v)) return ILL_WIDTH_DEFAULT;
+    return Math.min(ILL_WIDTH_MAX, Math.max(ILL_WIDTH_MIN, v));
+  } catch {
+    return ILL_WIDTH_DEFAULT;
+  }
+}
+
 export function Viewer({
   projectId,
   focusRequest,
+  onCitation,
 }: {
   projectId: string;
   focusRequest?: ViewerFocusRequest | null;
+  onCitation?: (c: Citation) => void;
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -52,6 +70,17 @@ export function Viewer({
   const setIllustratorEnabled = useUiStore((s) => s.setIllustratorEnabled);
   const { patch } = useAppSettings();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Resizable Live panel: the current design width is the minimum; growing
+  // the panel narrows the document pane (flex layout + max-inline-size).
+  // Persisted locally so it survives restarts.
+  const [illWidthRem, setIllWidthRem] = useState<number>(loadIllustratorWidth);
+  useEffect(() => {
+    try {
+      localStorage.setItem(ILL_WIDTH_KEY, String(illWidthRem));
+    } catch {
+      // Private mode etc. — the panel still resizes for this session.
+    }
+  }, [illWidthRem]);
   // True only for the first render after the reader flips Live Illustrator on,
   // so the panel opens but waits for one tap before spending tokens.
   const [justEnabled, setJustEnabled] = useState(false);
@@ -353,6 +382,11 @@ export function Viewer({
             open={drawerOpen}
             onClose={() => setDrawerOpen(false)}
             label={t("viewer.illustrator")}
+            widthRem={illWidthRem}
+            minWidthRem={ILL_WIDTH_MIN}
+            maxWidthRem={ILL_WIDTH_MAX}
+            onWidthChange={setIllWidthRem}
+            resizeLabel={t("illustrator.resizeHandle")}
           >
             <IllustratorDrawer
               projectId={projectId}
@@ -361,6 +395,7 @@ export function Viewer({
               visionSupported={visionSupported}
               autoRun={!justEnabled}
               onStarted={() => setJustEnabled(false)}
+              onCitation={onCitation}
             />
           </Drawer>
         ) : null}

@@ -10,12 +10,114 @@ import { illustratorApi } from "../../ipc/illustrator";
 import { inTauri, IpcError } from "../../ipc/client";
 import { useAppSettings } from "../settings/useAppSettings";
 import { useToast } from "../../components/useToast";
-import type { DetailLevel, Scope, GenerateStarted } from "../../ipc/types.gen";
+import type {
+  DetailLevel,
+  Scope,
+  GenerateStarted,
+  Citation,
+} from "../../ipc/types.gen";
 import { useStream } from "./useStream";
 import styles from "./IllustratorDrawer.module.css";
 
 const WHOLE = { t: "whole" as const };
 const LEVELS: DetailLevel[] = ["simple", "standard", "detailed"];
+
+function asCitations(value: unknown): Citation[] {
+  return Array.isArray(value) ? (value as Citation[]) : [];
+}
+
+/** Session boundary: the newest turn known when this Live session opened.
+ * `createdAt` is second-precision (`now_iso8601`), so UUIDv7 `id`s break
+ * same-second ties (they sort lexicographically in creation order). */
+export type LiveAnchor = { at: string; id: string };
+
+/** Split a thread into turns that predated this Live session (`past`) and
+ * turns asked during it (`live`). ISO-8601 strings compare
+ * lexicographically. */
+export function partitionLiveMessages<T extends { createdAt: string; id: string }>(
+  messages: T[],
+  anchor: LiveAnchor | null,
+): { past: T[]; live: T[] } {
+  if (!anchor) return { past: [], live: [...messages] };
+  return {
+    past: messages.filter(
+      (m) => m.createdAt < anchor.at || (m.createdAt === anchor.at && m.id <= anchor.id),
+    ),
+    live: messages.filter(
+      (m) => m.createdAt > anchor.at || (m.createdAt === anchor.at && m.id > anchor.id),
+    ),
+  };
+}
+
+/** One chat turn in message format (design.md §Studio, compact for the
+ * drawer): user turns are end-aligned bubbles, assistant turns stay open on
+ * the canvas with a role label. Text is selectable and copyable; citations
+ * appear only when the backend resolved some. */
+function MessageBubble({
+  role,
+  content,
+  citations,
+  streaming,
+  onCitation,
+}: {
+  role: "user" | "assistant";
+  content: string;
+  citations?: unknown;
+  streaming?: boolean;
+  onCitation?: (c: Citation) => void;
+}) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const cites = asCitations(citations);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(content);
+      toast.push({ tone: "success", message: t("illustrator.copied") });
+    } catch {
+      toast.push({ tone: "error", message: t("errors.internal") });
+    }
+  }
+
+  return (
+    <div
+      className={styles.msg}
+      data-role={role}
+      data-streaming={streaming || undefined}
+    >
+      <div className={styles.msgHead}>
+        <span className={styles.role}>
+          {role === "assistant"
+            ? t("studio.role.assistant")
+            : t("studio.role.user")}
+        </span>
+        <button
+          type="button"
+          className={styles.copyBtn}
+          onClick={() => void copy()}
+        >
+          {t("illustrator.copy")}
+        </button>
+      </div>
+      <Markdown>{content}</Markdown>
+      {cites.length > 0 ? (
+        <div className={styles.citations}>
+          {cites.map((c, i) => (
+            <button
+              type="button"
+              key={`${c.sourceId}-${i}`}
+              className={styles.citation}
+              disabled={!onCitation}
+              onClick={() => onCitation?.(c)}
+            >
+              [{i + 1}] {c.sourceName}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 /** Live Illustrator (docs/05 §4). Standalone from Studio — its own Q&A thread,
  * never fed into a Studio tab. On open it explains the whole source at the
@@ -30,6 +132,7 @@ export function IllustratorDrawer({
   visionSupported,
   autoRun = true,
   onStarted,
+  onCitation,
 }: {
   projectId: string;
   sourceId: string | null;
@@ -37,6 +140,7 @@ export function IllustratorDrawer({
   visionSupported: boolean;
   autoRun?: boolean;
   onStarted?: () => void;
+  onCitation?: (c: Citation) => void;
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -54,6 +158,11 @@ export function IllustratorDrawer({
   const [text, setText] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [started, setStarted] = useState(autoRun);
+  // Session boundary for "past vs live": the newest message known when
+  // this source was opened. Anything newer arrived during this Live
+  // session and stays expanded; anything older is past.
+  const [anchor, setAnchor] = useState<LiveAnchor | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   // One Q&A thread per source (FR-L4) — questions survive page moves.
   const thread = useQuery({
@@ -89,10 +198,13 @@ export function IllustratorDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, sourceId, level, genStream.ready, started]);
 
-  // A new source starts again from the Settings default.
+  // A new source starts again from the Settings default, with a fresh
+  // past/live boundary and a closed history.
   useEffect(() => {
     setLevelOverride(null);
-  }, [sourceId]);
+    setAnchor(null);
+    setHistoryOpen(false);
+  }, [sourceId, projectId]);
 
   useEffect(() => {
     if (
@@ -110,6 +222,14 @@ export function IllustratorDrawer({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [askStream.streaming, askStream.done, askStream.error]);
+
+  // Capture the session boundary once the thread first loads. Later
+  // invalidations (after our own questions) must not move it.
+  useEffect(() => {
+    if (anchor !== null || !thread.data) return;
+    const last = thread.data.messages.at(-1);
+    setAnchor({ at: last?.createdAt ?? "", id: last?.id ?? "" });
+  }, [thread.data, anchor]);
 
   function begin() {
     setStarted(true);
@@ -171,7 +291,14 @@ export function IllustratorDrawer({
   const cached = gen?.cached ?? null;
   const explanation = cached?.content ?? genStream.text;
   const generating = !cached && genStream.streaming;
-  const pastMessages = thread.data?.messages ?? [];
+  const allMessages = (thread.data?.messages ?? []).filter((m) => m.content !== "");
+  // Past = turns that already existed when this Live session opened.
+  // Live = turns asked during this session — always expanded, never hidden
+  // inside the "past" fold.
+  const { past: pastMessages, live: liveMessages } = partitionLiveMessages(
+    allMessages,
+    anchor,
+  );
   const streaming = genStream.streaming || askStream.streaming;
   const streamError =
     genErr ??
@@ -179,16 +306,34 @@ export function IllustratorDrawer({
       ? t([`errors.${genStream.errorCode ?? "internal"}`, "errors.internal"])
       : null) ??
     askErr;
-  // The rewrite buttons appear only right after the first auto explanation —
-  // once the reader has asked anything, the explanation is part of a
-  // conversation and silently swapping it would be confusing.
+  // The rewrite buttons appear only while the reader has not asked anything
+  // *in this session* — older past turns must not take them away.
   const canRewrite =
     started &&
     !!explanation &&
     !streamError &&
     !streaming &&
-    pastMessages.length === 0 &&
+    liveMessages.length === 0 &&
     !askStreamId;
+
+  // Follow the live conversation as it grows, but never yank a text
+  // selection the reader is making (selectable answers).
+  const liveCount = liveMessages.length;
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || (liveCount === 0 && !askStreamId)) return;
+    if (document.getSelection()?.toString()) return;
+    el.scrollTop = el.scrollHeight;
+  }, [liveCount, askStreamId, askStream.text]);
+
+  async function copyText(content: string) {
+    try {
+      await navigator.clipboard.writeText(content);
+      toast.push({ tone: "success", message: t("illustrator.copied") });
+    } catch {
+      toast.push({ tone: "error", message: t("errors.internal") });
+    }
+  }
 
   if (!sourceId) {
     return <div className={styles.empty}>{t("illustrator.openADocument")}</div>;
@@ -217,7 +362,7 @@ export function IllustratorDrawer({
         </p>
       ) : null}
 
-      <div className={styles.body} aria-live="polite">
+      <div ref={bodyRef} className={styles.body} aria-live="polite">
         {!started ? (
           <div className={styles.startCard}>
             <p>{t("illustrator.overviewHint")}</p>
@@ -230,16 +375,27 @@ export function IllustratorDrawer({
             <AlertIcon size={14} /> {streamError}
           </p>
         ) : explanation ? (
-          <>
-            {cached ? (
-              <p className={styles.cachedNote}>
-                <InfoIcon size={13} />
-                {t("illustrator.cached")} ·{" "}
-                {new Date(cached.createdAt).toLocaleString()}
-              </p>
-            ) : null}
+          <div className={styles.explanation}>
+            <div className={styles.explanationHead}>
+              {cached ? (
+                <p className={styles.cachedNote}>
+                  <InfoIcon size={13} />
+                  {t("illustrator.cached")} ·{" "}
+                  {new Date(cached.createdAt).toLocaleString()}
+                </p>
+              ) : (
+                <span />
+              )}
+              <button
+                type="button"
+                className={styles.copyBtn}
+                onClick={() => void copyText(explanation)}
+              >
+                {t("illustrator.copy")}
+              </button>
+            </div>
             <Markdown>{explanation}</Markdown>
-          </>
+          </div>
         ) : generating ? (
           <p className={styles.thinking}>{t("common.loading")}…</p>
         ) : (
@@ -262,6 +418,34 @@ export function IllustratorDrawer({
           </div>
         ) : null}
 
+        {liveMessages.length > 0 ? (
+          <section
+            className={styles.live}
+            aria-label={t("illustrator.live")}
+          >
+            <p className={styles.liveLabel}>{t("illustrator.live")}</p>
+            {liveMessages.map((m) => (
+              <MessageBubble
+                key={m.id}
+                role={m.role === "user" ? "user" : "assistant"}
+                content={m.content}
+                citations={m.citations}
+                onCitation={onCitation}
+              />
+            ))}
+          </section>
+        ) : null}
+
+        {askStreamId ? (
+          <MessageBubble
+            role="assistant"
+            content={askStream.text || "…"}
+            citations={askStream.citations}
+            streaming
+            onCitation={onCitation}
+          />
+        ) : null}
+
         {pastMessages.length > 0 ? (
           <div className={styles.history}>
             <button
@@ -276,17 +460,15 @@ export function IllustratorDrawer({
             </button>
             {historyOpen
               ? pastMessages.map((m) => (
-                  <div key={m.id} className={styles.msg} data-role={m.role}>
-                    <Markdown>{m.content}</Markdown>
-                  </div>
+                  <MessageBubble
+                    key={m.id}
+                    role={m.role === "user" ? "user" : "assistant"}
+                    content={m.content}
+                    citations={m.citations}
+                    onCitation={onCitation}
+                  />
                 ))
               : null}
-          </div>
-        ) : null}
-
-        {askStreamId ? (
-          <div className={styles.msg} data-role="assistant">
-            <Markdown>{askStream.text || "…"}</Markdown>
           </div>
         ) : null}
       </div>
@@ -332,7 +514,13 @@ export function IllustratorDrawer({
           <Button
             size="sm"
             variant="quiet"
-            disabled={!thread.data || (!explanation && pastMessages.length === 0) || streaming}
+            disabled={
+              !thread.data ||
+              (!explanation &&
+                pastMessages.length === 0 &&
+                liveMessages.length === 0) ||
+              streaming
+            }
             loading={handoff.isPending}
             onClick={() => handoff.mutate()}
           >
