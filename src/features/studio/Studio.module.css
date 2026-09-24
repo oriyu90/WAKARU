@@ -343,6 +343,19 @@
   justify-content: space-between;
   gap: var(--space-sm);
 }
+/* Model + scope selectors share the leading slot of the composer bar. */
+.selectGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.selectGroup > select {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 100%;
+}
 .scopeSel {
   height: 1.75rem;
   border: var(--rule-1) solid var(--color-rule);

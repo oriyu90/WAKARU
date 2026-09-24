@@ -72,4 +72,9 @@ pub struct StudioSendInput {
     /// before generating the new branch.
     #[serde(default)]
     pub replace_from_message_id: Option<String>,
+    /// Session-only model override: a profile id whose default model answers
+    /// this turn instead of the chat role binding. Never persisted, so
+    /// reopening the tab falls back to the configured default.
+    #[serde(default)]
+    pub model_profile_id: Option<String>,
 }

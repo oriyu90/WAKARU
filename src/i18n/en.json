@@ -201,7 +201,8 @@
     "AI_NETWORK": "Can't connect to the AI endpoint.",
     "AI_NOT_CONFIGURED": "No AI connection is set up.",
     "ai": {
-      "notConfigured": "No AI connection is set up."
+      "notConfigured": "No AI connection is set up.",
+      "modelNotSet": "The selected connection has no model set."
     },
     "fm": {
       "badImage": "Couldn't read the image."
@@ -347,6 +348,9 @@
     "workspacePath": "{{project}}/workspace",
     "workspaceEmpty": "Files the assistant writes appear here.",
     "scope": "Scope",
+    "model": "Model",
+    "defaultModel": "Default: {{name}}",
+    "noDefaultModel": "No default model",
     "message": "Message",
     "messagePlaceholder": "Ask about this project…",
     "send": "Send",

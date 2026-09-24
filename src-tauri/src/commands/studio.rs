@@ -113,6 +113,7 @@ pub async fn studio_resolve_tool(
     tab_id: String,
     approved: bool,
     ui_lang: String,
+    model_profile_id: Option<String>,
 ) -> AppResult<StudioSendResult> {
     let reg = state.streams.clone();
     let app_db_path = state.app_db_path.clone();
@@ -127,6 +128,7 @@ pub async fn studio_resolve_tool(
             tab_id,
             approved,
             ui_lang,
+            model_profile_id,
         },
     )
     .await

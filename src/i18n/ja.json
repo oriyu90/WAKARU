@@ -199,7 +199,8 @@
     "AI_NETWORK": "AI エンドポイントに接続できません。",
     "AI_NOT_CONFIGURED": "AI 接続が設定されていません。",
     "ai": {
-      "notConfigured": "AI 接続が設定されていません。"
+      "notConfigured": "AI 接続が設定されていません。",
+      "modelNotSet": "選択した接続にモデルが設定されていません。"
     },
     "fm": {
       "badImage": "画像を読み込めませんでした。"
@@ -344,6 +345,9 @@
     "workspacePath": "{{project}}/workspace",
     "workspaceEmpty": "アシスタントが書き出したファイルがここに表示されます。",
     "scope": "範囲",
+    "model": "モデル",
+    "defaultModel": "既定: {{name}}",
+    "noDefaultModel": "既定モデル未設定",
     "message": "メッセージ",
     "messagePlaceholder": "このプロジェクトについて質問…",
     "send": "送信",

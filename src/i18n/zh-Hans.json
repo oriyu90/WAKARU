@@ -199,7 +199,8 @@
     "AI_NETWORK": "无法连接 AI 端点。",
     "AI_NOT_CONFIGURED": "尚未设置 AI 连接。",
     "ai": {
-      "notConfigured": "尚未设置 AI 连接。"
+      "notConfigured": "尚未设置 AI 连接。",
+      "modelNotSet": "所选连接未设置模型。"
     },
     "fm": {
       "badImage": "无法读取图片。"
@@ -344,6 +345,9 @@
     "workspacePath": "{{project}}/workspace",
     "workspaceEmpty": "助手写入的文件会显示在这里。",
     "scope": "范围",
+    "model": "模型",
+    "defaultModel": "默认：{{name}}",
+    "noDefaultModel": "未设置默认模型",
     "message": "消息",
     "messagePlaceholder": "询问关于本项目的问题…",
     "send": "发送",

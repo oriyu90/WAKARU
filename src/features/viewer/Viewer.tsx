@@ -27,6 +27,23 @@ export type PreviewContext = {
 };
 
 const HOME = "__home__";
+const ACTIVE_TAB_KEY = "wakaru.viewer.activeTab";
+
+function loadActiveTab(projectId: string): string {
+  try {
+    return localStorage.getItem(`${ACTIVE_TAB_KEY}.${projectId}`) ?? HOME;
+  } catch {
+    return HOME;
+  }
+}
+
+function saveActiveTab(projectId: string, id: string) {
+  try {
+    localStorage.setItem(`${ACTIVE_TAB_KEY}.${projectId}`, id);
+  } catch {
+    // Private mode etc. — the tab still stays open for this session.
+  }
+}
 
 /** A request from elsewhere (e.g. a Studio citation) to open a source at a
  * locator. `nonce` changes each time so repeat clicks on the same source
@@ -68,7 +85,17 @@ export function Viewer({
   const { t } = useTranslation();
   const qc = useQueryClient();
   const toast = useToast();
-  const [active, setActive] = useState<string>(HOME);
+  // The open document survives unmounts (e.g. a settings round-trip):
+  // the active tab id is restored per project, then validated once the
+  // tab list loads (a closed tab falls back to the source list).
+  const [active, setActive] = useState<string>(() => loadActiveTab(projectId));
+  const reconciledProject = useRef<string | null>(null);
+  useEffect(() => {
+    setActive(loadActiveTab(projectId));
+  }, [projectId]);
+  useEffect(() => {
+    saveActiveTab(projectId, active);
+  }, [projectId, active]);
   const illustratorEnabled = useUiStore((s) => s.illustratorEnabled);
   const setIllustratorEnabled = useUiStore((s) => s.setIllustratorEnabled);
   const { patch } = useAppSettings();
@@ -231,6 +258,17 @@ export function Viewer({
       ?.querySelector<HTMLElement>('[data-active="true"]')
       ?.scrollIntoView({ block: "nearest" });
   }, [active, tabs.data]);
+
+  // Validate a restored tab id once per project: a tab closed elsewhere
+  // falls back to the source list instead of a dead selection.
+  useEffect(() => {
+    if (!tabs.data || reconciledProject.current === projectId) return;
+    reconciledProject.current = projectId;
+    setActive((cur) => {
+      if (cur === HOME) return cur;
+      return tabs.data!.some((tb) => tb.id === cur) ? cur : HOME;
+    });
+  }, [projectId, tabs.data]);
 
   // When Live Illustrator is on, the panel comes up automatically as soon as a
   // document is open (issue 6). Closing it stays closed until the next doc.

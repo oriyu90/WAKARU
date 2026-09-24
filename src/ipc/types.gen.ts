@@ -335,7 +335,13 @@ scope: string,
  * When set, replace this user turn and discard later turns atomically
  * before generating the new branch.
  */
-replaceFromMessageId: string | null, };
+replaceFromMessageId: string | null, 
+/**
+ * Session-only model override: a profile id whose default model answers
+ * this turn instead of the chat role binding. Never persisted, so
+ * reopening the tab falls back to the configured default.
+ */
+modelProfileId: string | null, };
 
 /**
  * Returned by `studio_send` / `studio_resolve_tool`. The frontend refetches

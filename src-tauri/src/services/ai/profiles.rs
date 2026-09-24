@@ -338,6 +338,42 @@ pub fn resolve(app_db: &Connection, role: Role) -> AppResult<Option<ResolvedRole
         return Ok(None);
     };
     let profile = get(app_db, &binding.profile_id)?;
+    Ok(Some(resolved_from_profile(
+        &profile,
+        binding.model,
+        binding.params,
+    )))
+}
+
+/// Resolve a concrete profile (a per-turn Studio model override) to the same
+/// shape as a role binding, using the profile's default model. Session-only:
+/// nothing is written back to `model_roles`, so reopening a tab falls back
+/// to the configured default.
+pub fn resolve_profile(app_db: &Connection, profile_id: &str) -> AppResult<ResolvedRole> {
+    let profile = get(app_db, profile_id)?;
+    let model = profile
+        .default_model
+        .clone()
+        .filter(|m| !m.trim().is_empty())
+        .ok_or_else(|| {
+            AppError::new(
+                "AI_MODEL_NOT_SET",
+                "error.ai.modelNotSet",
+                profile_id.to_string(),
+            )
+        })?;
+    Ok(resolved_from_profile(
+        &profile,
+        model,
+        serde_json::json!({}),
+    ))
+}
+
+fn resolved_from_profile(
+    profile: &AiProfile,
+    model: String,
+    params: serde_json::Value,
+) -> ResolvedRole {
     let headers = profile
         .extra_headers
         .as_object()
@@ -347,15 +383,15 @@ pub fn resolve(app_db: &Connection, role: Role) -> AppResult<Option<ResolvedRole
                 .collect()
         })
         .unwrap_or_default();
-    Ok(Some(ResolvedRole {
-        base_url: profile.base_url,
+    ResolvedRole {
+        base_url: profile.base_url.clone(),
         protocol: profile.protocol,
-        api_key: get_key(&binding.profile_id),
+        api_key: get_key(&profile.id),
         extra_headers: headers,
         timeout_ms: profile.timeout_ms,
-        model: binding.model,
-        params: binding.params,
-    }))
+        model,
+        params,
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -438,5 +474,63 @@ mod tests {
             get(&db, &profile.id).unwrap().protocol,
             ApiProtocol::Anthropic
         );
+    }
+
+    #[test]
+    fn resolve_profile_uses_the_default_model_without_touching_roles() {
+        let db = crate::storage::open_in_memory().unwrap();
+        crate::storage::migrate::run(
+            &db,
+            crate::storage::APP_MIGRATIONS,
+            crate::storage::APP_SCHEMA_VERSION,
+        )
+        .unwrap();
+        let profile = upsert(
+            &db,
+            AiProfileInput {
+                id: None,
+                name: "Local".into(),
+                base_url: "http://localhost:1234/v1".into(),
+                protocol: ApiProtocol::Openai,
+                api_key: None,
+                default_model: Some("local-model".into()),
+                extra_headers: None,
+                timeout_ms: None,
+            },
+        )
+        .unwrap();
+        let resolved = resolve_profile(&db, &profile.id).unwrap();
+        assert_eq!(resolved.model, "local-model");
+        assert_eq!(resolved.base_url, "http://localhost:1234/v1");
+        // No role binding was created as a side effect.
+        assert!(resolve(&db, Role::Chat).unwrap().is_none());
+    }
+
+    #[test]
+    fn resolve_profile_rejects_unknown_profiles_and_model_less_ones() {
+        let db = crate::storage::open_in_memory().unwrap();
+        crate::storage::migrate::run(
+            &db,
+            crate::storage::APP_MIGRATIONS,
+            crate::storage::APP_SCHEMA_VERSION,
+        )
+        .unwrap();
+        assert!(resolve_profile(&db, "missing").is_err());
+        let profile = upsert(
+            &db,
+            AiProfileInput {
+                id: None,
+                name: "No model".into(),
+                base_url: "http://localhost:1234/v1".into(),
+                protocol: ApiProtocol::Openai,
+                api_key: None,
+                default_model: None,
+                extra_headers: None,
+                timeout_ms: None,
+            },
+        )
+        .unwrap();
+        let err = resolve_profile(&db, &profile.id).unwrap_err();
+        assert_eq!(err.code, "AI_MODEL_NOT_SET");
     }
 }

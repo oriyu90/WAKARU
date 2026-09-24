@@ -1218,6 +1218,7 @@ async fn send_impl(
         text,
         scope,
         replace_from_message_id,
+        model_profile_id,
     } = input;
     let text = text.trim().to_string();
 
@@ -1225,13 +1226,16 @@ async fn send_impl(
     // first await (a rusqlite Connection is not Send).
     let (resolved, embed_role, mut ctx, resume_only) = {
         let app_db = crate::storage::open(app_db_path)?;
-        let resolved = profiles::resolve(&app_db, Role::Chat)?.ok_or_else(|| {
-            AppError::new(
-                "AI_NOT_CONFIGURED",
-                "error.ai.notConfigured",
-                "no chat model",
-            )
-        })?;
+        let resolved = match model_profile_id.as_deref().filter(|s| !s.trim().is_empty()) {
+            Some(profile_id) => profiles::resolve_profile(&app_db, profile_id)?,
+            None => profiles::resolve(&app_db, Role::Chat)?.ok_or_else(|| {
+                AppError::new(
+                    "AI_NOT_CONFIGURED",
+                    "error.ai.notConfigured",
+                    "no chat model",
+                )
+            })?,
+        };
         let embed_role = profiles::resolve(&app_db, Role::Embedding)?;
         let project_name: String = app_db
             .query_row(
@@ -1437,6 +1441,8 @@ pub async fn resolve_tool(
         tab_id,
         approved,
         ui_lang,
+        // Non-streaming path has no caller-supplied override.
+        model_profile_id: None,
     };
     resolve_tool_impl(None, reg, app_db_path, projects_root, request).await
 }
@@ -1446,6 +1452,9 @@ pub struct ResolveToolRequest {
     pub tab_id: String,
     pub approved: bool,
     pub ui_lang: String,
+    /// Same session-only override as `StudioSendInput::model_profile_id`: the
+    /// approval continuation must keep answering with the override model.
+    pub model_profile_id: Option<String>,
 }
 
 pub async fn resolve_tool_streaming(
@@ -1470,16 +1479,20 @@ async fn resolve_tool_impl(
         tab_id,
         approved,
         ui_lang,
+        model_profile_id,
     } = request;
     let (resolved, mut ctx) = {
         let app_db = crate::storage::open(app_db_path)?;
-        let resolved = profiles::resolve(&app_db, Role::Chat)?.ok_or_else(|| {
-            AppError::new(
-                "AI_NOT_CONFIGURED",
-                "error.ai.notConfigured",
-                "no chat model",
-            )
-        })?;
+        let resolved = match model_profile_id.as_deref().filter(|s| !s.trim().is_empty()) {
+            Some(profile_id) => profiles::resolve_profile(&app_db, profile_id)?,
+            None => profiles::resolve(&app_db, Role::Chat)?.ok_or_else(|| {
+                AppError::new(
+                    "AI_NOT_CONFIGURED",
+                    "error.ai.notConfigured",
+                    "no chat model",
+                )
+            })?,
+        };
         let embed_role = profiles::resolve(&app_db, Role::Embedding)?;
         let project_name: String = app_db
             .query_row(

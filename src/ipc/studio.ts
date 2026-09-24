@@ -22,18 +22,38 @@ export const studioApi = {
     call<void>("studio_close_tab", { projectId, tabId }),
   reorderTabs: (projectId: string, orderedIds: string[]) =>
     call<void>("studio_reorder_tabs", { projectId, orderedIds }),
-  send: (projectId: string, tabId: string, text: string, scope: string, replaceFromMessageId?: string) =>
+  send: (
+    projectId: string,
+    tabId: string,
+    text: string,
+    scope: string,
+    replaceFromMessageId?: string,
+    modelProfileId?: string,
+  ) =>
     call<StudioSendResult>("studio_send", {
-      input: { projectId, tabId, text, scope, replaceFromMessageId: replaceFromMessageId ?? null },
+      input: {
+        projectId,
+        tabId,
+        text,
+        scope,
+        replaceFromMessageId: replaceFromMessageId ?? null,
+        modelProfileId: modelProfileId ?? null,
+      },
       uiLang: lang(),
     }),
   cancel: (tabId: string) => call<void>("studio_cancel", { tabId }),
-  resolveTool: (projectId: string, tabId: string, approved: boolean) =>
+  resolveTool: (
+    projectId: string,
+    tabId: string,
+    approved: boolean,
+    modelProfileId?: string,
+  ) =>
     call<StudioSendResult>("studio_resolve_tool", {
       projectId,
       tabId,
       approved,
       uiLang: lang(),
+      modelProfileId: modelProfileId ?? null,
     }),
   listArtifacts: (projectId: string) =>
     call<Artifact[]>("studio_list_artifacts", { projectId }),

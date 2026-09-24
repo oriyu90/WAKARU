@@ -9,11 +9,13 @@ import { Markdown } from "../../components/Markdown";
 import { Textarea } from "../../components/Textarea";
 import { CloseIcon } from "../../app/Icons";
 import { studioApi } from "../../ipc/studio";
+import { aiApi } from "../../ipc/ai";
 import { pickSaveDir } from "../../ipc/fileModifier";
 import { inTauri } from "../../ipc/client";
 import { useToast } from "../../components/useToast";
 import { listen } from "@tauri-apps/api/event";
 import type {
+  AiProfile,
   Artifact,
   ChatMessage,
   Citation,
@@ -28,6 +30,12 @@ type StudioToolEvent = { tabId: string; name: string; state: "running" | "comple
 
 export function shouldSubmitStudioKey(key: string, shiftKey: boolean, isComposing: boolean) {
   return key === "Enter" && !shiftKey && !isComposing;
+}
+
+/** Profiles the reader can pick for a single Studio session: only ones with
+ * a default model are usable as an override target. */
+export function usableChatProfiles(profiles: AiProfile[]): AiProfile[] {
+  return profiles.filter((p) => (p.defaultModel ?? "").trim() !== "");
 }
 
 export function Studio({
@@ -50,6 +58,10 @@ export function Studio({
   const [activeId, setActiveId] = useState("");
   const [text, setText] = useState("");
   const [scope, setScope] = useState("project");
+  // Session-only model override (a profile id, or null for the configured
+  // default). Reset whenever the active conversation changes so reopening a
+  // tab always falls back to the default model.
+  const [modelProfileId, setModelProfileId] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [provisional, setProvisional] = useState("");
@@ -101,7 +113,27 @@ export function Studio({
   useEffect(() => {
     setEditingTurn(null);
     setText("");
+    // Reopening (or switching) a conversation drops the session-only model
+    // override and falls back to the configured default model.
+    setModelProfileId(null);
   }, [activeTabId]);
+
+  // Chat-capable connections for the session-only model selector.
+  const profiles = useQuery({
+    queryKey: ["ai-profiles"],
+    queryFn: aiApi.listProfiles,
+    enabled: inTauri,
+  });
+  const roleBindings = useQuery({
+    queryKey: ["ai-bindings"],
+    queryFn: aiApi.getRoleBindings,
+    enabled: inTauri,
+  });
+  const chatBinding = roleBindings.data?.chat ?? null;
+  const modelOptions = useMemo(
+    () => usableChatProfiles(profiles.data ?? []),
+    [profiles.data],
+  );
 
   const messages = useMemo(
     () => conversation.data?.messages ?? [],
@@ -136,7 +168,14 @@ export function Studio({
   });
   const send = useMutation({
     mutationFn: ({ payload, replaceFrom }: { payload: string; replaceFrom?: string }) =>
-      studioApi.send(projectId, activeTabId, payload, scope, replaceFrom),
+      studioApi.send(
+        projectId,
+        activeTabId,
+        payload,
+        scope,
+        replaceFrom,
+        modelProfileId ?? undefined,
+      ),
     onMutate: () => {
       // The turn is persisted before the model call, so clearing the composer
       // now can't lose it — and it stops the sent text lingering in the box
@@ -185,7 +224,8 @@ export function Studio({
     };
   }, [activeTabId]);
   const resolveTool = useMutation({
-    mutationFn: (approved: boolean) => studioApi.resolveTool(projectId, activeTabId, approved),
+    mutationFn: (approved: boolean) =>
+      studioApi.resolveTool(projectId, activeTabId, approved, modelProfileId ?? undefined),
     onMutate: () => { setProvisional(""); setRunningTool(""); },
     onSuccess: async () => {
       setProvisional("");
@@ -444,21 +484,43 @@ export function Studio({
           </div>
 
           <div className={styles.composerBar}>
-            <select
-              className={styles.scopeSel}
-              aria-label={t("studio.scope")}
-              value={scope}
-              onChange={(e) => setScope(e.target.value)}
-            >
-              <option value="project">{t("illustrator.scopeProject")}</option>
-              {sources
-                .filter((s) => s.status === "ready")
-                .map((s) => (
-                  <option key={s.id} value={`source:${s.id}`}>
-                    {t("illustrator.scopeSource")}: {s.originalName}
-                  </option>
-                ))}
-            </select>
+            <div className={styles.selectGroup}>
+              <select
+                className={styles.scopeSel}
+                aria-label={t("studio.model")}
+                title={t("studio.model")}
+                value={modelProfileId ?? ""}
+                onChange={(e) => setModelProfileId(e.target.value || null)}
+              >
+                <option value="">
+                  {chatBinding
+                    ? t("studio.defaultModel", { name: chatBinding.model })
+                    : t("studio.noDefaultModel")}
+                </option>
+                {modelOptions
+                  .filter((p) => p.id !== chatBinding?.profileId)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} · {p.defaultModel}
+                    </option>
+                  ))}
+              </select>
+              <select
+                className={styles.scopeSel}
+                aria-label={t("studio.scope")}
+                value={scope}
+                onChange={(e) => setScope(e.target.value)}
+              >
+                <option value="project">{t("illustrator.scopeProject")}</option>
+                {sources
+                  .filter((s) => s.status === "ready")
+                  .map((s) => (
+                    <option key={s.id} value={`source:${s.id}`}>
+                      {t("illustrator.scopeSource")}: {s.originalName}
+                    </option>
+                  ))}
+              </select>
+            </div>
             <div className={styles.composerActions}>
               {!editingTurn && messages.some((message) => message.role === "user") ? (
                 <Button
