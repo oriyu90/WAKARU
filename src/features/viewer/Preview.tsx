@@ -337,21 +337,6 @@ function ReadingPreview({
   originalUrl?: string | null;
 }) {
   const { t } = useTranslation();
-  const rel = detail.primaryAssetUrl
-    ? null
-    : `derived/${detail.id}/document.md`;
-  const direct = useQuery({
-    queryKey: ["reader", detail.id, detail.primaryAssetUrl],
-    enabled: !!detail.primaryAssetUrl,
-    queryFn: async () => {
-      const res = await fetch(detail.primaryAssetUrl!);
-      return res.text();
-    },
-  });
-  const viaDerived = useAssetText(projectId, detail.id, rel);
-  const text = detail.primaryAssetUrl ? direct.data : viaDerived.data;
-  const loading = detail.primaryAssetUrl ? direct.isLoading : viaDerived.isLoading;
-  const bodyRef = useRef<HTMLDivElement>(null);
   // Opt-in JS rendering for weblinks (docs/05 §4 lineage): the extracted
   // reader view stays the default so RAG grounding never changes, and remote
   // scripts run only after an explicit tap, inside the same opaque-origin
@@ -361,6 +346,28 @@ function ReadingPreview({
       ? originalUrl
       : null;
   const [live, setLive] = useState(false);
+  // A new document always starts in reader view: never inherit a live
+  // session (and its remote scripts) from the previous document.
+  useEffect(() => {
+    setLive(false);
+  }, [detail.id]);
+  // While the live frame is up, the reader text is off screen — don't fetch
+  // it. Returning to reader view refetches through the usual caches.
+  const showLive = live && !!liveUrl;
+  const rel =
+    showLive || detail.primaryAssetUrl ? null : `derived/${detail.id}/document.md`;
+  const direct = useQuery({
+    queryKey: ["reader", detail.id, detail.primaryAssetUrl],
+    enabled: !!detail.primaryAssetUrl && !showLive,
+    queryFn: async () => {
+      const res = await fetch(detail.primaryAssetUrl!);
+      return res.text();
+    },
+  });
+  const viaDerived = useAssetText(projectId, detail.id, rel);
+  const text = detail.primaryAssetUrl ? direct.data : viaDerived.data;
+  const loading = detail.primaryAssetUrl ? direct.isLoading : viaDerived.isLoading;
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className={styles.wrap}>
@@ -398,7 +405,7 @@ function ReadingPreview({
         ) : null}
       </Toolbar>
       <div className={styles.body} ref={bodyRef}>
-        {live && liveUrl ? (
+        {showLive ? (
           <div className={styles.liveWrap}>
             <iframe
               className={styles.liveFrame}

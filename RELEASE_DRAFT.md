@@ -1,3 +1,62 @@
+# v1.2.0 release record
+
+Prepared 2026-09-25. Scope: opt-in JavaScript live view for weblink previews
+(reader/live switch, opaque-origin `allow-scripts` sandbox, CSP `frame-src`
+extended to `https:`/`http:`, reader view stays default, live state resets
+per document, reader fetch paused while live). Verification: this file,
+`RELEASE_NOTES.md` (v1.2.0 section), `docs/DECISIONS.md` D-43.
+
+## Verified artifact
+
+- App: `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, version 1.2.0)
+- DMG: `WAKARU_1.2.0_aarch64.dmg`
+- Checksum: `WAKARU_1.2.0_aarch64.dmg.sha256` (basename only)
+- Size: `21,786,658` bytes
+- SHA-256: `1f47fd74b58f92e5e23a78d6a2513416ccc2e38662ecc701a8d965d42be1a6c7`
+- Platform: macOS 12+, Apple Silicon, ad-hoc signed, not notarised
+
+Scrutiny fixes over the first implementation: live state resets when the
+document changes (no inherited remote scripts), and reader-text fetching is
+disabled while the live frame is shown. The Tauri bundler again skipped
+re-signing the linker-signed binary, so the bundle was finished with
+`codesign --force --sign - --identifier com.yukiorita.wakaru --options
+runtime` and the DMG rebuilt with the same `bundle_dmg.sh` arguments.
+
+`codesign --verify --deep --strict` passes for the build output and the app
+inside the mounted DMG. `hdiutil verify` is VALID. The mounted app reached
+`WAKARU backend ready version="1.2.0"`; the startup lines contain no credential
+patterns.
+
+## Release scope
+
+- Weblink reader/live switch (originalUrl-gated, http(s) only).
+- No database migration, project archive change, AI profile migration or
+  dependency change.
+
+## Verification summary
+
+- Frontend: typecheck, eslint, design-rules, hardcoded-strings, 33 tests,
+  contrast, i18n parity, production build and npm audit (0) pass.
+- Rust: unchanged since v1.1.0 gates; fmt, clippy with warnings denied and
+  library tests re-run green.
+- Bindings drift: none.
+
+## Publication sequence
+
+1. Commit and tag `v1.2.0` on `main`.
+2. Publish the GitHub release with the verified DMG and checksum.
+3. Re-download release assets and compare byte size and SHA-256.
+4. Publish four localized Studio RIZI pages and release/news metadata.
+5. Record the release in the private common-rules maintenance document.
+
+## Explicit limits
+
+- No Developer ID signature or Apple notarisation credentials were supplied.
+- Windows and Linux are not built or verified.
+- Repository visibility remains private pending an explicit owner decision.
+
+---
+
 # v1.1.0 release record
 
 Prepared 2026-09-24. Scope: Live Illustrator five-item rework (selectable

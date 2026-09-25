@@ -1,3 +1,38 @@
+# WAKARU v1.2.0
+
+WAKARU v1.2.0 adds JavaScript rendering to web-link previews. A saved link
+can now switch between the extracted reader view and a live, scripted view
+of the original page.
+
+## What changed
+
+- Web links gain a reader/live switch beside the "open original" action. The
+  reader view stays the default so citations keep matching the stored text;
+  remote scripts run only after an explicit tap, inside the same opaque-origin
+  sandbox (`allow-scripts` only, no popups, no referrer) as imported-site
+  previews.
+- Switching documents always returns to the reader view, and the reader text
+  is not fetched while the live frame is on screen.
+- The app content-security policy now permits framing `https:` and `http:`
+  pages for this opt-in preview.
+
+## Compatibility
+
+- Existing projects, settings, conversations and sessions from v0.0.0 through
+  v1.1.0 remain compatible.
+- No database migration, project archive change or AI profile migration is
+  required.
+
+## Distribution
+
+Apple Silicon Mac, macOS 12 or later. The application is MIT licensed. This
+build is ad-hoc signed and is not Apple-notarised: on first launch,
+right-click WAKARU → Open (or allow it in System Settings → Privacy &
+Security). Distribution remains invite-only while the GitHub repository is
+private.
+
+---
+
 # WAKARU v1.1.0
 
 WAKARU v1.1.0 reworks the Live Illustrator panel around five reader requests:
