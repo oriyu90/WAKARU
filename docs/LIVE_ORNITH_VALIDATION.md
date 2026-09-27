@@ -1,6 +1,6 @@
 # Live OpenAI-compatible API validation
 
-## v0.1.0 result — 2026-09-08
+## v1.3.0 result — 2026-09-28
 
 The reusable live acceptance test completed against the owner-authorized local
 endpoint with `Qwen3.8-27B-MLX-4bit`. The credential was supplied only as a
@@ -14,7 +14,7 @@ and the test removed its temporary keychain credential.
 | Vision and JSON Schema probes | pass |
 | Live Illustrator source grounding | pass — Japanese and English explanations retained date, budget, and owner facts |
 | Prompt-injection boundary | pass — untrusted source text remained data and no credential was disclosed |
-| Studio tool loop and approved file write | pass — one Markdown artifact was saved and registered |
+| Studio tool loop and approved file write | pass — the model used the v1.3 recipes/tool definitions in two iterations; one grounded Markdown artifact was saved and registered |
 | Embeddings on the chat connection | unavailable — the endpoint returned a handled request error; WAKARU safely retains text-index search |
 | Secret leakage | none in test output, model output, or generated artifact |
 

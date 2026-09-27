@@ -129,6 +129,7 @@ pub fn run() {
             commands::studio_cancel,
             commands::studio_resolve_tool,
             commands::studio_list_artifacts,
+            commands::studio_import_files,
             commands::studio_import_artifact_as_source,
             commands::studio_download_artifact,
             commands::mcp_list_servers,

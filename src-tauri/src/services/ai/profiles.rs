@@ -420,6 +420,14 @@ mod tests {
             normalise_base_url("http://192.168.0.114:1234").unwrap(),
             "http://192.168.0.114:1234/v1"
         );
+        for official in [
+            "https://generativelanguage.googleapis.com/v1beta/openai",
+            "https://openrouter.ai/api/v1",
+            "https://open.bigmodel.cn/api/paas/v4",
+            "https://api.z.ai/api/paas/v4",
+        ] {
+            assert_eq!(normalise_base_url(official).unwrap(), official);
+        }
         for invalid in [
             "file:///tmp/api",
             "https://user:pass@example.com/v1",

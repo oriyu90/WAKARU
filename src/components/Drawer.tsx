@@ -74,7 +74,9 @@ export function Drawer({
       data-side={side}
       data-resizing={resizing || undefined}
       style={
-        widthRem != null
+        !open
+          ? { inlineSize: "0px", minInlineSize: "0px" }
+          : widthRem != null
           ? { inlineSize: `${clampRem(widthRem)}rem` }
           : width
             ? { inlineSize: width }
@@ -83,6 +85,7 @@ export function Drawer({
       role="region"
       aria-label={label}
       aria-hidden={!open}
+      inert={!open ? true : undefined}
     >
       {resizable ? (
         <div

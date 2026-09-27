@@ -7,7 +7,10 @@
 - `list_sources()` — 列出项目的来源。
 - `list_tabs()` / `read_tab(title)` — 查看其他 Studio 对话。
 - `list_files()` / `read_file(path)` — 查看该标签页的 `workspace/`。
+- `web_search(query)` — 通过已连接的 SearXNG 或 Tavily MCP 搜索网页。
 - `write_file(path, content)` — 向 `workspace/` 写入文件。运行前需要读者批准。
+- `build_document(path, format, title, sections, toc?)` — 可确定地生成 Markdown、DOCX 或 PDF。
+- `run_command(command, args?)` — 不经 shell 在沙箱内运行程序。
 
 规则：
 

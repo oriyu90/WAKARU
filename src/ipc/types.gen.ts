@@ -245,7 +245,7 @@ export type SandboxSettings = { commandTimeoutSec: number, autoAllowNewFileWrite
 
 export type SaveTextInput = { content: string, destPath: string, 
 /**
- * "md" | "txt"
+ * "md" | "txt" | "docx" | "pdf"
  */
 format: string, };
 

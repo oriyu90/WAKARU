@@ -481,3 +481,12 @@
 - **採用**: `ReadingPreview`に抜粋表示/ライブ表示の切替を設け、originalUrlがあるweblinkにだけ出す。既定は抜粋表示（RAG根拠と一致）のままにし、remote scriptは明示tapの後だけ、websiteと同一隔離（allow-scriptsのみ、popupなし、no-referrer）で動かす。CSP `frame-src`へ`https: http:`を追加する。
 - **理由**: 根拠の一致とremote code実行の最小化を両立し、取込・DB・RAGに触れずviewer層だけで完結させるため。
 - **影響**: Rust・DB・IPC・bindingsに変更なし。http(s)以外のoriginalUrlには切替を出さない。残存riskはD-33と同一 posture として保守memoへ記録する。
+
+## D-44 · 弱いモデルには安定ツールと短い作業レシピを渡し、派生ファイルはアプリ所有境界へ入れる
+
+- **日付**: 2026-09-28（v1.3.0）
+- **論点**: 接続モデルが資料取得・文書生成・MCP検索の使い分けを推測する設計では、ツール対応していても名前や順序を選べない。外部ファイルを直接参照すると移動・削除・symlink・競合で会話の再現性も失われる。
+- **採用**: Studio system promptへ短い source/document/web/command recipe と実在コマンド一覧を付与する。SearXNG/Tavilyの異なるtool schemaは組み込み `web_search(query)` に正規化し、Liveは明示的なWeb/現在情報要求時だけ同じbridgeを使う。Finder dropは通常ファイルだけを100 MiB/総量2 GiB上限内で `workspace/imports/` へ一時ファイル→flush→sync→renameし、artifact登録後にアプリ所有コピーをsource ingestする。PDF/DOCX生成とFile Modifier出力も同じ原子的完成点を使う。
+- **理由**: コンテキストを肥大化させず、低性能モデルにも「いつ何を呼ぶか」を伝え、外部状態やクラッシュから成果物と資料参照を分離するため。検索結果・資料・ツール結果は引き続き未信頼データでありsystem指示には昇格しない。
+- **影響**: DB migration、project archive、既存AI profileに変更なし。`studio_import_files` IPCを追加し、UI文字列は日本語・英語・簡体字中国語で同時追加。既存OpenAI/Anthropic adapterをGemini/OpenRouter/GLM/Ollama/LM Studio/MLXBarにもpresetで再利用する。
+- **差し戻し条件**: ベンダが互換面で必要機能を提供しなくなった場合のみ専用adapterを検討する。外部ファイルの参照渡しやshell経由実行へは戻さない。

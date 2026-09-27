@@ -1,5 +1,6 @@
 /* Conversational workspace: quiet rails and a centred reading thread. */
 .studio {
+  position: relative;
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -7,6 +8,48 @@
   grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--panel-w);
   overflow: hidden;
   background: var(--color-paper-2);
+}
+
+.dropOverlay {
+  position: absolute;
+  inset: var(--space-sm);
+  z-index: var(--z-modal);
+  display: grid;
+  place-content: center;
+  gap: var(--space-xs);
+  text-align: center;
+  border: 2px dashed var(--color-accent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-paper) 90%, var(--color-accent));
+  color: var(--color-ink-strong);
+  pointer-events: none;
+  box-shadow: var(--shadow-overlay);
+}
+
+.dropHint {
+  margin: 0;
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: var(--rule-1) solid var(--color-rule);
+  color: var(--color-muted);
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+}
+
+.activityList {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm) var(--space-sm);
+}
+
+.activityItem {
+  min-width: 0;
+}
+
+.activityItem > strong {
+  display: block;
+  margin-bottom: var(--space-2xs);
+  color: var(--color-ink);
+  font-size: var(--fs-xs);
 }
 .emptyPane {
   flex: 1;

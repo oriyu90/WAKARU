@@ -26,11 +26,15 @@ export const aiApi = {
 };
 
 export const AI_PRESETS: { label: string; baseUrl: string; protocol: ApiProtocol }[] = [
+  { label: "OpenAI", baseUrl: "https://api.openai.com/v1", protocol: "openai" },
+  { label: "Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", protocol: "openai" },
+  { label: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1", protocol: "openai" },
+  { label: "Claude (Anthropic)", baseUrl: "https://api.anthropic.com/v1", protocol: "anthropic" },
+  { label: "GLM (BigModel)", baseUrl: "https://open.bigmodel.cn/api/paas/v4", protocol: "openai" },
+  { label: "GLM (Z.AI)", baseUrl: "https://api.z.ai/api/paas/v4", protocol: "openai" },
   { label: "LM Studio", baseUrl: "http://localhost:1234/v1", protocol: "openai" },
   { label: "MLXBar", baseUrl: "http://127.0.0.1:11435/v1", protocol: "openai" },
   { label: "Ollama", baseUrl: "http://localhost:11434/v1", protocol: "openai" },
-  { label: "OpenAI", baseUrl: "https://api.openai.com/v1", protocol: "openai" },
-  { label: "Anthropic", baseUrl: "https://api.anthropic.com/v1", protocol: "anthropic" },
   { label: "Custom (OpenAI-compatible)", baseUrl: "", protocol: "openai" },
   { label: "Custom (Anthropic-compatible)", baseUrl: "", protocol: "anthropic" },
 ];

@@ -10,6 +10,7 @@
 
 use crate::error::{AppError, AppResult};
 use std::collections::HashSet;
+use std::ffi::OsString;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -23,6 +24,58 @@ pub const MAX_OUTPUT_BYTES: usize = 1024 * 1024;
 /// Only these are inherited by a sandboxed command (docs/05 §7.2). An API key
 /// can never reach a child process.
 const ENV_ALLOWLIST: &[&str] = &["PATH", "HOME", "TMPDIR", "LANG"];
+
+fn command_path() -> OsString {
+    let mut dirs: Vec<PathBuf> = std::env::var_os("PATH")
+        .map(|value| std::env::split_paths(&value).collect())
+        .unwrap_or_default();
+    dirs.extend(
+        [
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+            "/usr/sbin",
+            "/sbin",
+        ]
+        .into_iter()
+        .map(PathBuf::from),
+    );
+    if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
+        dirs.extend([
+            home.join(".local/bin"),
+            home.join(".cargo/bin"),
+            home.join("Library/Python/3.12/bin"),
+        ]);
+    }
+    let mut seen = HashSet::new();
+    dirs.retain(|dir| dir.is_dir() && seen.insert(dir.clone()));
+    std::env::join_paths(dirs).unwrap_or_else(|_| OsString::from("/usr/bin:/bin"))
+}
+
+/// Short, runtime-accurate command list placed in the weak-model capability
+/// guide. It advertises only tools that can actually be spawned by run_command.
+pub fn command_catalog() -> String {
+    let path = command_path();
+    let dirs: Vec<PathBuf> = std::env::split_paths(&path).collect();
+    let available: Vec<&str> = [
+        "python3",
+        "textutil",
+        "pandoc",
+        "soffice",
+        "ffmpeg",
+        "magick",
+        "pdftotext",
+    ]
+    .into_iter()
+    .filter(|name| dirs.iter().any(|dir| dir.join(name).is_file()))
+    .collect();
+    if available.is_empty() {
+        "(no optional conversion commands detected)".into()
+    } else {
+        available.join(", ")
+    }
+}
 
 fn denied(msg: impl Into<String>) -> AppError {
     AppError::new("SANDBOX_PATH_DENIED", "error.sandbox.pathDenied", msg)
@@ -218,10 +271,14 @@ pub async fn run_command(
         .stderr(std::process::Stdio::piped())
         .kill_on_drop(true);
     for key in ENV_ALLOWLIST {
+        if *key == "PATH" {
+            continue;
+        }
         if let Ok(val) = std::env::var(key) {
             cmd.env(key, val);
         }
     }
+    cmd.env("PATH", command_path());
     #[cfg(unix)]
     cmd.process_group(0); // own group, so we can signal children too
 

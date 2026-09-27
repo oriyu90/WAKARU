@@ -57,6 +57,8 @@ export const studioApi = {
     }),
   listArtifacts: (projectId: string) =>
     call<Artifact[]>("studio_list_artifacts", { projectId }),
+  importFiles: (projectId: string, tabId: string, paths: string[]) =>
+    call<Artifact[]>("studio_import_files", { projectId, tabId, paths }),
   importArtifact: (projectId: string, artifactId: string) =>
     call<Source>("studio_import_artifact_as_source", { projectId, artifactId }),
   downloadArtifact: (projectId: string, artifactId: string, destDir: string) =>

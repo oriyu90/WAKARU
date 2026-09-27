@@ -21,13 +21,21 @@
 
 | プリセット | Base URL | 備考 |
 |---|---|---|
+| OpenAI | `https://api.openai.com/v1` | OpenAI互換 |
+| Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | 公式OpenAI互換面 |
+| OpenRouter | `https://openrouter.ai/api/v1` | OpenAI互換 |
+| Claude | `https://api.anthropic.com/v1` | Anthropic互換 |
+| GLM (BigModel) | `https://open.bigmodel.cn/api/paas/v4` | OpenAI互換 |
+| GLM (Z.AI) | `https://api.z.ai/api/paas/v4` | OpenAI互換 |
 | LM Studio | `http://localhost:1234/v1` | APIキー不要（空でよい） |
+| MLXBar | `http://127.0.0.1:11435/v1` | OpenAI互換、任意Bearer |
 | Ollama | `http://localhost:11434/v1` | APIキー不要 |
-| OpenAI | `https://api.openai.com/v1` | |
-| Anthropic | `https://api.anthropic.com/v1` | Anthropic互換 |
 | カスタム | （空） | OpenAI互換 / Anthropic互換を選択 |
 
-> Gemini を使う場合は OpenAI互換エンドポイント（`https://generativelanguage.googleapis.com/v1beta/openai/`）を「カスタム」として入れる。Anthropic互換では `system`、画像、tools/tool_result、structured output、SSEイベントを共通内部形式へ相互変換する。
+プリセットは URL とプロトコルを埋めるだけで、ベンダ固有SDKには分岐しない。
+Anthropic互換では `system`、画像、tools/tool_result、structured output、
+SSEイベントを共通内部形式へ相互変換する。OpenAI/Anthropic互換を選べる
+カスタム項目は今後の互換サーバー用として残す。
 
 ### 1.3 能力判定（Capability detection）
 
@@ -290,7 +298,15 @@ system prompt は「成果を特定 → 抜粋を確認 → 必要なら検索�
 | `write_file(path, content)` | ワークスペースにファイル作成/上書き | **要承認**（上書き時は必須、新規は設定で自動許可可） |
 | `read_file(path)` | ワークスペース内を読む | 不要 |
 | `list_files(dir?)` | ワークスペースの一覧 | 不要 |
+| `build_document(path, format, title, sections, toc?)` | Markdown / DOCX / PDFを決定論的に組版 | 新規は設定に従う、上書きは必須 |
+| `web_search(query)` | 接続済みSearXNG/Tavily MCPで現在のWebを検索 | 不要（読み取り専用） |
 | `run_command(command, args[])` | サンドボックス内でコマンド実行 | **必ず要承認** |
+
+能力の低いモデルにも、毎ターンの短い作業レシピとして「抜粋→検索→ページ取得」
+「構造→`build_document`」「現在情報→`web_search`」「組み込みで不足時のみ
+`run_command`」の順を伝える。`read_document` は資料名・位置を返し、全文取得が
+20,000文字を超えた場合はページ指定で続けるよう明示する。利用可能な変換コマンドは
+実行時PATHから検出したものだけを列挙する。
 
 ### 5.4 ツール承認フロー
 

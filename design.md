@@ -75,6 +75,10 @@ not invent independent palettes or geometry.
   that surface, while the send action remains the strongest circular/rounded action.
 - Tool approvals, citations, scopes and artifacts retain their existing behavior and
   semantic labels.
+- Native file drag-over uses one quiet, high-contrast overlay over the Studio surface;
+  imported files appear in the existing workspace rail rather than a second file UI.
+- Completed tool requests and raw results are collapsed by default in semantic
+  `details` rows. Approval cards remain expanded because they require a decision.
 
 ## Viewer and document surfaces
 
@@ -82,6 +86,8 @@ not invent independent palettes or geometry.
 - File tabs use the same neutral filled selection language as the rest of the app.
 - Rendered documents stay on their natural document surface; the UI theme must not tint
   PDF/Office content.
+- Closing Live Illustrator sets its layout width and minimum width to zero and marks it
+  inert; only its open state may consume the remembered resizable width.
 
 ## Typography
 

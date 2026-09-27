@@ -8,8 +8,11 @@ tools:
 - `list_sources()` — list the project's sources.
 - `list_tabs()` / `read_tab(title)` — inspect other Studio conversations.
 - `list_files()` / `read_file(path)` — inspect the tab's `workspace/`.
+- `web_search(query)` — search the web through a connected SearXNG or Tavily MCP.
 - `write_file(path, content)` — write a file into `workspace/`. This needs the
   reader's approval before it runs.
+- `build_document(path, format, title, sections, toc?)` — deterministically create Markdown, DOCX or PDF.
+- `run_command(command, args?)` — run a program inside the sandbox without a shell.
 
 Rules:
 

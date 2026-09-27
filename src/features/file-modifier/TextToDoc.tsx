@@ -16,7 +16,7 @@ export function TextToDoc() {
   const { t } = useTranslation();
   const toast = useToast();
   const [input, setInput] = useState("");
-  const [format, setFormat] = useState<"md" | "txt">("md");
+  const [format, setFormat] = useState<"md" | "txt" | "docx" | "pdf">("md");
   const [streamId, setStreamId] = useState<string | null>(null);
   const [showDiff, setShowDiff] = useState(false);
   const [dir, setDir] = useState("");
@@ -47,7 +47,7 @@ export function TextToDoc() {
 
   const save = useMutation({
     mutationFn: () => {
-      const content = format === "md" && output ? output : input;
+      const content = format !== "txt" && output ? output : input;
       return fmApi.saveText({ content, destPath: `${dir}/${name}`, format });
     },
     onSuccess: (r) => toast.push({ tone: "success", message: t("fileModifier.wrote", { path: r.path }) }),
@@ -74,7 +74,7 @@ export function TextToDoc() {
         </div>
         <div className={styles.textCol}>
           <span className={styles.colLabel}>
-            {format === "md" ? t("fileModifier.organised") : "TXT"}
+            {format === "txt" ? "TXT" : t("fileModifier.organised")}
           </span>
           <div className={styles.outputBox}>
             {showDiff ? (
@@ -87,7 +87,7 @@ export function TextToDoc() {
                   </span>
                 ))}
               </pre>
-            ) : format === "md" ? (
+            ) : format !== "txt" ? (
               output ? (
                 <div className="reading">
                   <Markdown>{output}</Markdown>
@@ -100,7 +100,7 @@ export function TextToDoc() {
             )}
           </div>
           <div className={styles.outputBar}>
-            {format === "md" ? (
+            {format !== "txt" ? (
               <>
                 <Button
                   size="sm"
@@ -133,6 +133,14 @@ export function TextToDoc() {
           <input type="radio" checked={format === "txt"} onChange={() => setFormat("txt")} />
           {t("fileModifier.plainTxt")}
         </label>
+        <label>
+          <input type="radio" checked={format === "docx"} onChange={() => setFormat("docx")} disabled={!inTauri} />
+          {t("fileModifier.wordDoc")}
+        </label>
+        <label>
+          <input type="radio" checked={format === "pdf"} onChange={() => setFormat("pdf")} disabled={!inTauri} />
+          {t("fileModifier.pdfDoc")}
+        </label>
         {!inTauri ? <span className={styles.muted}>{t("errors.offline")}</span> : null}
       </div>
 
@@ -163,7 +171,7 @@ export function TextToDoc() {
         <Button
           variant="primary"
           loading={save.isPending}
-          disabled={!dir || !name.trim() || (format === "md" ? !output || suspiciousOutput : !input)}
+          disabled={!dir || !name.trim() || (format !== "txt" ? !output || suspiciousOutput : !input)}
           onClick={() => save.mutate()}
         >
           {t("common.save")}

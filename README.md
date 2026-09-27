@@ -22,8 +22,9 @@ so on first launch right-click WAKARU → **Open**.
 ## Highlights
 
 - **Bring your own model** — per-connection OpenAI-compatible (`/chat/completions`,
-  Bearer) or Anthropic-compatible (`/messages`, `x-api-key`) wire format. Cloud APIs,
-  LM Studio, Ollama, MLXBar (built-in preset), or another model host on your LAN. Reasoning
+  Bearer) or Anthropic-compatible (`/messages`, `x-api-key`) wire format. Presets cover
+  OpenAI, Gemini, OpenRouter, Claude, GLM/Z.AI, LM Studio, Ollama and MLXBar, while
+  custom compatible servers can run locally or on your LAN. Reasoning
   models are handled either way — a `reasoning_content` field or an inline
   `<think>…</think>` block is kept out of the answer.
 - **Real rendering** — PDF via bundled PDF.js, DOCX/PPTX structure, bounded sheet
@@ -34,8 +35,10 @@ so on first launch right-click WAKARU → **Open**.
 - **OCR** — scanned PDFs and images with text are recognised (pure-Rust `ocrs`,
   models fetched once) and folded into search; a scanned PDF also gets a
   `searchable.pdf` with an invisible, position-matched text layer.
-- **Studio `build_document`** — the agent assembles a formatted Markdown, Word or
-  PDF document from a title and sections; the model supplies structure, not layout.
+- **Studio creation recipes** — even a small local model gets explicit source-reading,
+  web-search, command and document-building recipes. `build_document` deterministically
+  assembles Markdown, Word or PDF; File Modifier can also save organised text in all
+  four formats.
 - **Hybrid search** — FTS + optional vector search, with a locally cached
   multilingual embedding model as an offline fallback.
 - **Live Illustrator** — plain-language, understanding-oriented explanations with
@@ -43,11 +46,13 @@ so on first launch right-click WAKARU → **Open**.
   page/source/project scope. Source-level sessions stay intact while pages change,
   and enter Studio only after the explicit **Hand off to Studio** action.
 - **Studio** — an agentic loop over your sources and a sandboxed workspace, with tool
-  approval, iteration limits and artifact export. Enter sends, Shift+Enter inserts a
-  newline, and any earlier user turn can be edited to create a new conversation tail.
+  approval, iteration limits and artifact export. Drop files from Finder to copy and
+  ingest them into the project; completed tool work stays in expandable activity rows.
+  Enter sends, Shift+Enter inserts a newline, and an earlier user turn can be edited.
 - **MCP** — local stdio servers (a bare `npx` / `uvx` / `node` command is found
   in the usual install locations; a SearXNG web-search preset is built in) and
-  policy-checked Streamable HTTP servers.
+  policy-checked Streamable HTTP servers. Connected SearXNG/Tavily search tools are
+  exposed to Studio and explicit Live Illustrator web requests through one stable tool.
 - **Private by default** — API keys in the OS keychain; original files served only
   through a project-scoped `wakaru-asset://` protocol; no telemetry.
 - Japanese / English / Simplified Chinese UI, light / dark / monochrome, WCAG AA.

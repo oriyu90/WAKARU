@@ -832,6 +832,99 @@ pub async fn call_tool(slug: &str, tool: &str, arguments: &str) -> AppResult<Str
     })
 }
 
+/// Route a stable, model-friendly `web_search(query)` capability to a connected
+/// search MCP. SearXNG and Tavily servers expose different tool names and input
+/// keys; Studio and Live Illustrator should not make a small model discover and
+/// reproduce those generated names on every turn.
+pub async fn web_search(query: &str) -> AppResult<String> {
+    let query = query.trim();
+    if query.is_empty() {
+        return Err(AppError::new(
+            "MCP_BAD_ARGUMENTS",
+            "error.mcp.callFailed",
+            "web search query is empty",
+        ));
+    }
+
+    let candidate = {
+        let g = conns().lock().await;
+        g.values()
+            .filter(|conn| !conn.service.is_closed())
+            .flat_map(|conn| {
+                conn.tools.iter().filter_map(move |tool| {
+                    let score = web_tool_score(tool);
+                    (score > 0).then(|| {
+                        (
+                            score,
+                            conn.slug.clone(),
+                            tool.alias.clone(),
+                            web_search_arguments(&tool.schema, query),
+                        )
+                    })
+                })
+            })
+            .max_by_key(|(score, _, _, _)| *score)
+    };
+
+    let Some((_, slug, alias, arguments)) = candidate else {
+        return Err(AppError::new(
+            "MCP_WEB_SEARCH_UNAVAILABLE",
+            "error.mcp.notConnected",
+            "no connected SearXNG, Tavily, or web-search MCP tool",
+        ));
+    };
+    call_tool(&slug, &alias, &arguments.to_string()).await
+}
+
+fn web_tool_score(tool: &ToolInfo) -> u8 {
+    let name = tool.name.to_ascii_lowercase();
+    let description = tool
+        .description
+        .as_deref()
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if name.contains("fetch") || name.contains("extract") || name.contains("crawl") {
+        return 0;
+    }
+    if name.contains("tavily_search") || name.contains("searxng") {
+        5
+    } else if name == "web_search" || name.contains("web_search") {
+        4
+    } else if name == "search" && description.contains("web") {
+        3
+    } else if name.contains("search")
+        && (description.contains("web")
+            || description.contains("internet")
+            || description.contains("tavily")
+            || description.contains("searx"))
+    {
+        2
+    } else {
+        0
+    }
+}
+
+fn web_search_arguments(schema: &Value, query: &str) -> Value {
+    let properties = schema
+        .get("properties")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    let query_key = ["query", "q", "search_query", "text"]
+        .into_iter()
+        .find(|key| properties.contains_key(*key))
+        .unwrap_or("query");
+    let mut args = Map::new();
+    args.insert(query_key.into(), Value::String(query.into()));
+    for key in ["max_results", "count", "limit"] {
+        if properties.contains_key(key) {
+            args.insert(key.into(), json!(5));
+            break;
+        }
+    }
+    Value::Object(args)
+}
+
 /// Drop every live connection (called on app shutdown — stdio children must not
 /// be orphaned, docs/05 §6.1).
 pub async fn shutdown_all() {
@@ -905,6 +998,30 @@ mod tests {
         assert!(alias
             .chars()
             .all(|character| character.is_ascii_alphanumeric() || character == '_'));
+    }
+
+    #[test]
+    fn web_search_bridge_recognises_searxng_and_tavily_schemas() {
+        let searx = ToolInfo {
+            name: "searxng_web_search".into(),
+            alias: "searx".into(),
+            description: Some("Search the web".into()),
+            schema: json!({"type":"object","properties":{"q":{"type":"string"},"limit":{"type":"integer"}}}),
+        };
+        let tavily = ToolInfo {
+            name: "tavily_search".into(),
+            alias: "tavily".into(),
+            description: Some("Internet search".into()),
+            schema: json!({"type":"object","properties":{"query":{"type":"string"},"max_results":{"type":"integer"}}}),
+        };
+        assert_eq!(web_tool_score(&searx), 5);
+        assert_eq!(web_tool_score(&tavily), 5);
+        assert_eq!(web_search_arguments(&searx.schema, "rust")["q"], "rust");
+        assert_eq!(web_search_arguments(&searx.schema, "rust")["limit"], 5);
+        assert_eq!(
+            web_search_arguments(&tavily.schema, "tauri")["query"],
+            "tauri"
+        );
     }
 
     /// Manual interoperability check against the official MCP "everything"

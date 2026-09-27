@@ -99,6 +99,8 @@
     "saveAs": "保存格式",
     "organisedMd": "整理后的 MD",
     "plainTxt": "原样 TXT",
+    "wordDoc": "Word 文档 (.docx)",
+    "pdfDoc": "PDF 文档 (.pdf)",
     "count": "字符"
   },
   "search": {
@@ -368,6 +370,11 @@
       "tool": "工具"
     },
     "toolResult": "工具结果",
+    "activity": "AI 执行的操作",
+    "activityCount_other": "{{count}} 次工具操作",
+    "dropFiles": "导入文件",
+    "dropFilesHint": "将文件拖入 Studio。它们会被复制到应用内，并同时添加到来源和工作区。",
+    "filesImported_other": "已导入 {{count}} 个文件。",
     "approvalTitle": "允许此操作？",
     "approvalBody": "助手想运行一个工具。请查看下方参数。",
     "toolWriteFile": "write_file",

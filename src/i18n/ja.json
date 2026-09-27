@@ -99,6 +99,8 @@
     "saveAs": "保存形式",
     "organisedMd": "整理されたMD",
     "plainTxt": "そのままTXT",
+    "wordDoc": "Word文書 (.docx)",
+    "pdfDoc": "PDF文書 (.pdf)",
     "count": "文字"
   },
   "search": {
@@ -368,6 +370,11 @@
       "tool": "ツール"
     },
     "toolResult": "ツールの結果",
+    "activity": "AIが行ったこと",
+    "activityCount_other": "{{count}} 件のツール利用",
+    "dropFiles": "ファイルをインポート",
+    "dropFilesHint": "ファイルをStudioへドロップすると、アプリ内にコピーし、資料と作業領域の両方へ追加します。",
+    "filesImported_other": "{{count}} 個のファイルを取り込みました。",
     "approvalTitle": "この操作を許可しますか？",
     "approvalBody": "アシスタントがツールを実行しようとしています。下の引数を確認してください。",
     "toolWriteFile": "write_file",

@@ -101,6 +101,8 @@
     "saveAs": "Save as",
     "organisedMd": "Organised MD",
     "plainTxt": "Plain TXT",
+    "wordDoc": "Word document (.docx)",
+    "pdfDoc": "PDF document (.pdf)",
     "count": "chars"
   },
   "search": {
@@ -371,6 +373,11 @@
       "tool": "Tool"
     },
     "toolResult": "Tool result",
+    "activity": "What the AI did",
+    "activityCount_other": "{{count}} tool actions",
+    "dropFiles": "Import files",
+    "dropFilesHint": "Drop files into Studio to copy them into the app and add them to both Sources and the workspace.",
+    "filesImported_other": "Imported {{count}} files.",
     "approvalTitle": "Approve this action?",
     "approvalBody": "The assistant wants to run a tool. Review the arguments below.",
     "toolWriteFile": "write_file",

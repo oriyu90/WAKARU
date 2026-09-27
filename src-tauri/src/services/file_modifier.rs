@@ -168,7 +168,7 @@ pub fn images_to_pdf(input: &ImagesToPdfInput) -> AppResult<WrittenFile> {
     let bytes = doc
         .with_pages(pages)
         .save(&PdfSaveOptions::default(), &mut warnings);
-    std::fs::write(&input.dest_path, bytes)?;
+    atomic_write(Path::new(&input.dest_path), &bytes)?;
     Ok(WrittenFile {
         path: input.dest_path.clone(),
     })
@@ -180,16 +180,83 @@ fn px_to_mm(px: f32) -> f32 {
 
 pub fn save_text(input: &SaveTextInput) -> AppResult<WrittenFile> {
     let mut path = input.dest_path.clone();
-    let want_ext = if input.format == "md" { "md" } else { "txt" };
+    let want_ext = match input.format.as_str() {
+        "md" => "md",
+        "txt" => "txt",
+        "docx" => "docx",
+        "pdf" => "pdf",
+        _ => {
+            return Err(AppError::new(
+                "FM_BAD_FORMAT",
+                "error.fm.badFormat",
+                &input.format,
+            ))
+        }
+    };
     if !path.to_lowercase().ends_with(&format!(".{want_ext}")) {
         path.push('.');
         path.push_str(want_ext);
     }
-    if let Some(parent) = Path::new(&path).parent() {
+    let destination = Path::new(&path);
+    if let Some(parent) = destination.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    std::fs::write(&path, &input.content)?;
+    let bytes = match input.format.as_str() {
+        "md" | "txt" => input.content.as_bytes().to_vec(),
+        format @ ("docx" | "pdf") => {
+            let title = destination
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .unwrap_or("Document");
+            let sections = [crate::services::doc_builder::DocSection {
+                level: 1,
+                heading: None,
+                body: input.content.clone(),
+            }];
+            crate::services::doc_builder::render(
+                format,
+                &crate::services::doc_builder::DocRequest {
+                    title,
+                    toc: false,
+                    sections: &sections,
+                },
+            )?
+        }
+        _ => unreachable!(),
+    };
+    atomic_write(destination, &bytes)?;
     Ok(WrittenFile { path })
+}
+
+/// Keep conversion outputs crash-safe: a failed or interrupted write never
+/// leaves a partial file at the user-selected destination.
+fn atomic_write(destination: &Path, bytes: &[u8]) -> AppResult<()> {
+    let parent = destination.parent().unwrap_or_else(|| Path::new("."));
+    let pending = parent.join(format!(
+        ".{}.{}.tmp",
+        destination
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("document"),
+        uuid::Uuid::now_v7()
+    ));
+    let write_result = (|| -> std::io::Result<()> {
+        use std::io::Write as _;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&pending)?;
+        file.write_all(bytes)?;
+        file.flush()?;
+        file.sync_all()?;
+        std::fs::rename(&pending, destination)?;
+        Ok(())
+    })();
+    if let Err(error) = write_result {
+        let _ = std::fs::remove_file(&pending);
+        return Err(error.into());
+    }
+    Ok(())
 }
 
 /// Stream an organised-Markdown conversion of `text` through the organizer role
@@ -345,5 +412,19 @@ mod tests {
         .unwrap();
         assert!(out.path.ends_with("notes.md"));
         assert_eq!(std::fs::read_to_string(&out.path).unwrap(), "# hi\n\nbody");
+    }
+
+    #[test]
+    fn save_text_builds_a_real_docx() {
+        let tmp = tempfile::tempdir().unwrap();
+        let out = save_text(&SaveTextInput {
+            content: "# Heading\n\nBody".into(),
+            dest_path: tmp.path().join("report").to_string_lossy().into(),
+            format: "docx".into(),
+        })
+        .unwrap();
+        assert!(out.path.ends_with("report.docx"));
+        let bytes = std::fs::read(out.path).unwrap();
+        assert_eq!(&bytes[..2], b"PK");
     }
 }

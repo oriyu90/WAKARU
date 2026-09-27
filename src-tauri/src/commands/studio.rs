@@ -144,6 +144,40 @@ pub fn studio_list_artifacts(
 }
 
 #[tauri::command]
+pub fn studio_import_files(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    project_id: String,
+    tab_id: String,
+    paths: Vec<String>,
+) -> AppResult<Vec<Artifact>> {
+    let workspace = projects::project_dir(&state.projects_dir, &project_id).join("workspace");
+    let imported = {
+        let db = projects::open_db(&state.projects_dir, &project_id)?;
+        studio::import_external_files(&db, &workspace, &tab_id, &paths)?
+    };
+    // Ingest the project-owned copies so search_sources/read_document can use
+    // dropped PDFs and Office documents. Unsupported formats remain valid
+    // workspace artifacts instead of making the whole drop fail.
+    for item in &imported {
+        if let Ok(created) = sources::add_files(
+            &app,
+            &state.app_db_path,
+            &state.projects_dir,
+            state.jobs.clone(),
+            &project_id,
+            vec![item.abs_path.to_string_lossy().to_string()],
+        ) {
+            let db = projects::open_db(&state.projects_dir, &project_id)?;
+            if let Some(source) = created.first() {
+                studio::mark_artifact_imported(&db, &item.artifact.id, &source.id)?;
+            }
+        }
+    }
+    Ok(imported.into_iter().map(|item| item.artifact).collect())
+}
+
+#[tauri::command]
 pub fn studio_import_artifact_as_source(
     app: AppHandle,
     state: State<'_, AppState>,

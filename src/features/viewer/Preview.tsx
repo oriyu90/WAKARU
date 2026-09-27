@@ -1,18 +1,32 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import { Markdown } from "../../components/Markdown";
 import { Skeleton } from "../../components/Skeleton";
 import { ErrorState } from "../../components/ErrorState";
 import { IconButton } from "../../components/IconButton";
 import { Button } from "../../components/Button";
 import { ChevronRightIcon, CloseIcon } from "../../app/Icons";
-import { documentApi } from "../../ipc/viewer";
-import { call } from "../../ipc/client";
+import { documentApi, viewerApi } from "../../ipc/viewer";
 import type { SourceDetail, SourceKind, ViewerTab } from "../../ipc/types.gen";
 import { DocxFilePreview, PdfFilePreview, PptxFilePreview, ScrollNav, WorkbookPreview } from "./FilePreviews";
 import { WebsitePreview } from "./WebsitePreview";
 import styles from "./previews.module.css";
+
+/** Keep the in-memory rail state consistent with the durable locator. Without
+ * this, switching tabs remounts a paged preview from the stale query result
+ * even though SQLite already contains the newer page. */
+export function rememberTabLocator(
+  qc: QueryClient,
+  projectId: string,
+  tabId: string,
+  locator: unknown,
+) {
+  qc.setQueryData<ViewerTab[]>(["viewer-tabs", projectId], (tabs) =>
+    tabs?.map((tab) => (tab.id === tabId ? { ...tab, locator } : tab)),
+  );
+}
 
 /* ───────────────────────── shared bits ───────────────────────── */
 
@@ -181,6 +195,7 @@ function PagedPreview({
   onContext?: (c: { sourceId: string; locator: unknown; position?: string }) => void;
 }) {
   const { t } = useTranslation();
+  const qc = useQueryClient();
   const [page, setPage] = useState(
     typeof (tab.locator as { page?: number })?.page === "number"
       ? (tab.locator as { page: number }).page
@@ -205,11 +220,9 @@ function PagedPreview({
   }, [total]);
 
   useEffect(() => {
-    void call("viewer_update_locator", {
-      projectId,
-      tabId: tab.id,
-      locator: { t: "page", page: clamped },
-    }).catch(() => {});
+    const locator = { t: "page", page: clamped };
+    rememberTabLocator(qc, projectId, tab.id, locator);
+    void viewerApi.updateLocator(projectId, tab.id, locator).catch(() => {});
     onContext?.({
       sourceId: tab.sourceId,
       locator: { t: "page", page: clamped },
@@ -443,6 +456,7 @@ export function Preview({
   tab: ViewerTab;
   onContext?: (c: { sourceId: string; locator: unknown; position?: string }) => void;
 }) {
+  const qc = useQueryClient();
   const detail = useQuery({
     queryKey: ["source-detail", projectId, tab.sourceId],
     queryFn: () => documentApi.detail(projectId, tab.sourceId),
@@ -479,8 +493,10 @@ export function Preview({
       ? (tab.locator as { page: number }).page
       : 1;
     return <PdfFilePreview detail={d} projectId={projectId} initialPage={initialPage} onPage={(page, total) => {
-      void call("viewer_update_locator", { projectId, tabId: tab.id, locator: { t: "page", page } }).catch(() => {});
-      onContext?.({ sourceId: tab.sourceId, locator: { t: "page", page }, position: `${page} / ${total}` });
+      const locator = { t: "page", page };
+      rememberTabLocator(qc, projectId, tab.id, locator);
+      void viewerApi.updateLocator(projectId, tab.id, locator).catch(() => {});
+      onContext?.({ sourceId: tab.sourceId, locator, position: `${page} / ${total}` });
     }} fallback={<PagedPreview projectId={projectId} tab={tab} total={d.pageCount ?? 1} onContext={onContext} />} />;
   }
   if (d.kind === "slides") {
@@ -490,8 +506,10 @@ export function Preview({
       ? (tab.locator as { page: number }).page
       : 1;
     return <PptxFilePreview detail={d} initialPage={initialPage} onPage={(page, total) => {
-      void call("viewer_update_locator", { projectId, tabId: tab.id, locator: { t: "page", page } }).catch(() => {});
-      onContext?.({ sourceId: tab.sourceId, locator: { t: "page", page }, position: `${page} / ${total}` });
+      const locator = { t: "page", page };
+      rememberTabLocator(qc, projectId, tab.id, locator);
+      void viewerApi.updateLocator(projectId, tab.id, locator).catch(() => {});
+      onContext?.({ sourceId: tab.sourceId, locator, position: `${page} / ${total}` });
     }} fallback={fallback} />;
   }
   if (d.kind === "markdown") {

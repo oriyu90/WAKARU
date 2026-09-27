@@ -1316,6 +1316,18 @@ mod tests {
             ("http://localhost:1234/v1", "http://localhost:1234/v1"),
             ("https://api.openai.com/v1", "https://api.openai.com/v1"),
             (
+                "https://generativelanguage.googleapis.com/v1beta/openai/",
+                "https://generativelanguage.googleapis.com/v1beta/openai",
+            ),
+            (
+                "https://openrouter.ai/api/v1",
+                "https://openrouter.ai/api/v1",
+            ),
+            (
+                "https://open.bigmodel.cn/api/paas/v4",
+                "https://open.bigmodel.cn/api/paas/v4",
+            ),
+            (
                 "https://gw.example.com/openai/v1",
                 "https://gw.example.com/openai/v1",
             ),

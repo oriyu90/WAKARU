@@ -22,7 +22,7 @@ pub struct ImagesToPdfInput {
 pub struct SaveTextInput {
     pub content: String,
     pub dest_path: String,
-    /// "md" | "txt"
+    /// "md" | "txt" | "docx" | "pdf"
     pub format: String,
 }
 

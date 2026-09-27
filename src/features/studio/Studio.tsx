@@ -66,6 +66,7 @@ export function Studio({
   const [title, setTitle] = useState("");
   const [provisional, setProvisional] = useState("");
   const [runningTool, setRunningTool] = useState("");
+  const [dropActive, setDropActive] = useState(false);
   const [editingTurn, setEditingTurn] = useState<{ id: string; content: string } | null>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -235,6 +236,55 @@ export function Studio({
     onError: (e) => toast.push({ tone: "error", message: (e as Error).message }),
   });
   const streaming = send.isPending || resolveTool.isPending;
+  const importFiles = useMutation({
+    mutationFn: (paths: string[]) =>
+      studioApi.importFiles(projectId, activeTabId, paths),
+    onSuccess: async (created) => {
+      await Promise.all([
+        refreshArtifacts(),
+        qc.invalidateQueries({ queryKey: ["sources", projectId] }),
+      ]);
+      toast.push({
+        tone: "success",
+        message: t("studio.filesImported", { count: created.length }),
+      });
+    },
+    onError: () =>
+      toast.push({ tone: "error", message: t("studio.importFailed") }),
+  });
+
+  // Tauri's native file-drop event carries real filesystem paths on macOS;
+  // HTML drag data in WKWebView does not do so reliably. The listener exists
+  // only while Studio is mounted and a conversation can own the artifacts.
+  useEffect(() => {
+    if (!inTauri || !activeTabId) return;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void import("@tauri-apps/api/webviewWindow").then(async ({ getCurrentWebviewWindow }) => {
+      const stop = await getCurrentWebviewWindow().onDragDropEvent((event) => {
+        if (event.payload.type === "enter" || event.payload.type === "over") {
+          setDropActive(true);
+        } else if (event.payload.type === "leave") {
+          setDropActive(false);
+        } else if (event.payload.type === "drop") {
+          setDropActive(false);
+          const paths = event.payload.paths.filter(Boolean);
+          if (paths.length) importFiles.mutate(paths);
+        }
+      });
+      if (disposed) stop();
+      else unlisten = stop;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+      setDropActive(false);
+    };
+    // The mutation object is stable for the active render; re-registering on
+    // each mutation state change would briefly lose native drop events.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTabId, projectId]);
+
   const importArtifact = useMutation({
     mutationFn: (id: string) => studioApi.importArtifact(projectId, id),
     onSuccess: async (source) => {
@@ -304,6 +354,12 @@ export function Studio({
 
   return (
     <div className={styles.studio}>
+      {dropActive ? (
+        <div className={styles.dropOverlay} role="status">
+          <strong>{t("studio.dropFiles")}</strong>
+          <span>{t("studio.dropFilesHint")}</span>
+        </div>
+      ) : null}
       <aside className={styles.rail} aria-label={t("studio.tabs")}>
         <ul className={styles.railList}>
           {rows.map((tab) => (
@@ -547,6 +603,7 @@ export function Studio({
           <span className={styles.wsTitle}>{t("studio.workspace")}</span>
           <code className={styles.wsPath}>{t("studio.workspacePath", { project: projectName })}</code>
         </div>
+        <p className={styles.dropHint}>{t("studio.dropFilesHint")}</p>
         {artifacts.data?.length ? (
           <ul className={styles.artifacts}>
             {artifacts.data.map((a: Artifact) => (
@@ -636,6 +693,29 @@ function MessageRow({
         ) : null}
       </div>
       {message.content ? <Markdown>{message.content}</Markdown> : null}
+
+      {calls.length && message.status !== "pending_approval" ? (
+        <details className={styles.toolBlock}>
+          <summary className={styles.toolSummary}>
+            <span className={styles.role}>{t("studio.activity")}</span>
+            <span className={styles.toolMeta}>
+              {t("studio.activityCount", { count: calls.length })}
+            </span>
+          </summary>
+          <div className={styles.activityList}>
+            {calls.map((call, index) => (
+              <section key={call.id ?? index} className={styles.activityItem}>
+                <strong>{call.name}</strong>
+                <pre className={styles.toolOut}>
+                  {typeof call.arguments === "string"
+                    ? call.arguments
+                    : JSON.stringify(call.arguments, null, 2)}
+                </pre>
+              </section>
+            ))}
+          </div>
+        </details>
+      ) : null}
 
       {message.status === "pending_approval" && calls.length ? (
         <section className={styles.approval} aria-label={t("studio.approvalTitle")}>

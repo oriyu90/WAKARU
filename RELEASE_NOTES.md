@@ -1,3 +1,47 @@
+# WAKARU v1.3.0
+
+WAKARU v1.3.0 makes document work more spacious and dependable, especially
+with smaller local models: closed Live Illustrator panels return their space,
+Viewer tabs remember their page, and Studio can import, read, search and create
+files through clearer, inspectable workflows.
+
+## What changed
+
+- Closing Live Illustrator now collapses it to zero width and returns the full
+  area to the document. PDF and slide page changes update both durable state and
+  the active tab cache, so switching away and back restores the exact page.
+- Studio gives small models concise recipes for finding source evidence, reading
+  documents, building DOCX/PDF/Markdown, searching the web and using approved
+  commands. Source reads identify the document/page and clearly report truncation.
+- A stable `web_search` tool routes to a connected SearXNG or Tavily MCP tool.
+  Explicit current-information requests in Live Illustrator use the same bridge;
+  all web results remain marked as untrusted and separate from project evidence.
+- Finder files can be dropped onto Studio. WAKARU atomically copies them into
+  `workspace/imports`, displays them in the right rail and queues supported files
+  for normal source ingestion. Tool requests and results are collapsed by default
+  under expandable activity summaries.
+- File Modifier can save organised text as Markdown, TXT, Word or PDF. Every
+  conversion uses a same-directory atomic replace so an interrupted write cannot
+  expose a partial output.
+- Connection presets now include OpenAI, Gemini, OpenRouter, Claude/Anthropic,
+  GLM (BigModel and Z.AI), LM Studio, MLXBar, Ollama and custom compatible APIs.
+
+## Compatibility
+
+- Existing projects, settings, conversations and sessions from v0.0.0 through
+  v1.2.0 remain compatible.
+- No database migration, project archive change or saved AI-profile migration is
+  required. Presets only prefill new profile settings.
+
+## Distribution
+
+Apple Silicon Mac, macOS 12 or later. The application is MIT licensed. This
+build is ad-hoc signed and is not Apple-notarised: on first launch,
+right-click WAKARU → **Open** (or allow it in System Settings → Privacy &
+Security).
+
+---
+
 # WAKARU v1.2.0
 
 WAKARU v1.2.0 adds JavaScript rendering to web-link previews. A saved link

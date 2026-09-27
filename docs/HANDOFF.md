@@ -2,6 +2,17 @@
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
+**2026-09-28 · v1.3.0 reader/Studio reliability** — A closed Live Illustrator
+drawer is now zero-width/inert, and Viewer page/slide locators update the React
+cache as well as SQLite so tab switching restores the reading position. Studio
+adds weak-model work recipes, bounded document reads, a stable SearXNG/Tavily
+`web_search` bridge shared with explicit Live web requests, native Finder file
+drop into `workspace/imports`, and collapsed completed activity. File Modifier
+saves Markdown/TXT/DOCX/PDF atomically. Settings presets cover OpenAI, Gemini,
+OpenRouter, Claude, GLM/Z.AI, LM Studio, MLXBar and Ollama through the existing
+OpenAI/Anthropic adapters. No DB/project/profile migration. See
+`IMPLEMENTATION_PLAN_v1.3.0.md` and D-44.
+
 **2026-09-11 · v1.0.0 formal stable hardening** — The formal-release audit is
 recorded in `FORMAL_RELEASE_AUDIT_AND_PLAN.md`. Studio now normalises generated
 document extensions to the selected format before approval and write, records

@@ -2,6 +2,70 @@
 
 Cumulative; newest release first.
 
+## v1.3.0 reader and Studio reliability — 2026-09-28
+
+Scope: nine reader requests covering Viewer layout/state, small-model Studio
+tool use, document generation/conversion, MCP-backed web search, inspectable
+activity, external file drop, and current OpenAI/Anthropic-compatible providers.
+No database, project archive or saved-profile migration.
+
+### Resolved findings
+
+- The closed Live Illustrator drawer explicitly owns zero inline/minimum width
+  and is inert; its remembered resizable width applies only while open.
+- PDF/PPTX locators update the Viewer tab cache immediately as well as SQLite,
+  preventing a stale page on remount after switching tabs.
+- Studio supplies compact source/document/web/command recipes, bounded labelled
+  document reads and a runtime command catalogue. A stable `web_search` bridge
+  maps connected SearXNG/Tavily schemas; explicit Live web requests reuse it.
+- Native Tauri drag/drop copies regular files atomically into
+  `workspace/imports`, applies 100 MiB/file and 2 GiB/workspace limits, registers
+  artifacts and queues supported copies for normal source ingestion.
+- Completed assistant tool requests and raw results are closed `details` rows;
+  pending approvals stay expanded with full arguments.
+- File Modifier emits Markdown, TXT, real DOCX and PDF with matching extensions
+  and same-directory atomic replacement. Image-to-PDF uses the same safe write.
+- Presets now cover OpenAI, Gemini, OpenRouter, Claude, GLM/BigModel, GLM/Z.AI,
+  LM Studio, MLXBar, Ollama and custom OpenAI/Anthropic-compatible servers.
+
+### Automated and live gates
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck / lint / design / hardcoded strings | pass |
+| Frontend unit tests | 35 passed across 12 files |
+| Contrast / i18n parity / production build | pass; 412 keys × 3 languages; existing large-chunk advisory only |
+| ts-rs binding export | 81 passed; generated binding drift 0 |
+| Rust fmt / clippy (`-D warnings`) | pass |
+| Rust library tests | 208 passed; 1 network/npx interoperability test intentionally ignored |
+| Rust phase integration tests | 43 passed |
+| Owner-authorised LAN AI acceptance | pass: 6 models, tools/Vision/JSON schema, JA/EN Live grounding, two-iteration Studio document write, no secret leak |
+| `cargo deny` advisories / bans / licenses / sources | pass |
+| npm production audit | 0 vulnerabilities |
+
+### Design and runtime review
+
+- The packaged app was visually checked in Japanese dark mode. Closing Live
+  returned the full PDF stage; switching PDF → Markdown → PDF restored page
+  3/31; Studio showed collapsed “AIが行ったこと” and tool-result rows plus the
+  external-drop guidance; File Modifier exposed Word and PDF save choices.
+- The drop overlay, activity rows and workspace hint reuse existing surfaces,
+  type, borders and spacing. No token or navigation hierarchy changed. Japanese,
+  English and Simplified Chinese stay key-for-key complete.
+- The owner-provided API key was process-only. It is absent from source, model
+  output, generated artifacts and startup logs.
+
+### Release artifact
+
+| Item | Value |
+|---|---|
+| App | arm64 `WAKARU.app`, version `1.3.0`, minimum macOS 12; ad-hoc signed |
+| Signature | `codesign --verify --deep --strict` passes for build output and mounted-image app |
+| DMG | `WAKARU_1.3.0_aarch64.dmg`, 23,207,099 bytes; `hdiutil verify` VALID |
+| SHA-256 | `eb42b9e5abcae2be854042c15401d05a49c159ead387d952b40c55539ef9145e` |
+| Startup probe | mounted app remained healthy and logged `WAKARU backend ready version="1.3.0"`; secret-pattern scan found none |
+| Platform | macOS 12+, Apple Silicon; Windows/Linux not built or verified; not notarised |
+
 ## v1.0.0 formal release verification — 2026-09-11
 
 Scope: formal-release audit and hardening of Viewer safety/memory behavior,

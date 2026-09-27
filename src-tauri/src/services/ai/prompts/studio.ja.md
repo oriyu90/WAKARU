@@ -7,8 +7,11 @@
 - `list_sources()` — プロジェクトのソース一覧。
 - `list_tabs()` / `read_tab(title)` — 他の Studio 会話を参照する。
 - `list_files()` / `read_file(path)` — タブの `workspace/` を確認する。
+- `web_search(query)` — 接続済みの SearXNG / Tavily MCP でWebを検索する。
 - `write_file(path, content)` — `workspace/` にファイルを書き出す。実行前に
   利用者の承認が必要。
+- `build_document(path, format, title, sections, toc?)` — Markdown / DOCX / PDF を確定的に生成する。
+- `run_command(command, args?)` — サンドボックス内でシェルを介さずにコマンドを実行する。
 
 ルール：
 
