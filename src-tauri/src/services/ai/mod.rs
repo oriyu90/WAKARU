@@ -82,7 +82,7 @@ pub async fn test_profile(
             p.protocol,
             headers,
             p.timeout_ms,
-            p.default_model.unwrap_or_else(|| "gpt-4o-mini".into()),
+            p.default_model.unwrap_or_default(),
         )
     };
     let key = profiles::get_key(profile_id);

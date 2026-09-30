@@ -4,6 +4,9 @@
   min-width: 0;
   min-height: 0;
 }
+.viewer[data-expanded="true"] .rail {
+  display: none;
+}
 
 /* ── vertical rail: home · open documents · add / link · Illustrator ── */
 .rail {
@@ -141,12 +144,37 @@
   min-height: 0;
   display: flex;
   container-type: inline-size;
+  overflow: hidden;
+}
+.restoreButton {
+  position: absolute;
+  inset-inline-end: var(--space-md);
+  inset-block-end: var(--space-md);
+  z-index: var(--z-raised);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--row-height);
+  padding-inline: var(--space-sm);
+  border: var(--rule-control) solid var(--color-rule-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  background: var(--color-paper);
+  box-shadow: var(--shadow-overlay);
+  font: inherit;
+  cursor: pointer;
+}
+.restoreButton:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: 2px;
 }
 .pane {
-  flex: 1;
+  flex: 1 1 0;
+  inline-size: 0;
   min-width: 0;
   min-height: 0;
   display: flex;
+  overflow: hidden;
   background: var(--color-paper);
 }
 /* one child at a time (source list or a preview) — let it fill the width */

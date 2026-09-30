@@ -98,8 +98,13 @@ export function AiSettings() {
                   </span>
                   {r && !r.ok ? (
                     <p className={styles.testError}>
-                      {t("ai.unreachableHint")}
-                      {r.note ? <> <code>{r.note}</code></> : null}
+                      {r.note?.startsWith("AI_MODEL_NOT_LOADED")
+                        ? t("ai.modelNotLoaded")
+                        : r.note?.startsWith("AI_MODEL_NOT_SET")
+                          ? t("ai.selectModelToTest")
+                          : r.note?.startsWith("AI_AUTH")
+                            ? t("errors.AI_AUTH")
+                          : <>{t("ai.unreachableHint")}{r.note ? <> <code>{r.note}</code></> : null}</>}
                     </p>
                   ) : null}
                 </div>

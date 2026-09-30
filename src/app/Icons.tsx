@@ -115,6 +115,18 @@ export const PanelRightIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const ExpandIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M9 4H4v5M15 4h5v5M4 15v5h5M20 15v5h-5" />
+  </Svg>
+);
+
+export const CollapseIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 9h5V4M20 9h-5V4M4 15h5v5M20 15h-5v5" />
+  </Svg>
+);
+
 /** A link / chain — "add a web link". */
 export const LinkIcon = (p: IconProps) => (
   <Svg {...p}>

@@ -12,6 +12,7 @@ tools:
 - `write_file(path, content)` — write a file into `workspace/`. This needs the
   reader's approval before it runs.
 - `build_document(path, format, title, sections, toc?)` — deterministically create Markdown, DOCX or PDF.
+- `build_site(path, files)` — create an HTML/CSS/JavaScript source site or interactive demo.
 - `run_command(command, args?)` — run a program inside the sandbox without a shell.
 
 Rules:
@@ -39,4 +40,7 @@ Rules:
   into chat; layout, page breaks and the table of contents are handled for you.
 - For a plain file (code, config, a short note) call `write_file` with the
   complete final content. Keep paths relative and simple (e.g. `summary.md`).
+- For a web page or interactive source, call `build_site` with the complete
+  content of every file, including `index.html`. Use relative links between
+  files. Confirm a successful tool result before saying it was created.
 - Answer in the reader's language.

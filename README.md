@@ -26,12 +26,15 @@ so on first launch right-click WAKARU → **Open**.
   OpenAI, Gemini, OpenRouter, Claude, GLM/Z.AI, LM Studio, Ollama and MLXBar, while
   custom compatible servers can run locally or on your LAN. Reasoning
   models are handled either way — a `reasoning_content` field or an inline
-  `<think>…</think>` block is kept out of the answer.
+  `<think>…</think>` block is kept out of the answer. Connection checks verify
+  actual generation with the selected model and identify stopped MLXBar models.
 - **Real rendering** — PDF via bundled PDF.js, DOCX/PPTX structure, bounded sheet
   tables, Markdown, images, audio/video with transcripts. Studio-generated Markdown,
   PDF and other artifacts can be imported straight into Viewer, and queued imports
   refresh into their final preview without reopening the project. PDF, DOCX and PPTX
   views include non-destructive invert, contrast and bounded PDF sharpening controls.
+  Document zoom and a full-width reading mode make dense material easier to read;
+  closing Live Illustrator returns its width to the document.
 - **OCR** — scanned PDFs and images with text are recognised (pure-Rust `ocrs`,
   models fetched once) and folded into search; a scanned PDF also gets a
   `searchable.pdf` with an invisible, position-matched text layer.
@@ -45,10 +48,13 @@ so on first launch right-click WAKARU → **Open**.
   citations. Follow-up questions use bounded conversation-aware RAG in the selected
   page/source/project scope. Source-level sessions stay intact while pages change,
   and enter Studio only after the explicit **Hand off to Studio** action.
+  Page-scoped questions include visible-page evidence even when search wording
+  differs from the source.
 - **Studio** — an agentic loop over your sources and a sandboxed workspace, with tool
   approval, iteration limits and artifact export. Drop files from Finder to copy and
   ingest them into the project; completed tool work stays in expandable activity rows.
   Enter sends, Shift+Enter inserts a newline, and an earlier user turn can be edited.
+  Follow-up searches respect the selected source and only cite retrieved chunks.
 - **MCP** — local stdio servers (a bare `npx` / `uvx` / `node` command is found
   in the usual install locations; a SearXNG web-search preset is built in) and
   policy-checked Streamable HTTP servers. Connected SearXNG/Tavily search tools are

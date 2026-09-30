@@ -1,3 +1,57 @@
+# v1.4.0 release record
+
+Prepared 2026-09-30. Scope: generation-aware MLXBar connection checking,
+document zoom and full-width reading, Live drawer width return, and stronger
+source-scoped Studio/Live retrieval and citations. See `RELEASE_NOTES.md`,
+`DESIGN_v1.4.0.md`, D-45 and `QUALITY_REPORT.md`.
+
+## Verified artifact
+
+- App: `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, macOS 12+,
+  version 1.4.0, ad-hoc signed with runtime option)
+- DMG: `WAKARU_1.4.0_aarch64.dmg` (21,821,067 bytes)
+- Checksum: `WAKARU_1.4.0_aarch64.dmg.sha256`
+- SHA-256: `b38dbd4e24911d68838ad29ddfc6ddf452801bb256d17ff0fc336376cea4b287`
+- `codesign --verify --deep --strict` passed on the built app and mounted DMG
+  app. `hdiutil verify` was VALID. The mounted app reached
+  `WAKARU backend ready version="1.4.0"`.
+- The supplied PIN is absent from tracked source, new documentation and DMG.
+
+The Tauri bundler skipped a complete app signature. The app was ad-hoc signed
+with identifier `com.yukiorita.wakaru` and the DMG rebuilt using Tauri's
+`bundle_dmg.sh` before final verification.
+
+## Verification summary
+
+- Owner-specified loaded MLXBar model: authenticated generation, tools, vision,
+  JSON Schema, Japanese/English source explanations and a grounded Studio
+  Markdown artifact passed. The unavailable embeddings route fell back to
+  local retrieval. See `docs/LIVE_ORNITH_VALIDATION.md`.
+- Frontend: typecheck, lint/design/hardcoded checks, 36 tests, contrast,
+  i18n parity (421 keys × 3 languages), production build and production npm
+  audit (0 vulnerabilities) passed.
+- Rust: fmt, clippy with denied warnings, 212 library tests passed (1 ignored),
+  nonignored integration suites, bindings and cargo-deny passed.
+- Debug app visual inspection covered PDF zoom, Live open/close width and
+  full-width document/restore.
+
+## Publication sequence
+
+1. Commit and tag `v1.4.0` on `main`.
+2. Publish the GitHub release with the verified DMG and checksum; re-download
+   the assets and compare hash and size.
+3. Publish four localized Studio RIZI pages and release/news metadata after
+   the site tests.
+4. Record the release in the private common-rules maintenance document.
+
+## Limits
+
+- No Developer ID signature or Apple notarisation credentials were supplied.
+- Windows and Linux are not built or verified.
+- The GitHub repository remains private.
+
+---
+
 # v1.2.0 release record
 
 Prepared 2026-09-25. Scope: opt-in JavaScript live view for weblink previews

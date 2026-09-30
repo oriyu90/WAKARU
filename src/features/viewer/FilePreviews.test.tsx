@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SourceDetail } from "../../ipc/types.gen";
 import "../../i18n";
-import { documentContrast, PptxFilePreview, sharpenRgba } from "./FilePreviews";
+import { boundedPdfRaster, documentContrast, PptxFilePreview, sharpenRgba } from "./FilePreviews";
 
 describe("document enhancement", () => {
   it("clamps contrast and sharpens a bounded raster without changing alpha", () => {
@@ -24,6 +24,14 @@ describe("document enhancement", () => {
 
   it("skips sharpening above the memory safety ceiling", () => {
     expect(sharpenRgba(new Uint8ClampedArray(4), 1_333_334, 3, 100)).toBe(false);
+  });
+
+  it("limits a zoomed PDF canvas without shrinking its displayed size", () => {
+    const raster = boundedPdfRaster(8_000, 6_000, 2);
+    expect(8_000 * 6_000 * raster * raster).toBeLessThanOrEqual(16_000_000);
+    expect(8_000 * raster).toBeLessThanOrEqual(8_192);
+    expect(boundedPdfRaster(1_000, 800, 2)).toBe(2);
+    expect(boundedPdfRaster(Number.POSITIVE_INFINITY, 800, 2)).toBe(1);
   });
 });
 
@@ -80,5 +88,7 @@ describe("PptxFilePreview", () => {
     await waitFor(() => expect(renderSlideToElement).toHaveBeenCalledTimes(1));
     expect(container.querySelector("svg")).not.toBeNull();
     expect(onPage).toHaveBeenCalledWith(1, 2);
+    fireEvent.click(screen.getByRole("button", { name: /^(拡大|Zoom in|放大)$/ }));
+    expect(container.querySelector<HTMLElement>('[data-inverted="false"]')?.style.getPropertyValue("--document-zoom")).toBe("1.25");
   });
 });

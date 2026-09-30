@@ -33,7 +33,15 @@ pub async fn probe(client: &AiClient, model: &str) -> AppResult<TestResult> {
         }
     };
 
-    let reachable = !models.is_empty() || model_ping(client, model).await;
+    // A catalogue response proves only that authentication and routing work.
+    // MLXBar can list a model that was manually stopped; a real generation then
+    // fails with MODEL_NOT_LOADED. Probe the selected model before reporting OK.
+    let generation = if model.trim().is_empty() {
+        None
+    } else {
+        Some(model_ping(client, model).await)
+    };
+    let reachable = matches!(generation, Some(Ok(())));
 
     let mut result = TestResult {
         ok: reachable,
@@ -46,9 +54,16 @@ pub async fn probe(client: &AiClient, model: &str) -> AppResult<TestResult> {
         note: None,
     };
     if !reachable {
-        let mut note = soft_note
-            .map(|m| format!("endpoint unreachable: {m}"))
-            .unwrap_or_else(|| "endpoint unreachable".into());
+        let mut note = match generation {
+            Some(Err(err)) if err.code == "AI_MODEL_NOT_LOADED" => "AI_MODEL_NOT_LOADED".into(),
+            Some(Err(err)) if err.code == "AI_AUTH" => "AI_AUTH".into(),
+            Some(Err(err)) => err.message,
+            None => "AI_MODEL_NOT_SET".into(),
+            Some(Ok(())) => unreachable!(),
+        };
+        if let Some(list_error) = soft_note {
+            note.push_str(&format!("; model list: {list_error}"));
+        }
         // The most common misconfiguration for a local OpenAI-compatible server
         // (LM Studio, Ollama's OpenAI shim, …) is a base URL missing the `/v1`
         // path segment — `/models` and `/chat/completions` then 404.
@@ -108,19 +123,29 @@ fn transport_hint(raw: &str) -> String {
     )
 }
 
-async fn model_ping(client: &AiClient, model: &str) -> bool {
-    // A 1-token completion. If it doesn't error hard, the endpoint is alive.
+async fn model_ping(client: &AiClient, model: &str) -> AppResult<()> {
+    // A bounded generation confirms that this exact model can run. Reasoning
+    // models may spend the entire tiny budget in hidden thought, so a clean
+    // stream with a real delta still proves availability even if length-limited.
     let cancel = tokio_util::sync::CancellationToken::new();
-    client
+    let mut saw_delta = false;
+    let _ = client
         .chat_stream(
             model,
-            json!([{ "role": "user", "content": "ping" }]),
-            &json!({ "max_tokens": 1 }),
+            json!([{ "role": "user", "content": "Reply OK." }]),
+            &json!({ "max_tokens": 64 }),
             &cancel,
-            |_, _| {},
+            |_, text| saw_delta |= !text.is_empty(),
         )
-        .await
-        .is_ok()
+        .await?;
+    if !saw_delta {
+        return Err(crate::error::AppError::new(
+            "AI_BAD_RESPONSE",
+            "error.ai.badResponse",
+            "model probe produced no output",
+        ));
+    }
+    Ok(())
 }
 
 async fn probe_vision(client: &AiClient, model: &str) -> bool {
@@ -211,6 +236,7 @@ async fn probe_json_schema(client: &AiClient, model: &str) -> bool {
 mod tests {
     use super::*;
     use crate::domain::ai::ApiProtocol;
+    use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::time::Duration;
 
@@ -263,5 +289,44 @@ mod tests {
         );
         // No 1s+2s retry back-off on a dead endpoint.
         assert!(started.elapsed() < Duration::from_secs(2), "probe retried");
+    }
+
+    #[tokio::test]
+    async fn listed_but_stopped_mlxbar_model_fails_generation_probe() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            for _ in 0..2 {
+                let (mut socket, _) = listener.accept().unwrap();
+                let mut request = [0u8; 8192];
+                let size = socket.read(&mut request).unwrap();
+                let route = String::from_utf8_lossy(&request[..size]);
+                let (status, body) = if route.contains("GET /v1/models") {
+                    (
+                        "200 OK",
+                        r#"{"data":[{"id":"Qwen3.8-27B-MLX-4bit","loaded":false}]}"#,
+                    )
+                } else {
+                    (
+                        "409 Conflict",
+                        r#"{"error":{"code":"MODEL_NOT_LOADED","message":"stopped"}}"#,
+                    )
+                };
+                write!(socket, "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+            }
+        });
+        let client = AiClient::new(
+            ApiProtocol::Openai,
+            &format!("http://{addr}/v1"),
+            None,
+            vec![],
+            2_000,
+        )
+        .unwrap();
+        let result = probe(&client, "Qwen3.8-27B-MLX-4bit").await.unwrap();
+        assert_eq!(result.models, vec!["Qwen3.8-27B-MLX-4bit"]);
+        assert!(!result.ok);
+        assert_eq!(result.note.as_deref(), Some("AI_MODEL_NOT_LOADED"));
+        server.join().unwrap();
     }
 }

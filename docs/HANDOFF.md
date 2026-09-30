@@ -2,6 +2,8 @@
 
 Written 2026-09-01. Read this first if you're picking the project back up.
 
+**2026-09-30 · v1.4.0** — Reader zoom and full-width mode, Live drawer width reallocation, MLXBar generation-aware connection diagnostics, and scoped/recoverable Studio/Live RAG passed local gates. The designated LAN model `Qwen3.8-27B-MLX-4bit` was subsequently loaded; its authenticated generation, Japanese and English source explanations, tool use, and a grounded Studio Markdown artifact passed the ignored live acceptance test. See `IMPLEMENTATION_PLAN_v1.4.0.md`, `DESIGN_v1.4.0.md`, `docs/LIVE_ORNITH_VALIDATION.md` and the current `QUALITY_REPORT.md` for the exact scope and release verification.
+
 **2026-09-28 · v1.3.0 reader/Studio reliability** — A closed Live Illustrator
 drawer is now zero-width/inert, and Viewer page/slide locators update the React
 cache as well as SQLite so tab switching restores the reading position. Studio

@@ -2,6 +2,41 @@
 
 Cumulative; newest release first.
 
+## v1.4.0 verification — 2026-09-30
+
+Scope: MLXBar connection diagnostics, Viewer width/zoom, Studio/Live source grounding. No DB, IPC or profile migration.
+
+| Gate | Current result |
+|---|---|
+| Frontend typecheck, lint, design/hardcoded checks, i18n, build | pass; 421 keys × 3 languages |
+| Frontend tests and contrast | pass; 36 tests, light/dark contrast |
+| Rust fmt, clippy, library and integration tests | pass; 212 library tests passed, 1 ignored; integration suite passed |
+| Rust advisories and npm production audit | pass; 0 npm vulnerabilities |
+| Debug macOS app build and visual check | pass; Japanese dark mode PDF, Live open/close width, 100→125→100% zoom, full-width document/restore; a flex overflow found in the first build was fixed and rechecked |
+| Owner-specified LAN model generation, source explanations, Studio RAG and artifact creation | pass; loaded `Qwen3.8-27B-MLX-4bit` generated authenticated responses, Japanese and English source explanations retained fixture facts, Studio saved one grounded Markdown document with citations in two tool iterations |
+| Embedding API fallback | pass; chat endpoint returned `AI_REQUEST` for embeddings; local search completed the Studio workflow |
+| Release app/DMG signature and mounted startup | pass; arm64 v1.4.0, macOS 12+, strict signature passes for build and mounted app; DMG checksum VALID; mounted app logged `backend ready version="1.4.0"` |
+
+Design review: the stopped-model response is classified without exposing the PIN; model listing alone no longer reports a successful generation test. Search citations are restored only from actual `search_sources` tool calls; source-scoped reads cannot cross the selected source. PDF canvas raster has a 16-million-pixel and 8192-pixel-side ceiling. See `DESIGN_v1.4.0.md` and `IMPLEMENTATION_PLAN_v1.4.0.md`.
+
+The specified model was initially stopped and correctly rejected by the new generation-aware probe. It was later loaded and passed the live acceptance test. The packaged release passed signature, image-integrity and mounted-startup checks.
+
+### Release artifact
+
+| Item | Value |
+|---|---|
+| App | arm64 `WAKARU.app`, version `1.4.0`, minimum macOS 12; ad-hoc signed with runtime option |
+| Signature | `codesign --verify --deep --strict` passes for build output and mounted-image app |
+| DMG | `WAKARU_1.4.0_aarch64.dmg`, 21,821,067 bytes; `hdiutil verify` VALID |
+| SHA-256 | `b38dbd4e24911d68838ad29ddfc6ddf452801bb256d17ff0fc336376cea4b287` |
+| Startup probe | mounted app remained healthy and logged `WAKARU backend ready version="1.4.0"` |
+| Secret scan | supplied PIN absent from tracked source, new documents, and DMG |
+| Platform | macOS 12+, Apple Silicon; Windows/Linux not built or verified; not notarised |
+
+The Tauri bundler again left an incomplete app signature. The app was ad-hoc
+signed with identifier `com.yukiorita.wakaru`, then the DMG was rebuilt with
+Tauri's `bundle_dmg.sh` before image and mounted-app verification.
+
 ## v1.3.0 reader and Studio reliability — 2026-09-28
 
 Scope: nine reader requests covering Viewer layout/state, small-model Studio

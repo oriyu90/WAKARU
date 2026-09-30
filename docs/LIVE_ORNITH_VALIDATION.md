@@ -1,5 +1,32 @@
 # Live OpenAI-compatible API validation
 
+## v1.4.0 result — 2026-09-30
+
+The owner-specified LAN MLXBar model `Qwen3.8-27B-MLX-4bit` was initially
+listed but stopped. The generation-aware connection test correctly classified
+HTTP 409 `MODEL_NOT_LOADED`. When the model became loaded, authenticated
+non-streaming generation returned HTTP 200 and the reusable ignored acceptance
+test passed with its PIN supplied only as a process environment variable.
+The test removed its temporary keychain credential and did not print the PIN.
+
+| Check | Result |
+|---|---|
+| Model discovery and real streaming probe | pass; 6 models found |
+| Tool calls, vision and JSON Schema probes | pass |
+| Japanese and English source explanation | pass; deadline, budget and owner retained |
+| Source prompt-injection boundary | pass; model output and artifact contain no PIN |
+| Studio project-source search, tool loop and document creation | pass; two iterations, one registered Markdown artifact with grounded date, budget, owner and `[S1]` tags |
+| Embeddings on the chat connection | unavailable (`AI_REQUEST`); local retrieval fallback completed the document workflow |
+
+The test completed in about 190 seconds on this LAN. Its Illustrator and
+Studio work overlapped with the capability probe timing reported by the test;
+these numbers are observations, not performance promises. Live Illustrator's
+question retrieval rules, page fallback and citation mapping also pass the
+local Rust tests. The live run directly exercised the Illustrator model client
+and prompts; it did not automate a click through the Live panel.
+
+---
+
 ## v1.3.0 result — 2026-09-28
 
 The reusable live acceptance test completed against the owner-authorized local

@@ -5,6 +5,7 @@ import { Button } from "../../components/Button";
 import { ErrorState } from "../../components/ErrorState";
 import { IconButton } from "../../components/IconButton";
 import { ChevronRightIcon } from "../../app/Icons";
+import { ZoomControls } from "./ZoomControls";
 import { documentApi } from "../../ipc/viewer";
 import { ocrApi } from "../../ipc/ocr";
 import { useToast } from "../../components/useToast";
@@ -18,6 +19,18 @@ import styles from "./previews.module.css";
 // the interactive renderer to a release-safe ceiling.
 const MAX_INTERACTIVE_BYTES = 96 * 1024 * 1024;
 const MAX_SHARPEN_PIXELS = 4_000_000;
+const MAX_PDF_CANVAS_PIXELS = 16_000_000;
+const MAX_PDF_CANVAS_SIDE = 8_192;
+const MAX_PDF_DISPLAY_SIDE = 16_384;
+
+export function boundedPdfRaster(width: number, height: number, preferred: number) {
+  if (![width, height, preferred].every(Number.isFinite) || width <= 0 || height <= 0) return 1;
+  return Math.min(
+    preferred,
+    Math.sqrt(MAX_PDF_CANVAS_PIXELS / Math.max(1, width * height)),
+    MAX_PDF_CANVAS_SIDE / Math.max(1, width, height),
+  );
+}
 
 export function documentContrast(clarity: number) {
   return 1 + Math.min(Math.max(clarity, 0), 100) * 0.006;
@@ -266,20 +279,28 @@ export function PdfFilePreview({
     void (async () => {
       const pdfPage = await pdf.getPage(page);
       if (cancelled || !canvasRef.current) return;
-      const raster = Math.min(window.devicePixelRatio || 1, 2);
+      const preferredRaster = Math.min(window.devicePixelRatio || 1, 2);
       // Fit the page to the available width; `zoom` (the − / + control) multiplies
       // on top. Clamp so a small page doesn't balloon and a huge one still fits.
-      const intrinsic = pdfPage.getViewport({ scale: 1 }).width;
-      const fit = availWidth > 0 ? availWidth / intrinsic : 1;
-      const cssScale = Math.min(Math.max(fit * zoom, 0.1), 4);
+      const base = pdfPage.getViewport({ scale: 1 });
+      if (![base.width, base.height].every(Number.isFinite) || base.width <= 0 || base.height <= 0) {
+        throw new Error("invalid-pdf-page-dimensions");
+      }
+      const fit = availWidth > 0 ? availWidth / base.width : 1;
+      const cssScale = Math.min(Math.max(fit * zoom, 0.1), 4, MAX_PDF_DISPLAY_SIDE / Math.max(base.width, base.height));
+      const display = pdfPage.getViewport({ scale: cssScale });
+      // Large windows and high display scale can otherwise allocate a canvas
+      // of hundreds of megabytes. Keep the displayed zoom while bounding the
+      // raster allocation; very large pages become slightly softer instead.
+      const raster = boundedPdfRaster(display.width, display.height, preferredRaster);
       const viewport = pdfPage.getViewport({ scale: raster * cssScale });
       const canvas = canvasRef.current;
       const context = canvas.getContext("2d", { alpha: false });
       if (!context) throw new Error("canvas-context-unavailable");
-      canvas.width = Math.floor(viewport.width);
-      canvas.height = Math.floor(viewport.height);
-      canvas.style.width = `${viewport.width / raster}px`;
-      canvas.style.height = `${viewport.height / raster}px`;
+      canvas.width = Math.max(1, Math.floor(viewport.width));
+      canvas.height = Math.max(1, Math.floor(viewport.height));
+      canvas.style.width = `${display.width}px`;
+      canvas.style.height = `${display.height}px`;
       renderTask.current?.cancel();
       const task = pdfPage.render({ canvas, canvasContext: context, viewport });
       renderTask.current = task;
@@ -367,9 +388,7 @@ export function PdfFilePreview({
             {t("viewer.ocrRun")}
           </Button>
         ) : null}
-        <Button size="sm" variant="quiet" onClick={() => setZoom((value) => Math.max(.5, value - .25))}>−</Button>
-        <span className={styles.pageLabel}>{Math.round(zoom * 100)}%</span>
-        <Button size="sm" variant="quiet" onClick={() => setZoom((value) => Math.min(3, value + .25))}>+</Button>
+        <ZoomControls zoom={zoom} onZoom={setZoom} />
       </div>
       <div ref={viewportRef} className={styles.canvasViewport} aria-label={t("viewer.pdfPreview")}>
         {!pdf && !error ? <div className={styles.centered}>{t("states.analyzing")}…</div> : null}
@@ -392,6 +411,7 @@ export function DocxFilePreview({ detail, fallback }: { detail: SourceDetail; fa
   const asset = useAssetBuffer(detail);
   const host = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<unknown>(null);
+  const [zoom, setZoom] = useState(1);
   const inverted = useUiStore((s) => s.docInverted);
   const clarity = useUiStore((s) => s.docClarity);
 
@@ -423,12 +443,16 @@ export function DocxFilePreview({ detail, fallback }: { detail: SourceDetail; fa
   if (asset.isError || error) return <div className={styles.previewFallback}><ErrorState error={asset.error ?? error} onRetry={() => { setError(null); void asset.refetch(); }} />{fallback}</div>;
   return (
     <div className={styles.filePreview}>
+      <div className={styles.fileToolbar}>
+        <span className={styles.toolbarSpacer} />
+        <ZoomControls zoom={zoom} onZoom={setZoom} />
+      </div>
       <div
         className={styles.officeViewport}
         aria-label={t("viewer.docxPreview")}
         ref={host}
         data-inverted={inverted}
-        style={{ "--document-contrast": documentContrast(clarity) } as React.CSSProperties}
+        style={{ "--document-contrast": documentContrast(clarity), "--document-zoom": zoom } as React.CSSProperties}
       />
       <ScrollNav targetRef={host} />
     </div>
@@ -453,6 +477,7 @@ export function PptxFilePreview({
   const [page, setPage] = useState(Math.max(1, initialPage));
   const [total, setTotal] = useState(detail.pageCount ?? 1);
   const [error, setError] = useState<unknown>(null);
+  const [zoom, setZoom] = useState(1);
   const inverted = useUiStore((s) => s.docInverted);
   const clarity = useUiStore((s) => s.docClarity);
   const onPageRef = useRef(onPage);
@@ -498,13 +523,14 @@ export function PptxFilePreview({
       <div className={styles.fileToolbar}>
         <PageControls page={page} total={total} onPage={setPage} />
         <span className={styles.toolbarSpacer} />
+        <ZoomControls zoom={zoom} onZoom={setZoom} />
       </div>
       <div className={styles.slideViewport} aria-label={t("viewer.pptxPreview")}>
         <div
           ref={host}
           className={styles.slideHost}
           data-inverted={inverted}
-          style={{ filter: `${inverted ? "invert(1) " : ""}contrast(${documentContrast(clarity)})` }}
+          style={{ filter: `${inverted ? "invert(1) " : ""}contrast(${documentContrast(clarity)})`, "--document-zoom": zoom } as React.CSSProperties}
         />
         {total > 1 ? <EdgeNav page={page} total={total} onPage={setPage} /> : null}
       </div>
@@ -520,6 +546,7 @@ export function WorkbookPreview({ projectId, detail }: { projectId: string; deta
     queryFn: () => Promise.all(Array.from({ length: total }, (_, index) => documentApi.get(projectId, detail.id, index + 1))),
   });
   const [selected, setSelected] = useState(0);
+  const [zoom, setZoom] = useState(1);
   const tables = (docs.data ?? []).filter((doc: DocumentPayload) => doc.text.trimStart().startsWith("|"));
   if (docs.isError) return <ErrorState error={docs.error} onRetry={() => docs.refetch()} />;
   return (
@@ -530,13 +557,15 @@ export function WorkbookPreview({ projectId, detail }: { projectId: string; deta
             {tables.map((doc, index) => <option key={doc.ordinal} value={index}>{doc.title ?? `${index + 1}`}</option>)}
           </select>
         </label>
+        <span className={styles.toolbarSpacer} />
+        <ZoomControls zoom={zoom} onZoom={setZoom} />
       </div>
-      <div className={styles.body}>{docs.isLoading ? <div className={styles.centered}>{t("states.analyzing")}…</div> : <MarkdownTable text={tables[selected]?.text ?? ""} />}</div>
+      <div className={styles.body} style={{ "--document-zoom": zoom } as React.CSSProperties}>{docs.isLoading ? <div className={styles.centered}>{t("states.analyzing")}…</div> : <MarkdownTable text={tables[selected]?.text ?? ""} />}</div>
     </div>
   );
 }
 
 function MarkdownTable({ text }: { text: string }) {
   const rows = text.split("\n").filter(Boolean).filter((_, index) => index !== 1).map((line) => line.slice(1, -1).split("|").map((cell) => cell.trim().replace(/\\\|/g, "|")));
-  return <table className={styles.sheet}><thead><tr>{(rows[0] ?? []).map((cell, index) => <th key={index}>{cell}</th>)}</tr></thead><tbody>{rows.slice(1).map((row, ri) => <tr key={ri}>{row.map((cell, ci) => <td key={ci}>{cell}</td>)}</tr>)}</tbody></table>;
+  return <table className={styles.sheet} style={{ zoom: "var(--document-zoom, 1)" }}><thead><tr>{(rows[0] ?? []).map((cell, index) => <th key={index}>{cell}</th>)}</tr></thead><tbody>{rows.slice(1).map((row, ri) => <tr key={ri}>{row.map((cell, ci) => <td key={ci}>{cell}</td>)}</tr>)}</tbody></table>;
 }

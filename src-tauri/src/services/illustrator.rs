@@ -401,7 +401,7 @@ pub async fn ask(
                 _ => None,
             };
             let project_db = projects::open_db(projects_root, &input.project_id)?;
-            let hits = retrieval::hybrid_search(
+            let mut hits = retrieval::hybrid_search(
                 &project_db,
                 &retrieval_query,
                 qvec.as_deref(),
@@ -409,6 +409,21 @@ pub async fn ask(
                 ordinal_filter,
                 LIVE_TOP_K,
             )?;
+            if matches!(input.scope, crate::domain::illustrator::Scope::Page) {
+                if let (Some(source_id), Some(page)) = (src.as_deref(), ordinal_filter) {
+                    for hit in retrieval::page_chunks(&project_db, source_id, page, LIVE_TOP_K)? {
+                        if hits.len() >= LIVE_TOP_K {
+                            break;
+                        }
+                        if !hits
+                            .iter()
+                            .any(|existing| existing.chunk_id == hit.chunk_id)
+                        {
+                            hits.push(hit);
+                        }
+                    }
+                }
+            }
             (resolved, hits, project_name, prior_messages)
         }
     };
@@ -899,7 +914,32 @@ fn load_live_history(
 /// without letting conversation history grow the query without bound.
 fn follow_up_query(question: &str, previous_question: Option<&str>) -> String {
     let current = question.chars().take(800).collect::<String>();
-    match previous_question.filter(|previous| !previous.trim().is_empty()) {
+    // Only carry the earlier subject for an actual follow-up. Otherwise an
+    // unrelated earlier question contaminates both keyword and vector recall.
+    let lower = question.trim().to_lowercase();
+    let is_follow_up = [
+        "それ",
+        "その",
+        "これ",
+        "この点",
+        "なぜ",
+        "どうして",
+        "詳しく",
+        "続き",
+        "it",
+        "that",
+        "those",
+        "why",
+        "more",
+        "above",
+        "前述",
+        "上述",
+        "这个",
+        "为什么",
+    ]
+    .iter()
+    .any(|word| lower.starts_with(word));
+    match previous_question.filter(|previous| is_follow_up && !previous.trim().is_empty()) {
         Some(previous) => format!(
             "{}\n{}",
             previous.chars().take(500).collect::<String>(),
@@ -917,6 +957,16 @@ fn locator_page(locator: &serde_json::Value) -> Option<i64> {
 }
 
 pub(crate) fn build_rag_block(items: &[retrieval::HybridHit], lang: &str) -> String {
+    if items.is_empty() {
+        return match lang {
+            "ja" => {
+                "今回の質問に一致する資料抜粋はありません。資料に根拠があると主張しないでください。"
+            }
+            "zh-Hans" | "zh" => "本轮问题没有匹配的资料摘录。请勿声称资料提供了依据。",
+            _ => "No project excerpt matched this question. Do not claim source support.",
+        }
+        .to_string();
+    }
     // Conditional citations: `[S*]` tags are attached only when the answer
     // actually relies on an excerpt. Small talk, paraphrase requests and
     // operation guidance must not carry sources. The resolver
@@ -981,6 +1031,7 @@ fn needs_retrieval(question: &str) -> bool {
         "こんばんは",
         "おはよう",
         "ありがとう",
+        "ありがとうございます",
         "おねがいします",
         "お願いします",
         "すみません",
@@ -1003,20 +1054,21 @@ fn needs_retrieval(question: &str) -> bool {
     }
     // CJK greetings are short; Latin small talk can be a little longer.
     let len = trimmed.chars().count();
-    let looks_small_talk = SMALL_TALK
-        .iter()
-        .any(|p| trimmed.starts_with(p) || trimmed.ends_with(p));
+    let normalized = trimmed
+        .trim_end_matches(['。', '！', '!', '.', ' ', '　'])
+        .to_lowercase();
+    let looks_small_talk = SMALL_TALK.iter().any(|p| normalized == *p);
     if looks_small_talk && len <= 40 {
         return false;
     }
     // Operation questions about the panel itself never need sources.
     let ops = [
-        "使い方",
-        "つかいかた",
-        "how to use",
-        "how do i use",
-        "怎么用",
-        "如何使用",
+        "このパネルの使い方",
+        "ライブ解説の使い方",
+        "how to use this panel",
+        "how do i use live",
+        "这个面板怎么用",
+        "如何使用实时讲解",
     ];
     if len <= 40 && ops.iter().any(|p| trimmed.to_lowercase().contains(p)) {
         return false;
@@ -1337,6 +1389,8 @@ mod tests {
         assert!(!needs_retrieval("このパネルの使い方は？"));
         assert!(needs_retrieval("量子ビットとは何ですか？"));
         assert!(needs_retrieval("それはなぜですか？"));
+        assert!(needs_retrieval("こんにちは、この資料の要点は何ですか？"));
+        assert!(needs_retrieval("この資料の使い方を説明してください"));
         assert!(needs_retrieval(
             "この資料の3章を要約して、出典も出してください"
         ));
@@ -1357,6 +1411,10 @@ mod tests {
         );
         assert!(query.contains("量子計算"));
         assert!(query.contains("それはなぜ"));
+        assert_eq!(
+            follow_up_query("新しい資料の結論は？", Some("古い資料の目的は？")),
+            "新しい資料の結論は？"
+        );
         assert!(
             follow_up_query(&"あ".repeat(2_000), Some(&"い".repeat(2_000)))
                 .chars()

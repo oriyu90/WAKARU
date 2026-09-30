@@ -11,7 +11,7 @@ import { CloseIcon } from "../../app/Icons";
 import { studioApi } from "../../ipc/studio";
 import { aiApi } from "../../ipc/ai";
 import { pickSaveDir } from "../../ipc/fileModifier";
-import { inTauri } from "../../ipc/client";
+import { inTauri, IpcError } from "../../ipc/client";
 import { useToast } from "../../components/useToast";
 import { listen } from "@tauri-apps/api/event";
 import type {
@@ -54,6 +54,9 @@ export function Studio({
   const { t } = useTranslation();
   const qc = useQueryClient();
   const toast = useToast();
+  const aiErrorText = (error: unknown) => error instanceof IpcError
+    ? t([`errors.${error.code}`, "errors.internal"])
+    : t("errors.internal");
 
   const [activeId, setActiveId] = useState("");
   const [text, setText] = useState("");
@@ -197,7 +200,7 @@ export function Studio({
       setRunningTool("");
       // Surface the persisted user turn + its error even though the send failed.
       await refreshTabs();
-      toast.push({ tone: "error", message: (e as Error).message });
+      toast.push({ tone: "error", message: aiErrorText(e) });
     },
   });
 
@@ -233,7 +236,7 @@ export function Studio({
       setRunningTool("");
       await Promise.all([refreshTabs(), refreshArtifacts()]);
     },
-    onError: (e) => toast.push({ tone: "error", message: (e as Error).message }),
+    onError: (e) => toast.push({ tone: "error", message: aiErrorText(e) }),
   });
   const streaming = send.isPending || resolveTool.isPending;
   const importFiles = useMutation({

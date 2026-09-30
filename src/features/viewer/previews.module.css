@@ -32,6 +32,12 @@
   color: var(--color-ink);
   white-space: nowrap;
 }
+.zoomControls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex: none;
+}
 
 .body {
   flex: 1;
@@ -115,7 +121,6 @@ mark.hitActive {
   max-width: 100%;
   height: auto;
   transform-origin: center;
-  transition: transform var(--dur-short) var(--ease-out);
   box-shadow: var(--shadow-whisper);
 }
 
@@ -300,6 +305,7 @@ mark.hitActive {
 .officeViewport :global(.docx-wrapper) {
   padding: clamp(var(--space-xs), 2vw, var(--space-xl));
   background: transparent;
+  zoom: var(--document-zoom, 1);
 }
 .officeViewport :global(.docx) {
   max-width: 100%;
@@ -319,6 +325,7 @@ mark.hitActive {
 .slideHost {
   width: min(100%, 75rem);
   min-width: 16rem;
+  zoom: var(--document-zoom, 1);
 }
 .slideHost > :global(svg) {
   display: block;

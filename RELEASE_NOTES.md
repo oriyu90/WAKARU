@@ -1,3 +1,41 @@
+# WAKARU v1.4.0
+
+WAKARU v1.4.0 improves local AI connection checks, source-grounded answers, and
+document reading space.
+
+## What changed
+
+- MLXBar connection checks now generate a short reply with the selected model.
+  A model that appears in the list but is stopped no longer passes the test;
+  the app explains that state without exposing credentials.
+- Viewer can expand the document to the full working area and restore the
+  previous layout. PDF, images, Word, slides, spreadsheets, Markdown and text
+  previews have visible zoom controls. Closing Live Illustrator gives its width
+  back to the document. PDF rendering is bounded to avoid oversized canvases.
+- Studio's follow-up source searches use the selected scope and hybrid search,
+  and citations resolve only to real retrieved chunks. Source-scoped tabs cannot
+  read another source. The creation guide also names the existing website tool.
+- Live Illustrator keeps a new question's topic separate from older turns and
+  includes visible-page chunks when keyword/vector search misses their wording.
+  Vector failures safely fall back to full-text search.
+- Connection and Studio errors, zoom and layout controls are localized in
+  Japanese, English and Simplified Chinese.
+
+## Compatibility
+
+Existing projects, settings, conversations, sessions and AI profiles remain
+compatible. No database or IPC migration is required. OpenAI-compatible and
+Anthropic-compatible connection formats are unchanged.
+
+## Distribution
+
+Apple Silicon Mac, macOS 12 or later. The application is MIT licensed. This
+build is ad-hoc signed and is not Apple-notarised: on first launch,
+right-click WAKARU → **Open** (or allow it in System Settings → Privacy &
+Security).
+
+---
+
 # WAKARU v1.3.0
 
 WAKARU v1.3.0 makes document work more spacious and dependable, especially

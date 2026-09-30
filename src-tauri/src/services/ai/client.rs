@@ -805,6 +805,24 @@ fn net_err(e: reqwest::Error) -> AppError {
 
 /// Map an HTTP status to a retriable/terminal AppError (docs/05 §1.5).
 fn classify(status: u16, body: String) -> AppError {
+    if status == 409
+        && serde_json::from_str::<Value>(&body)
+            .ok()
+            .and_then(|value| {
+                value
+                    .pointer("/error/code")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+            })
+            .as_deref()
+            == Some("MODEL_NOT_LOADED")
+    {
+        return AppError::new(
+            "AI_MODEL_NOT_LOADED",
+            "error.ai.modelNotLoaded",
+            "The selected model is stopped. Load it in MLXBar.",
+        );
+    }
     let snippet = sanitise(&body);
     match status {
         429 | 500 | 502 | 503 | 504 | 529 => AppError::new(
@@ -914,6 +932,17 @@ mod tests {
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::sync::mpsc;
+
+    #[test]
+    fn mlxbar_stopped_model_has_specific_safe_error() {
+        let error = classify(
+            409,
+            r#"{"error":{"code":"MODEL_NOT_LOADED","message":"モデルは手動で停止されています"}}"#
+                .into(),
+        );
+        assert_eq!(error.code, "AI_MODEL_NOT_LOADED");
+        assert!(!error.message.contains("Bearer"));
+    }
 
     #[test]
     fn anthropic_adapter_moves_system_tools_and_results_to_native_shape() {

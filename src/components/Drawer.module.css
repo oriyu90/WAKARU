@@ -14,6 +14,11 @@
 .drawer[data-side="left"] {
   border-inline-end: var(--rule-1) solid var(--color-rule);
 }
+.drawer[data-open="false"] {
+  flex-basis: 0;
+  min-inline-size: 0;
+  border: 0;
+}
 .drawer[data-open="true"] {
   inline-size: min(24rem, 100%);
 }

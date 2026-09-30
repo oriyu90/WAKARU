@@ -12,6 +12,7 @@ import { documentApi, viewerApi } from "../../ipc/viewer";
 import type { SourceDetail, SourceKind, ViewerTab } from "../../ipc/types.gen";
 import { DocxFilePreview, PdfFilePreview, PptxFilePreview, ScrollNav, WorkbookPreview } from "./FilePreviews";
 import { WebsitePreview } from "./WebsitePreview";
+import { ZoomControls } from "./ZoomControls";
 import styles from "./previews.module.css";
 
 /** Keep the in-memory rail state consistent with the durable locator. Without
@@ -69,6 +70,7 @@ function TextPreview({
   const rel = `sources/${tab.sourceId}/${tab.name}`;
   const q = useAssetText(projectId, tab.sourceId, rel);
   const [wrap, setWrap] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [rendered, setRendered] = useState(markdown);
   const [find, setFind] = useState<string>("");
   const [findOpen, setFindOpen] = useState(false);
@@ -117,9 +119,10 @@ function TextPreview({
           <Button size="sm" variant="quiet" onClick={() => setRendered(false)}>
             {t("viewer.showSource")}
           </Button>
+          <ZoomControls zoom={zoom} onZoom={setZoom} />
         </Toolbar>
         <div className={styles.body} ref={bodyRef}>
-          <div className={styles.reading}>
+          <div className={styles.reading} style={{ zoom }}>
             <Markdown>{q.data ?? ""}</Markdown>
           </div>
         </div>
@@ -139,6 +142,7 @@ function TextPreview({
             {t("viewer.showRendered")}
           </Button>
         ) : null}
+        <ZoomControls zoom={zoom} onZoom={setZoom} />
       </Toolbar>
       <div className={styles.body} ref={bodyRef}>
         {findOpen ? (
@@ -160,7 +164,7 @@ function TextPreview({
             </IconButton>
           </div>
         ) : null}
-        <div className={styles.code} data-wrap={wrap}>
+        <div className={styles.code} data-wrap={wrap} style={{ zoom }}>
           <div className={styles.gutter} aria-hidden="true">
             {lines.map((_, i) => (
               <span key={i}>{i + 1}</span>
@@ -280,20 +284,11 @@ function ImagePreview({ url }: { url: string }) {
   return (
     <div className={styles.wrap}>
       <Toolbar>
-        <Button size="sm" variant="quiet" onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}>
-          −
-        </Button>
-        <span className={styles.pageLabel}>{Math.round(zoom * 100)}%</span>
-        <Button size="sm" variant="quiet" onClick={() => setZoom((z) => Math.min(4, z + 0.25))}>
-          +
-        </Button>
-        <Button size="sm" variant="quiet" onClick={() => setZoom(1)}>
-          1:1
-        </Button>
+        <ZoomControls zoom={zoom} onZoom={setZoom} min={0.25} max={4} />
       </Toolbar>
       <div className={styles.body}>
         <div className={styles.imageBody}>
-          <img src={url} alt="" style={{ transform: `scale(${zoom})` }} />
+          <img src={url} alt="" style={{ zoom }} />
         </div>
       </div>
     </div>

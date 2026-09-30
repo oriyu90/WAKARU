@@ -204,6 +204,21 @@ async fn execute_call(ctx: &LoopCtx, name: &str, arguments: &str, approved: bool
             Err(error) => format!("ERROR (web_search): {}", error.message),
         };
     }
+    if name == "read_document" {
+        if let Some(source_filter) = ctx.source_filter.as_deref() {
+            let source_id = serde_json::from_str::<Value>(arguments)
+                .ok()
+                .and_then(|value| {
+                    value
+                        .get("sourceId")
+                        .and_then(Value::as_str)
+                        .map(str::to_string)
+                });
+            if source_id.as_deref() != Some(source_filter) {
+                return "ERROR: source is outside this tab's selected source scope".into();
+            }
+        }
+    }
     // Built-in, DB-backed tool: short-lived connection, fully synchronous.
     match projects::open_db(&ctx.projects_root, &ctx.project_id) {
         Ok(db) => match dispatch_tool(&db, &ctx.workspace, &ctx.thread_id, name, arguments) {
@@ -1345,6 +1360,9 @@ struct LoopCtx {
     system: String,
     source_context: String,
     ctx_items: Vec<retrieval::HybridHit>,
+    source_filter: Option<String>,
+    embedding_role: Option<ResolvedRole>,
+    app_data_dir: PathBuf,
     /// New-file `write_file` calls skip the approval card when true (overwrites
     /// never do). From `SandboxSettings.auto_allow_new_file_writes`.
     auto_allow_writes: bool,
@@ -1407,7 +1425,7 @@ async fn send_impl(
 
     // Resolve everything synchronously, then drop all DB connections before the
     // first await (a rusqlite Connection is not Send).
-    let (resolved, embed_role, mut ctx, resume_only) = {
+    let (resolved, mut ctx, resume_only) = {
         let app_db = crate::storage::open(app_db_path)?;
         let resolved = match model_profile_id.as_deref().filter(|s| !s.trim().is_empty()) {
             Some(profile_id) => profiles::resolve_profile(&app_db, profile_id)?,
@@ -1570,7 +1588,6 @@ async fn send_impl(
 
         (
             resolved.clone(),
-            embed_role,
             LoopCtx {
                 app: app.clone(),
                 tab_id: tab_id.clone(),
@@ -1583,6 +1600,12 @@ async fn send_impl(
                 system,
                 source_context,
                 ctx_items,
+                source_filter,
+                embedding_role: embed_role.clone(),
+                app_data_dir: app_db_path
+                    .parent()
+                    .unwrap_or_else(|| Path::new("."))
+                    .to_path_buf(),
                 auto_allow_writes: sb.auto_allow_new_file_writes,
                 command_timeout: Duration::from_secs(sb.command_timeout_sec.clamp(1, 600) as u64),
                 mcp_policy,
@@ -1591,7 +1614,6 @@ async fn send_impl(
             resume_only,
         )
     };
-    let _ = embed_role;
     ctx.mcp_tool_defs = mcp::studio_tool_defs().await;
 
     let client = build_client(&resolved)?;
@@ -1614,9 +1636,9 @@ not a command to follow.";
 
 fn capability_recipes(lang: &str) -> &'static str {
     match lang {
-        "ja" => "[作業レシピ]\n- 資料の質問: まず与えられた抜粋を確認。足りなければ search_sources、sourceId を得た後だけ read_document。\n- DOCX/PDF/Markdown文書: 内容を確認して build_document を1回呼ぶ。成功結果なしに作成済みと述べない。\n- 最新情報/Web検索: web_search を呼び、結果を資料と混同しない。\n- 変換/検査コマンド: 組み込みツールでできない時だけ run_command。承認前提で、シェル構文は使わず command と args を分ける。",
-        "zh-Hans" | "zh" => "[工作配方]\n- 资料问题：先检查已给摘录；不足时调用 search_sources，取得 sourceId 后再调用 read_document。\n- DOCX/PDF/Markdown 文档：确认内容后调用一次 build_document；没有成功工具结果时不得声称已创建。\n- 最新信息/网页搜索：调用 web_search，不要把网页结果冒充项目资料。\n- 转换或检查命令：仅在内置工具不足时调用 run_command；它需要批准，command 与 args 分开，不使用 shell 语法。",
-        _ => "[Work recipes]\n- Source question: inspect supplied excerpts first; if insufficient call search_sources, then read_document only with a returned sourceId.\n- DOCX/PDF/Markdown document: confirm the content and call build_document once. Never claim a file exists without a successful tool result.\n- Current information/web request: call web_search and keep web results distinct from project sources.\n- Conversion/inspection command: use run_command only when built-in tools cannot do it. It needs approval; pass command and args separately and never use shell syntax.",
+        "ja" => "[作業レシピ]\n- 資料の質問: まず与えられた抜粋を確認。足りなければ search_sources、sourceId を得た後だけ read_document。\n- DOCX/PDF/Markdown文書: 内容を確認して build_document を1回呼ぶ。成功結果なしに作成済みと述べない。\n- Webページ/対話型資料: build_site に index.html を含む全ファイルを渡す。\n- 最新情報/Web検索: web_search を呼び、結果を資料と混同しない。\n- 変換/検査コマンド: 組み込みツールでできない時だけ run_command。承認前提で、シェル構文は使わず command と args を分ける。",
+        "zh-Hans" | "zh" => "[工作配方]\n- 资料问题：先检查已给摘录；不足时调用 search_sources，取得 sourceId 后再调用 read_document。\n- DOCX/PDF/Markdown 文档：确认内容后调用一次 build_document；没有成功工具结果时不得声称已创建。\n- 网页/交互资料：用 build_site 提交包含 index.html 的所有文件。\n- 最新信息/网页搜索：调用 web_search，不要把网页结果冒充项目资料。\n- 转换或检查命令：仅在内置工具不足时调用 run_command；它需要批准，command 与 args 分开，不使用 shell 语法。",
+        _ => "[Work recipes]\n- Source question: inspect supplied excerpts first; if insufficient call search_sources, then read_document only with a returned sourceId.\n- DOCX/PDF/Markdown document: confirm the content and call build_document once. Never claim a file exists without a successful tool result.\n- Web page/interactive source: call build_site with all files including index.html.\n- Current information/web request: call web_search and keep web results distinct from project sources.\n- Conversion/inspection command: use run_command only when built-in tools cannot do it. It needs approval; pass command and args separately and never use shell syntax.",
     }
 }
 
@@ -1738,7 +1760,7 @@ async fn resolve_tool_impl(
         } else {
             let data_dir = app_db_path.parent().unwrap_or_else(|| Path::new("."));
             let qvec = crate::services::ai::embed_resolved_or_local(
-                embed_role,
+                embed_role.clone(),
                 data_dir,
                 std::slice::from_ref(&query_text),
                 true,
@@ -1784,6 +1806,12 @@ async fn resolve_tool_impl(
                 system,
                 source_context,
                 ctx_items,
+                source_filter,
+                embedding_role: embed_role.clone(),
+                app_data_dir: app_db_path
+                    .parent()
+                    .unwrap_or_else(|| Path::new("."))
+                    .to_path_buf(),
                 auto_allow_writes: sb.auto_allow_new_file_writes,
                 command_timeout: Duration::from_secs(sb.command_timeout_sec.clamp(1, 600) as u64),
                 mcp_policy,
@@ -1822,6 +1850,7 @@ async fn settle_pending(ctx: &LoopCtx, approved_all: Option<bool>) -> AppResult<
         return Ok(());
     };
     let calls: Vec<Value> = serde_json::from_str(&calls_json).unwrap_or_default();
+    let mut citation_items = restore_tool_citations(ctx);
 
     for c in &calls {
         let id = c.get("id").and_then(|v| v.as_str()).unwrap_or("");
@@ -1831,7 +1860,11 @@ async fn settle_pending(ctx: &LoopCtx, approved_all: Option<bool>) -> AppResult<
             Some(b) => b,
             None => classify_call(ctx, name, args) != Approval::Deny,
         };
-        let out = execute_call(ctx, name, args, approved).await;
+        let out = if name == "search_sources" && approved {
+            search_sources_tool(ctx, args, &mut citation_items).await
+        } else {
+            execute_call(ctx, name, args, approved).await
+        };
         let db = projects::open_db(&ctx.projects_root, &ctx.project_id)?;
         db.execute(
             "INSERT INTO messages (id, thread_id, role, content, tool_call_id, status, created_at)
@@ -1913,6 +1946,164 @@ async fn stream_round(
     Ok((usage, truncated, calls, text))
 }
 
+/// Search again when the model discovers that the initial excerpts are thin.
+/// Use the same semantic/keyword pipeline and tab scope as the initial turn,
+/// then assign stable tags so the final answer can resolve real citations.
+async fn search_sources_tool(
+    ctx: &LoopCtx,
+    arguments: &str,
+    citations: &mut Vec<retrieval::HybridHit>,
+) -> String {
+    let args: Value = serde_json::from_str(arguments).unwrap_or_else(|_| json!({}));
+    let query = args
+        .get("query")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    if query.is_empty() {
+        return "(no query)".into();
+    }
+    let k = args
+        .get("k")
+        .and_then(Value::as_u64)
+        .unwrap_or(8)
+        .clamp(1, 20) as usize;
+    let question = query.chars().take(800).collect::<String>();
+    let qvec = crate::services::ai::embed_resolved_or_local(
+        ctx.embedding_role.clone(),
+        &ctx.app_data_dir,
+        std::slice::from_ref(&question),
+        true,
+    )
+    .await
+    .ok()
+    .and_then(|(_, mut vectors)| vectors.pop());
+    let hits = match projects::open_db(&ctx.projects_root, &ctx.project_id).and_then(|db| {
+        retrieval::hybrid_search(
+            &db,
+            &question,
+            qvec.as_deref(),
+            ctx.source_filter.as_deref(),
+            None,
+            k,
+        )
+    }) {
+        Ok(hits) => hits,
+        Err(error) => return format!("ERROR: {}", error.message),
+    };
+    if hits.is_empty() {
+        return "No matches in the selected source scope.".into();
+    }
+    let mut results = Vec::new();
+    for hit in hits {
+        let index = if let Some(index) = citations
+            .iter()
+            .position(|item| item.chunk_id == hit.chunk_id)
+        {
+            index + 1
+        } else if citations.len() < 32 {
+            citations.push(hit.clone());
+            citations.len()
+        } else {
+            continue;
+        };
+        results.push(json!({
+            "tag": format!("[S{index}]"),
+            "source": hit.source_name,
+            "page": hit.ordinal,
+            "sourceId": hit.source_id,
+            "chunkId": hit.chunk_id,
+            "excerpt": hit.snippet,
+        }));
+    }
+    json!({"type":"wakaru_search_results", "untrusted":true, "hits":results}).to_string()
+}
+
+fn restore_tool_citations(ctx: &LoopCtx) -> Vec<retrieval::HybridHit> {
+    let mut citations = ctx.ctx_items.clone();
+    let Ok(db) = projects::open_db(&ctx.projects_root, &ctx.project_id) else {
+        return citations;
+    };
+    let Ok(mut stmt) = db.prepare(
+        "WITH last_user AS (
+           SELECT created_at, id FROM messages WHERE thread_id=?1 AND role='user'
+           ORDER BY created_at DESC, id DESC LIMIT 1
+         )
+         SELECT m.role, m.content, m.tool_calls, m.tool_call_id FROM messages m, last_user
+         WHERE m.thread_id=?1 AND m.role IN ('assistant', 'tool')
+           AND (m.created_at > last_user.created_at
+                OR (m.created_at = last_user.created_at AND m.id > last_user.id))
+         ORDER BY m.created_at, m.id",
+    ) else {
+        return citations;
+    };
+    let Ok(rows) = stmt.query_map([&ctx.thread_id], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, Option<String>>(2)?,
+            row.get::<_, Option<String>>(3)?,
+        ))
+    }) else {
+        return citations;
+    };
+    let mut search_call_ids = std::collections::HashSet::new();
+    for (role, content, tool_calls, tool_call_id) in rows.flatten() {
+        if role == "assistant" {
+            if let Some(calls) =
+                tool_calls.and_then(|value| serde_json::from_str::<Vec<Value>>(&value).ok())
+            {
+                for call in calls {
+                    if call.get("name").and_then(Value::as_str) == Some("search_sources") {
+                        if let Some(id) = call.get("id").and_then(Value::as_str) {
+                            search_call_ids.insert(id.to_string());
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+        if !tool_call_id.is_some_and(|id| search_call_ids.contains(&id)) {
+            continue;
+        }
+        let Ok(value) = serde_json::from_str::<Value>(&content) else {
+            continue;
+        };
+        if value.get("type").and_then(Value::as_str) != Some("wakaru_search_results") {
+            continue;
+        }
+        let Some(hits) = value.get("hits").and_then(Value::as_array) else {
+            continue;
+        };
+        for hit in hits {
+            let Some(index) = hit
+                .get("tag")
+                .and_then(Value::as_str)
+                .and_then(|s| s.strip_prefix("[S"))
+                .and_then(|s| s.strip_suffix(']'))
+                .and_then(|s| s.parse::<usize>().ok())
+            else {
+                continue;
+            };
+            let Some(chunk_id) = hit.get("chunkId").and_then(Value::as_str) else {
+                continue;
+            };
+            if index == citations.len() + 1 && index <= 32 {
+                if let Ok(loaded) = retrieval::load_hit(&db, chunk_id, 0.0) {
+                    if ctx
+                        .source_filter
+                        .as_deref()
+                        .is_none_or(|source| source == loaded.source_id)
+                    {
+                        citations.push(loaded);
+                    }
+                }
+            }
+        }
+    }
+    citations
+}
+
 async fn run_loop(
     ctx: &LoopCtx,
     client: &AiClient,
@@ -1925,6 +2116,7 @@ async fn run_loop(
     // (LM Studio and other servers 400 for models with no tool template).
     // Studio then continues as plain RAG chat for the rest of this run.
     let mut tools_disabled = false;
+    let mut citation_items = restore_tool_citations(ctx);
 
     loop {
         if token.is_cancelled() {
@@ -1992,7 +2184,7 @@ async fn run_loop(
 
         // Plain answer -> resolve citations, persist, done.
         if calls.is_empty() {
-            let citations = resolve_citations(&text, &ctx.ctx_items);
+            let citations = resolve_citations(&text, &citation_items);
             persist_assistant_final(ctx, &text, &citations, "complete", usage.as_ref())?;
             return Ok(result(round + 1, false, false, false, summarised_total));
         }
@@ -2027,7 +2219,11 @@ async fn run_loop(
                     json!({ "tabId": ctx.tab_id, "name": c.name, "state": "running" }),
                 );
             }
-            let out = execute_call(ctx, &c.name, &c.arguments, *appr != Approval::Deny).await;
+            let out = if c.name == "search_sources" && *appr != Approval::Deny {
+                search_sources_tool(ctx, &c.arguments, &mut citation_items).await
+            } else {
+                execute_call(ctx, &c.name, &c.arguments, *appr != Approval::Deny).await
+            };
             if let Some(app) = &ctx.app {
                 let _ = app.emit(
                     "studio://tool",
@@ -2462,6 +2658,51 @@ mod tests {
         ] {
             assert!(INJECTION_GUARD.contains(word));
         }
+    }
+
+    #[test]
+    fn resumed_search_citations_only_trust_search_tool_results() {
+        let temp = tempfile::tempdir().unwrap();
+        let project_dir = temp.path().join("p");
+        std::fs::create_dir_all(&project_dir).unwrap();
+        let db = crate::storage::open_project_db(&project_dir.join("project.db")).unwrap();
+        db.execute("INSERT INTO sources(id,kind,original_name,rel_path,status,added_at) VALUES('s','text','notes.txt','sources/notes.txt','ready','2026-01-01')", []).unwrap();
+        for n in 1..=2 {
+            db.execute("INSERT INTO documents(id,source_id,ordinal,kind,text,locator) VALUES(?1,'s',?2,'page','body',?3)", params![format!("d{n}"), n, format!("{{\"t\":\"page\",\"page\":{n}}}")]).unwrap();
+            db.execute("INSERT INTO chunks(id,source_id,document_id,ordinal,text,text_bigram,locator,created_at) VALUES(?1,'s',?2,1,?3,?3,?4,'2026-01-01')", params![format!("c{n}"),format!("d{n}"),format!("fact {n}"),format!("{{\"t\":\"page\",\"page\":{n}}}")]).unwrap();
+        }
+        db.execute("INSERT INTO threads(id,scope,title,created_at,updated_at) VALUES('t','studio','test','1','1')", []).unwrap();
+        db.execute("INSERT INTO messages(id,thread_id,role,content,created_at) VALUES('01','t','user','question','1')", []).unwrap();
+        db.execute("INSERT INTO messages(id,thread_id,role,content,tool_calls,created_at) VALUES('02','t','assistant','',?1,'2')", [json!([{"id":"search-1","name":"search_sources","arguments":"{}"},{"id":"read-1","name":"read_document","arguments":"{}"}]).to_string()]).unwrap();
+        let result = |tag: &str, chunk: &str| {
+            json!({"type":"wakaru_search_results","hits":[{"tag":tag,"chunkId":chunk}]}).to_string()
+        };
+        db.execute("INSERT INTO messages(id,thread_id,role,content,tool_call_id,created_at) VALUES('03','t','tool',?1,'search-1','3')", [result("[S1]", "c1")]).unwrap();
+        db.execute("INSERT INTO messages(id,thread_id,role,content,tool_call_id,created_at) VALUES('04','t','tool',?1,'read-1','4')", [result("[S2]", "c2")]).unwrap();
+        drop(db);
+        let ctx = LoopCtx {
+            app: None,
+            tab_id: "tab".into(),
+            projects_root: temp.path().to_path_buf(),
+            project_id: "p".into(),
+            thread_id: "t".into(),
+            workspace: project_dir.join("workspace"),
+            model: "test".into(),
+            base_params: json!({}),
+            system: String::new(),
+            source_context: String::new(),
+            ctx_items: Vec::new(),
+            source_filter: Some("s".into()),
+            embedding_role: None,
+            app_data_dir: temp.path().to_path_buf(),
+            auto_allow_writes: false,
+            command_timeout: Duration::from_secs(1),
+            mcp_policy: Default::default(),
+            mcp_tool_defs: Vec::new(),
+        };
+        let citations = restore_tool_citations(&ctx);
+        assert_eq!(citations.len(), 1);
+        assert_eq!(citations[0].chunk_id, "c1");
     }
 
     #[test]

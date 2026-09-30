@@ -175,7 +175,12 @@ pub fn hybrid_search(
                 |_| Ok(()),
             )
             .is_ok();
-        if has {
+        let indexed_dim: Option<i64> = project_db
+            .query_row("SELECT dim FROM embedding_meta WHERE id = 1", [], |row| {
+                row.get(0)
+            })
+            .ok();
+        if has && indexed_dim == Some(qv.len() as i64) && !qv.is_empty() {
             let bytes: Vec<u8> = crate::services::embed::l2_normalize(qv)
                 .iter()
                 .flat_map(|x| x.to_le_bytes())
@@ -187,11 +192,18 @@ pub fn hybrid_search(
                    AND (?2 IS NULL OR c.source_id = ?2)
                    AND (?3 IS NULL OR d.ordinal = ?3)
                  ORDER BY distance";
-            let mut stmt = project_db.prepare(sql)?;
-            let map = |r: &rusqlite::Row| r.get::<_, String>(0);
-            vec_ids = stmt
-                .query_map(rusqlite::params![bytes, source_id, document_ordinal], map)?
-                .collect::<Result<_, _>>()?;
+            let vector_result = (|| -> rusqlite::Result<Vec<String>> {
+                let mut stmt = project_db.prepare(sql)?;
+                let rows = stmt.query_map(
+                    rusqlite::params![bytes, source_id, document_ordinal],
+                    |row| row.get::<_, String>(0),
+                )?;
+                rows.collect()
+            })();
+            match vector_result {
+                Ok(ids) => vec_ids = ids,
+                Err(error) => tracing::warn!("vector search failed; using text search: {error}"),
+            }
         }
     }
 
@@ -214,7 +226,28 @@ pub fn hybrid_search(
     Ok(hits)
 }
 
-fn load_hit(
+/// Keep the currently visible page available to Live even when a paraphrased
+/// question has no FTS overlap and no embedding model is configured.
+pub fn page_chunks(
+    project_db: &rusqlite::Connection,
+    source_id: &str,
+    ordinal: i64,
+    limit: usize,
+) -> crate::error::AppResult<Vec<HybridHit>> {
+    let mut stmt = project_db.prepare(
+        "SELECT c.id FROM chunks c JOIN documents d ON d.id = c.document_id
+         WHERE c.source_id = ?1 AND d.ordinal = ?2
+         ORDER BY c.ordinal LIMIT ?3",
+    )?;
+    let ids = stmt
+        .query_map(rusqlite::params![source_id, ordinal, limit as i64], |row| {
+            row.get::<_, String>(0)
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    ids.iter().map(|id| load_hit(project_db, id, 0.0)).collect()
+}
+
+pub(crate) fn load_hit(
     project_db: &rusqlite::Connection,
     chunk_id: &str,
     score: f64,
@@ -257,6 +290,26 @@ fn is_cjk(c: char) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn visible_page_chunks_are_bounded_and_preserve_real_locators() {
+        let db = crate::storage::open_in_memory().unwrap();
+        crate::storage::migrate::run(
+            &db,
+            crate::storage::PROJECT_MIGRATIONS,
+            crate::storage::PROJECT_SCHEMA_VERSION,
+        )
+        .unwrap();
+        db.execute("INSERT INTO sources(id,kind,original_name,rel_path,status,added_at) VALUES('s','text','note.txt','sources/note.txt','ready','2026-01-01')", []).unwrap();
+        for page in 1..=2 {
+            db.execute("INSERT INTO documents(id,source_id,ordinal,kind,text,locator) VALUES(?1,'s',?2,'page','body',?3)", rusqlite::params![format!("d{page}"),page,format!("{{\"t\":\"page\",\"page\":{page}}}")]).unwrap();
+            db.execute("INSERT INTO chunks(id,source_id,document_id,ordinal,text,text_bigram,locator,created_at) VALUES(?1,'s',?2,1,?3,?3,?4,'2026-01-01')", rusqlite::params![format!("c{page}"),format!("d{page}"),format!("page {page}"),format!("{{\"t\":\"page\",\"page\":{page}}}")]).unwrap();
+        }
+        let hits = page_chunks(&db, "s", 2, 1).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].document_id, "d2");
+        assert!(hits[0].locator.contains("\"page\":2"));
+    }
 
     #[test]
     fn japanese_becomes_bigrams() {

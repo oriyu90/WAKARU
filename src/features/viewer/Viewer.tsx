@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { HomeIcon, CloseIcon, FileIcon, PlusIcon, LinkIcon, PanelRightIcon } from "../../app/Icons";
+import { HomeIcon, CloseIcon, FileIcon, PlusIcon, LinkIcon, PanelRightIcon, ExpandIcon, CollapseIcon } from "../../app/Icons";
 import { Drawer } from "../../components/Drawer";
 import { Button } from "../../components/Button";
 import { Dialog } from "../../components/Dialog";
@@ -100,6 +100,28 @@ export function Viewer({
   const setIllustratorEnabled = useUiStore((s) => s.setIllustratorEnabled);
   const { patch } = useAppSettings();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const expandButtonRef = useRef<HTMLButtonElement>(null);
+  const restoreButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => setExpanded(false), [projectId]);
+  useEffect(() => {
+    if (!expanded) return;
+    restoreButtonRef.current?.focus();
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setExpanded(false);
+        requestAnimationFrame(() => expandButtonRef.current?.focus());
+      }
+    };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [expanded]);
+
+  function restoreDocument() {
+    setExpanded(false);
+    requestAnimationFrame(() => expandButtonRef.current?.focus());
+  }
   // Resizable Live panel: the current design width is the minimum; growing
   // the panel narrows the document pane (flex layout + max-inline-size).
   // Persisted locally so it survives restarts.
@@ -310,7 +332,7 @@ export function Viewer({
   }
 
   return (
-    <div className={styles.viewer}>
+    <div className={styles.viewer} data-expanded={expanded}>
       <div
         ref={railRef}
         className={styles.rail}
@@ -366,6 +388,18 @@ export function Viewer({
         </div>
 
         <div className={styles.railFoot}>
+          {active !== HOME && activeTab ? (
+            <button
+              ref={expandButtonRef}
+              type="button"
+              className={styles.railToggle}
+              aria-label={t("viewer.expandDocument")}
+              onClick={() => setExpanded(true)}
+            >
+              <ExpandIcon size={15} />
+              <span className={styles.railName}>{t("viewer.expandDocument")}</span>
+            </button>
+          ) : null}
           <Button
             size="sm"
             variant="primary"
@@ -416,6 +450,18 @@ export function Viewer({
       </div>
 
       <div className={styles.stage}>
+        {expanded ? (
+          <button
+            ref={restoreButtonRef}
+            type="button"
+            className={styles.restoreButton}
+            aria-label={t("viewer.restoreDocument")}
+            onClick={restoreDocument}
+          >
+            <CollapseIcon size={16} />
+            {t("viewer.restoreDocument")}
+          </button>
+        ) : null}
         <div className={styles.pane}>
           {active === HOME || !activeTab ? (
             <SourceListPanel projectId={projectId} onOpen={openTab} />
@@ -426,7 +472,7 @@ export function Viewer({
 
         {illustratorEnabled ? (
           <Drawer
-            open={drawerOpen}
+            open={drawerOpen && !expanded}
             onClose={() => setDrawerOpen(false)}
             label={t("viewer.illustrator")}
             widthRem={illWidthRem}
