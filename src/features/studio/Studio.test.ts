@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { shouldSubmitStudioKey, usableChatProfiles } from "./Studio";
+import {
+  isPrePersistStudioError,
+  newClientRequestId,
+  shouldSubmitStudioKey,
+  usableChatProfiles,
+} from "./Studio";
 import type { AiProfile } from "../../ipc/types.gen";
 
 const profile = (id: string, defaultModel: string | null): AiProfile => ({
@@ -39,5 +44,24 @@ describe("usableChatProfiles (session model override)", () => {
       profile("c", "  "),
     ]);
     expect(out.map((p) => p.id)).toEqual(["a"]);
+  });
+});
+
+describe("v1.5.0 optimistic send keys", () => {
+  it("issues unique non-empty client request ids", () => {
+    const seen = new Set([newClientRequestId(), newClientRequestId(), newClientRequestId()]);
+    expect(seen.size).toBe(3);
+    for (const id of seen) expect(id.trim().length).toBeGreaterThan(0);
+  });
+});
+
+describe("v1.5.0 pre/post persist classification", () => {
+  it("restores the draft only for pre-persist failures", () => {
+    expect(isPrePersistStudioError("STUDIO_EMPTY_MESSAGE")).toBe(true);
+    expect(isPrePersistStudioError("STUDIO_REWIND_LOCKED")).toBe(true);
+    expect(isPrePersistStudioError("AI_NOT_CONFIGURED")).toBe(true);
+    expect(isPrePersistStudioError("AI_REQUEST")).toBe(false);
+    expect(isPrePersistStudioError("AI_TRUNCATED")).toBe(false);
+    expect(isPrePersistStudioError("")).toBe(false);
   });
 });

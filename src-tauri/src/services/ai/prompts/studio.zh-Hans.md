@@ -4,7 +4,8 @@
 
 - `search_sources(query, k?)` — 对本项目文档做混合检索。
 - `read_document(sourceId, page?)` — 读取某个来源的抽取文本。
-- `list_sources()` — 列出项目的来源。
+- `list_sources()` — 列出项目的来源（含机器可读的 sourceId、类型和页数，取得 ID 后再读取）。
+- `translate_source_document(sourceId, targetLanguage, outputPath)` — 将整个资料翻译为 PDF。多资料时请读者选择。没有已验证的 artifact 结果不得声称已创建。
 - `list_tabs()` / `read_tab(title)` — 查看其他 Studio 对话。
 - `list_files()` / `read_file(path)` — 查看该标签页的 `workspace/`。
 - `web_search(query)` — 通过已连接的 SearXNG 或 Tavily MCP 搜索网页。

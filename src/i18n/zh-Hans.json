@@ -220,7 +220,14 @@
     "WEBSITE_INVALID": "无法将该文件夹作为网站导入。",
     "STUDIO_SITE_INVALID": "无法生成站点（请检查文件集）。",
     "STUDIO_REWIND_LOCKED": "请先完成或停止当前回复，再编辑历史记录。",
-    "STUDIO_MESSAGE_NOT_FOUND": "找不到要编辑的消息。"
+    "STUDIO_MESSAGE_NOT_FOUND": "找不到要编辑的消息。",
+    "STUDIO_TOOL_ARG": "缺少工具参数。",
+    "STUDIO_TRANSLATE_NO_SOURCE": "未找到资料。",
+    "STUDIO_TRANSLATE_EMPTY": "资料中没有可翻译的正文。",
+    "STUDIO_TRANSLATE_ARG": "翻译请求不正确。",
+    "STUDIO_TRANSLATE_TOO_LARGE": "资料过大，请拆分后重试。",
+    "STUDIO_TRANSLATE_RENDER": "PDF 生成失败。",
+    "STUDIO_TRANSLATE_TRUNCATED": "翻译中途被截断，请拆分后重试。"
   },
   "viewer": {
     "readonly": "只读",
@@ -402,7 +409,12 @@
     "cancelled": "已停止。",
     "pickConversation": "请选择一个会话",
     "pickConversationBody": "从左侧列表打开会话，或新建一个。过去的会话在打开前不会显示。",
-    "toolResultLines_other": "{{count}} 行"
+    "toolResultLines_other": "{{count}} 行",
+    "sending": "发送中…",
+    "sent": "已发送",
+    "sendFailed": "发送失败",
+    "workingTab": "正在其他对话中处理",
+    "translateProgress": "正在翻译 {{done}}/{{total}} 页"
   },
   "mcp": {
     "transportSupport": "支持 stdio 和 MCP Streamable HTTP。连接失败仅影响该服务器。",

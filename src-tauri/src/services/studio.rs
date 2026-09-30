@@ -39,6 +39,12 @@ mod prompts {
 /// Tool round-trips one `studio_send` (or one "続行") will run before it stops
 /// and asks the reader to continue (AC-6-8).
 const MAX_TOOL_ROUNDS: u32 = 10;
+/// Cumulative rounds since the last user message, across `続行` resumes
+/// (v1.5.0 B-2). `続行` never resets this counter.
+const MAX_TOTAL_ROUNDS: u32 = 30;
+/// The second identical unrecoverable tool failure ends that request's
+/// automatic run (v1.5.0 B-2).
+const MAX_SAME_FAILURE: u32 = 2;
 /// Context budget for the assembled message array, in characters (~1 token ≈ 4
 /// chars). Older turns above this are folded into a summary; the latest question
 /// is never dropped (AC-6-9).
@@ -91,23 +97,35 @@ fn classify_call(ctx: &LoopCtx, name: &str, arguments: &str) -> Approval {
         // programs and reach the network.
         "run_command" => Approval::Ask,
         "web_search" => Approval::Auto,
-        "write_file" | "build_document" | "build_site" => {
+        "write_file" | "build_document" | "build_site" | "translate_source_document" => {
             let parsed = serde_json::from_str::<Value>(arguments).ok();
             let mut path = parsed
                 .as_ref()
-                .and_then(|v| v.get("path").and_then(|p| p.as_str()).map(str::to_string))
+                .and_then(|v| {
+                    v.get("path")
+                        .and_then(|p| p.as_str())
+                        .map(str::to_string)
+                        .or_else(|| {
+                            v.get("outputPath")
+                                .and_then(|p| p.as_str())
+                                .map(str::to_string)
+                        })
+                })
                 .unwrap_or_default();
             // `build_document` normalises the extension before writing. Apply
             // the same rule here or a model could propose `report.md` with
             // `format: pdf` and bypass overwrite approval for `report.pdf`.
+            // v1.5.0: no implicit `md` default — a missing format must not
+            // silently downgrade a PDF request.
             if name == "build_document" {
-                let format = parsed
+                if let Some(format) = parsed
                     .as_ref()
                     .and_then(|v| v.get("format"))
                     .and_then(Value::as_str)
-                    .unwrap_or("md");
-                if let Some(normalised) = document_output_path(&path, format) {
-                    path = normalised;
+                {
+                    if let Some(normalised) = document_output_path(&path, format) {
+                        path = normalised;
+                    }
                 }
             }
             let exists = sandbox::resolve_in_sandbox(&ctx.workspace, &path)
@@ -125,16 +143,179 @@ fn classify_call(ctx: &LoopCtx, name: &str, arguments: &str) -> Approval {
     }
 }
 
+/// Structured tool error for the model (v1.5.0 B-2). Human display is
+/// localised in the frontend; no stacks or document bodies are included.
+fn tool_error_json(tool: &str, code: &str, detail: &str, required: &[&str]) -> String {
+    json!({
+        "ok": false,
+        "code": code,
+        "tool": tool,
+        "required": required,
+        "detail": detail,
+    })
+    .to_string()
+}
+
+/// Canonical key for `(tool, normalised args, error code)` duplicate counting.
+fn failure_key(tool: &str, arguments: &str, code: &str) -> String {
+    format!("{tool}\u{1f}@{}\u{1f}@{code}", normalise_args(arguments))
+}
+
+/// Normalise raw tool arguments so `{"a":1,"b":2}` and `{"b":2,"a":1}`
+/// count as the same failure. Falls back to trimmed raw text.
+fn normalise_args(arguments: &str) -> String {
+    let trimmed = arguments.trim();
+    if trimmed.is_empty() {
+        return "{}".to_string();
+    }
+    match serde_json::from_str::<Value>(trimmed) {
+        Ok(v) => canonical_json(&v).to_string(),
+        Err(_) => trimmed.to_string(),
+    }
+}
+
+fn canonical_json(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => {
+            let mut sorted = serde_json::Map::with_capacity(map.len());
+            let mut keys: Vec<&String> = map.keys().collect();
+            keys.sort();
+            for k in keys {
+                sorted.insert(k.clone(), canonical_json(&map[k]));
+            }
+            Value::Object(sorted)
+        }
+        Value::Array(arr) => Value::Array(arr.iter().map(canonical_json).collect()),
+        other => other.clone(),
+    }
+}
+
+/// Extract the structured `code` from a tool result, if present.
+fn tool_result_code(output: &str) -> Option<String> {
+    let v: Value = serde_json::from_str(output).ok()?;
+    if v.get("ok").and_then(Value::as_bool) != Some(false) {
+        return None;
+    }
+    v.get("code").and_then(Value::as_str).map(str::to_string)
+}
+
+/// Emit `studio://turn-persisted` with ids only (v1.5.0 A-1).
+fn emit_turn_persisted(
+    app: &Option<AppHandle>,
+    project_id: &str,
+    tab_id: &str,
+    client_request_id: &Option<String>,
+    message_id: &str,
+) {
+    if let Some(app) = app {
+        let _ = app.emit(
+            "studio://turn-persisted",
+            json!({
+                "projectId": project_id,
+                "tabId": tab_id,
+                "clientRequestId": client_request_id,
+                "messageId": message_id,
+            }),
+        );
+    }
+}
+
+/// Emit `studio://history-changed` for the visible tab (v1.5.0 A-1).
+/// Coalescing happens in the frontend; a missed event still converges via
+/// the existing completion refetch.
+fn emit_history_changed(app: &Option<AppHandle>, tab_id: &str) {
+    if let Some(app) = app {
+        let _ = app.emit("studio://history-changed", json!({ "tabId": tab_id }));
+    }
+}
+
+/// Emit `studio://document-progress` with counts only (v1.5.0 C-6).
+fn emit_document_progress(
+    app: &Option<AppHandle>,
+    tab_id: &str,
+    done: usize,
+    total: usize,
+    phase: &str,
+) {
+    if let Some(app) = app {
+        let _ = app.emit(
+            "studio://document-progress",
+            json!({ "tabId": tab_id, "done": done, "total": total, "phase": phase }),
+        );
+    }
+}
+
+/// Available sources for `read_document` single-candidate completion
+/// (v1.5.0 B-1): `(id, kind, name, pages)`.
+fn available_sources(db: &Connection) -> Vec<(String, String, String, i64)> {
+    let mut out = Vec::new();
+    let Ok(mut stmt) = db.prepare(
+        "SELECT s.id, s.kind, s.original_name, COUNT(d.id)
+         FROM sources s LEFT JOIN documents d ON d.source_id = s.id
+         WHERE s.status = 'ready'
+         GROUP BY s.id ORDER BY s.added_at",
+    ) else {
+        return out;
+    };
+    let Ok(rows) = stmt.query_map([], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, String>(1)?,
+            r.get::<_, String>(2)?,
+            r.get::<_, i64>(3)?,
+        ))
+    }) else {
+        return out;
+    };
+    for row in rows.flatten() {
+        out.push(row);
+    }
+    out
+}
+
+/// v1.5.0 B-1: complete a missing `read_document.sourceId` only when the
+/// target is unambiguous — the tab's selected single source, or exactly one
+/// ready source in the project. Otherwise return `None` so the caller emits
+/// a structured ambiguity error instead of guessing.
+fn complement_source_id(
+    db: &Connection,
+    source_filter: Option<&str>,
+    requested: Option<&str>,
+) -> Option<String> {
+    if let Some(id) = requested.filter(|s| !s.trim().is_empty()) {
+        return Some(id.to_string());
+    }
+    if let Some(single) = source_filter {
+        return Some(single.to_string());
+    }
+    let sources = available_sources(db);
+    if sources.len() == 1 {
+        return Some(sources[0].0.clone());
+    }
+    None
+}
+
 /// Run one proposed call (any origin) and return the string that becomes its
 /// `role: "tool"` message. Never holds a DB connection across an await.
-async fn execute_call(ctx: &LoopCtx, name: &str, arguments: &str, approved: bool) -> String {
+/// Invalid arguments are rejected before any side effect (v1.5.0 B-2).
+async fn execute_call(
+    ctx: &LoopCtx,
+    client: &AiClient,
+    token: &CancellationToken,
+    name: &str,
+    arguments: &str,
+    approved: bool,
+) -> String {
     if !approved {
         return r#"{"error":"user_denied"}"#.to_string();
+    }
+    if name == "translate_source_document" {
+        return execute_translate(ctx, client, token, arguments).await;
     }
     if let Some((slug, tool)) = name.split_once("__") {
         return match mcp::call_tool(slug, tool, arguments).await {
             Ok(s) => s,
-            Err(e) => format!("ERROR: {}", e.message),
+            Err(e) => tool_error_json(&format!("{slug}__{tool}"), &e.code, &e.message, &[]),
         };
     }
     if name == "run_command" {
@@ -186,7 +367,7 @@ async fn execute_call(ctx: &LoopCtx, name: &str, arguments: &str, approved: bool
                     s
                 }
             }
-            Err(e) => format!("ERROR: {}", e.message),
+            Err(e) => tool_error_json("run_command", &e.code, &e.message, &[]),
         };
     }
     if name == "web_search" {
@@ -199,34 +380,341 @@ async fn execute_call(ctx: &LoopCtx, name: &str, arguments: &str, approved: bool
                     .map(str::to_string)
             })
             .unwrap_or_default();
+        if query.trim().is_empty() {
+            return tool_error_json(name, "MISSING_QUERY", "query is required", &["query"]);
+        }
         return match mcp::web_search(&query).await {
             Ok(output) => output,
-            Err(error) => format!("ERROR (web_search): {}", error.message),
+            Err(error) => tool_error_json("web_search", &error.code, &error.message, &[]),
         };
-    }
-    if name == "read_document" {
-        if let Some(source_filter) = ctx.source_filter.as_deref() {
-            let source_id = serde_json::from_str::<Value>(arguments)
-                .ok()
-                .and_then(|value| {
-                    value
-                        .get("sourceId")
-                        .and_then(Value::as_str)
-                        .map(str::to_string)
-                });
-            if source_id.as_deref() != Some(source_filter) {
-                return "ERROR: source is outside this tab's selected source scope".into();
-            }
-        }
     }
     // Built-in, DB-backed tool: short-lived connection, fully synchronous.
     match projects::open_db(&ctx.projects_root, &ctx.project_id) {
-        Ok(db) => match dispatch_tool(&db, &ctx.workspace, &ctx.thread_id, name, arguments) {
+        Ok(db) => match dispatch_tool(
+            &db,
+            &ctx.workspace,
+            &ctx.thread_id,
+            name,
+            arguments,
+            ctx.source_filter.as_deref(),
+        ) {
             Ok(s) => s,
-            Err(e) => format!("ERROR: {}", e.message),
+            Err(e) => tool_error_json(name, &e.code, &e.message, &[]),
         },
-        Err(e) => format!("ERROR: {}", e.message),
+        Err(e) => tool_error_json(name, &e.code, &e.message, &[]),
     }
+}
+
+/// v1.5.0 C: translate every extracted page of one source to a real PDF.
+/// Runs page-by-page model requests with no tools, verifies the PDF and
+/// registers exactly one artifact. Any failure leaves no partial final PDF.
+async fn execute_translate(
+    ctx: &LoopCtx,
+    client: &AiClient,
+    token: &CancellationToken,
+    arguments: &str,
+) -> String {
+    use crate::services::studio_translate as tr;
+    let args: Value = match serde_json::from_str(arguments) {
+        Ok(v) => v,
+        Err(_) => {
+            return tool_error_json(
+                "translate_source_document",
+                "INVALID_JSON",
+                "arguments must be a JSON object",
+                &[],
+            )
+        }
+    };
+    let requested_id = args
+        .get("sourceId")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .filter(|v| !v.trim().is_empty());
+    let target_raw = args
+        .get("targetLanguage")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let output_raw = args
+        .get("outputPath")
+        .or_else(|| args.get("path"))
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    if target_raw.trim().is_empty() {
+        return tool_error_json(
+            "translate_source_document",
+            "MISSING_TARGET",
+            "targetLanguage is required (ja, en or zh-Hans)",
+            &["targetLanguage"],
+        );
+    }
+    let Some(target_lang) = tr::normalize_target_language(&target_raw) else {
+        return tool_error_json(
+            "translate_source_document",
+            "INVALID_TARGET",
+            "targetLanguage must be ja, en or zh-Hans",
+            &["targetLanguage"],
+        );
+    };
+    if output_raw.trim().is_empty() {
+        return tool_error_json(
+            "translate_source_document",
+            "MISSING_OUTPUT",
+            "outputPath is required (a workspace-relative .pdf path)",
+            &["outputPath"],
+        );
+    }
+    // Resolve the source and collect pages with a short-lived connection.
+    let (source_name, pages) = {
+        let db = match projects::open_db(&ctx.projects_root, &ctx.project_id) {
+            Ok(db) => db,
+            Err(e) => {
+                return tool_error_json("translate_source_document", &e.code, &e.message, &[])
+            }
+        };
+        let sid = match complement_source_id(
+            &db,
+            ctx.source_filter.as_deref(),
+            requested_id.as_deref(),
+        ) {
+            Some(id) => id,
+            None => {
+                let candidates = available_sources(&db);
+                if candidates.is_empty() {
+                    return tool_error_json(
+                        "translate_source_document",
+                        "NO_SOURCES",
+                        "no ready sources",
+                        &["sourceId"],
+                    );
+                }
+                let list: Vec<Value> = candidates
+                    .iter()
+                    .take(10)
+                    .map(|(id, kind, cname, pg)| {
+                        json!({"sourceId": id, "kind": kind, "name": cname, "pages": pg})
+                    })
+                    .collect();
+                return json!({
+                    "ok": false,
+                    "code": "AMBIGUOUS_SOURCE",
+                    "tool": "translate_source_document",
+                    "required": ["sourceId"],
+                    "detail": "several sources exist; ask the reader to pick one",
+                    "candidates": list,
+                })
+                .to_string();
+            }
+        };
+        if let Some(filter) = ctx.source_filter.as_deref() {
+            if sid != filter {
+                return tool_error_json(
+                    "translate_source_document",
+                    "SCOPE_DENIED",
+                    "source is outside this tab's selected source scope",
+                    &["sourceId"],
+                );
+            }
+        }
+        match tr::collect_pages(&db, &sid) {
+            Ok(v) => v,
+            Err(e) => {
+                return tool_error_json("translate_source_document", &e.code, &e.message, &[])
+            }
+        }
+    };
+    if let Err(e) = tr::validate_plan(&pages, &target_lang, output_raw.trim()) {
+        return tool_error_json("translate_source_document", &e.code, &e.message, &[]);
+    }
+    let empties = tr::empty_pages(&pages);
+    if !empties.is_empty() {
+        return json!({
+            "ok": false,
+            "code": "EMPTY_PAGES",
+            "tool": "translate_source_document",
+            "detail": format!("pages with no extracted text: {}", empties.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(", ")),
+            "pages": empties,
+        })
+        .to_string();
+    }
+    let total = pages.len();
+    emit_document_progress(&ctx.app, &ctx.tab_id, 0, total, "translating");
+    let label = tr::target_language_label(&target_lang);
+    let mut translated_pages: Vec<String> = Vec::with_capacity(total);
+    for (idx, page) in pages.iter().enumerate() {
+        if token.is_cancelled() {
+            return json!({"ok": false, "code": "CANCELLED", "tool": "translate_source_document"})
+                .to_string();
+        }
+        let chunks = tr::split_for_translate(&page.text, tr::MAX_CHUNK_CHARS);
+        if chunks.is_empty() {
+            return json!({
+                "ok": false, "code": "EMPTY_PAGES",
+                "tool": "translate_source_document",
+                "detail": format!("page {} has no translatable text", page.ordinal),
+                "pages": [page.ordinal],
+            })
+            .to_string();
+        }
+        let mut page_out = String::new();
+        for chunk in &chunks {
+            if token.is_cancelled() {
+                return json!({"ok": false, "code": "CANCELLED", "tool": "translate_source_document"})
+                    .to_string();
+            }
+            match translate_chunk(client, ctx, &target_lang, label, chunk, token).await {
+                Ok(t) if !t.trim().is_empty() => {
+                    if !page_out.is_empty() {
+                        page_out.push_str("\n\n");
+                    }
+                    page_out.push_str(t.trim());
+                }
+                Ok(_) => {
+                    // Retry once with a smaller split before failing the page.
+                    let retry_chunks = tr::split_for_translate(chunk, tr::RETRY_CHUNK_CHARS);
+                    let mut recovered = String::new();
+                    let mut ok = true;
+                    for rc in &retry_chunks {
+                        match translate_chunk(client, ctx, &target_lang, label, rc, token).await {
+                            Ok(t) if !t.trim().is_empty() => {
+                                if !recovered.is_empty() {
+                                    recovered.push_str("\n\n");
+                                }
+                                recovered.push_str(t.trim());
+                            }
+                            _ => {
+                                ok = false;
+                                break;
+                            }
+                        }
+                    }
+                    if !ok || recovered.trim().is_empty() {
+                        return json!({
+                            "ok": false, "code": "TRANSLATE_FAILED",
+                            "tool": "translate_source_document",
+                            "detail": format!("page {} could not be translated; retry or split the source", page.ordinal),
+                            "pages": [page.ordinal],
+                        })
+                        .to_string();
+                    }
+                    if !page_out.is_empty() {
+                        page_out.push_str("\n\n");
+                    }
+                    page_out.push_str(recovered.trim());
+                }
+                Err(e) => {
+                    return tool_error_json("translate_source_document", &e.code, &e.message, &[]);
+                }
+            }
+        }
+        if page_out.trim().is_empty() {
+            return json!({
+                "ok": false, "code": "TRANSLATE_FAILED",
+                "tool": "translate_source_document",
+                "detail": format!("page {} produced no output", page.ordinal),
+                "pages": [page.ordinal],
+            })
+            .to_string();
+        }
+        translated_pages.push(page_out);
+        emit_document_progress(&ctx.app, &ctx.tab_id, idx + 1, total, "translating");
+    }
+    if token.is_cancelled() {
+        return json!({"ok": false, "code": "CANCELLED", "tool": "translate_source_document"})
+            .to_string();
+    }
+    emit_document_progress(&ctx.app, &ctx.tab_id, total, total, "rendering");
+    let sections =
+        tr::sections_from_translations(&source_name, &target_lang, &pages, &translated_pages);
+    let title = format!("{source_name} — {label} translation");
+    let req = doc_builder::DocRequest {
+        title: title.trim(),
+        toc: false,
+        sections: &sections,
+    };
+    let bytes = match doc_builder::render("pdf", &req) {
+        Ok(b) => b,
+        Err(e) => {
+            // v1.5.0 B-1: a PDF request never silently becomes Markdown.
+            return tool_error_json("translate_source_document", &e.code, &e.message, &[]);
+        }
+    };
+    if let Err(e) = tr::verify_pdf_bytes(&bytes) {
+        return tool_error_json("translate_source_document", &e.code, &e.message, &[]);
+    }
+    let out_path = output_raw.trim().to_string();
+    // Atomic write + artifact registration only after every page verified.
+    let db = match projects::open_db(&ctx.projects_root, &ctx.project_id) {
+        Ok(db) => db,
+        Err(e) => return tool_error_json("translate_source_document", &e.code, &e.message, &[]),
+    };
+    if let Err(e) = write_artifact(&db, &ctx.workspace, &ctx.thread_id, &out_path, &bytes) {
+        return tool_error_json("translate_source_document", &e.code, &e.message, &[]);
+    }
+    let rel = format!("workspace/{}", out_path.trim_start_matches("./"));
+    let artifact_id: Option<String> = db
+        .query_row(
+            "SELECT id FROM artifacts WHERE rel_path = ?1",
+            [&rel],
+            |r| r.get(0),
+        )
+        .optional()
+        .unwrap_or(None);
+    emit_document_progress(&ctx.app, &ctx.tab_id, total, total, "done");
+    json!({
+        "ok": true,
+        "tool": "translate_source_document",
+        "artifactId": artifact_id,
+        "path": rel,
+        "pages": total,
+        "bytes": bytes.len(),
+    })
+    .to_string()
+}
+
+/// One page chunk translation with no tools. `finish_reason:length` surfaces
+/// as `truncated=true` and the caller retries once with a smaller split.
+async fn translate_chunk(
+    client: &AiClient,
+    ctx: &LoopCtx,
+    target_lang: &str,
+    label: &str,
+    chunk: &str,
+    token: &CancellationToken,
+) -> AppResult<String> {
+    let system = match target_lang {
+        "ja" => "あなたは翻訳者です。入力テキストを自然な日本語に全訳してください。段落を保ち、余計な解説や前置きを付けず、翻訳文だけを出力してください。",
+        "zh-Hans" | "zh" => "你是翻译。将输入文本完整译为简体中文，保持段落，只输出译文，不要添加解释或前言。",
+        _ => "You are a translator. Translate the input text fully into natural English. Keep paragraphs, output only the translation with no commentary.",
+    };
+    let messages = json!([
+        {"role": "system", "content": system},
+        {"role": "user", "content": format!("Translate into {label}:\n\n{chunk}")},
+    ]);
+    let mut params = ctx.base_params.clone();
+    if let Some(obj) = params.as_object_mut() {
+        obj.remove("tools");
+        obj.remove("tool_choice");
+    }
+    let acc = std::sync::Mutex::new(String::new());
+    let (usage, truncated, _) = client
+        .chat_stream(&ctx.model, messages, &params, token, |kind, t| {
+            if kind == "text" {
+                acc.lock().unwrap_or_else(|e| e.into_inner()).push_str(t);
+            }
+        })
+        .await?;
+    let _ = usage;
+    if truncated {
+        return Err(AppError::new(
+            "STUDIO_TRANSLATE_TRUNCATED",
+            "error.studio.translateTruncated",
+            "translation was cut by the output limit",
+        ));
+    }
+    Ok(acc.into_inner().unwrap_or_else(|e| e.into_inner()))
 }
 
 // ───────────────────────── tab CRUD (FR-T1/T2) ─────────────────────────
@@ -371,30 +859,31 @@ fn persist_user_branch(
     scope: &str,
     text: &str,
     replace_target: Option<(String, String)>,
-) -> AppResult<()> {
+) -> AppResult<String> {
+    let message_id = Uuid::now_v7().to_string();
     let tx = db.unchecked_transaction()?;
     tx.execute(
         "UPDATE studio_tabs SET scope = ?2 WHERE id = ?1",
         params![tab_id, scope],
     )?;
-    if let Some((created_at, message_id)) = replace_target {
+    if let Some((created_at, target_id)) = replace_target {
         tx.execute(
             "DELETE FROM messages WHERE thread_id=?1
              AND (created_at > ?2 OR (created_at = ?2 AND id >= ?3))",
-            params![thread_id, created_at, message_id],
+            params![thread_id, created_at, target_id],
         )?;
     }
     tx.execute(
-        "INSERT INTO messages (id, thread_id, role, content, created_at)
-         VALUES (?1, ?2, 'user', ?3, ?4)",
-        params![Uuid::now_v7().to_string(), thread_id, text, now_iso8601()],
+        "INSERT INTO messages (id, thread_id, role, content, status, created_at)
+         VALUES (?1, ?2, 'user', ?3, 'complete', ?4)",
+        params![message_id, thread_id, text, now_iso8601()],
     )?;
     tx.execute(
         "UPDATE threads SET updated_at = ?2 WHERE id = ?1",
         params![thread_id, now_iso8601()],
     )?;
     tx.commit()?;
-    Ok(())
+    Ok(message_id)
 }
 
 fn load_messages(db: &Connection, thread_id: &str) -> AppResult<Vec<ChatMessage>> {
@@ -774,9 +1263,10 @@ fn tool_defs() -> Value {
     json!([
         f("search_sources", "Search this project's sources. Call this when the supplied excerpts do not contain enough evidence.",
           json!({ "query": { "type": "string" }, "k": { "type": "integer" } }), json!(["query"])),
-        f("read_document", "Read a source's extracted text after finding its sourceId. Prefer a page returned by search_sources. Omit page for a bounded whole-document digest; the result says when it was truncated.",
+        f("read_document", "Read a source's extracted text. First call list_sources (or use a sourceId returned by search_sources) to obtain the exact sourceId, then pass it here. Prefer a page returned by search_sources. Omit page for a bounded whole-document digest; the result says when it was truncated.",
           json!({ "sourceId": { "type": "string" }, "page": { "type": "integer", "minimum": 1 } }), json!(["sourceId"])),
-        f("list_sources", "List this project's sources.", json!({}), json!([])),
+        f("list_sources", "List this project's sources with their machine-readable sourceId, kind and page counts. Call this before read_document when you do not yet have a sourceId.",
+          json!({}), json!([])),
         f("list_tabs", "List the other Studio conversations in this project.", json!({}), json!([])),
         f("read_tab", "Read another Studio conversation by its title.",
           json!({ "title": { "type": "string" } }), json!(["title"])),
@@ -828,23 +1318,54 @@ fn tool_defs() -> Value {
           "Run a program inside workspace/ (no shell). Always needs the reader's approval; it can reach the network.",
           json!({ "command": { "type": "string" }, "args": { "type": "array", "items": { "type": "string" } } }),
           json!(["command"])),
+        f("translate_source_document",
+          "Translate a whole source document (every extracted page, in order) into a new PDF. Use this when the reader asks to translate a full document and save it as PDF. Pass the sourceId from list_sources/search_sources (ask the reader to pick one when several sources exist), the targetLanguage (ja, en or zh-Hans) and a workspace-relative outputPath ending in .pdf. The tool translates page by page, renders a real PDF and registers one artifact; it reports missing pages and never claims a PDF exists without a verified artifact.",
+          json!({
+            "sourceId": { "type": "string", "description": "source id from list_sources or search_sources" },
+            "targetLanguage": { "type": "string", "description": "ja, en or zh-Hans" },
+            "outputPath": { "type": "string", "description": "workspace-relative output path ending in .pdf, e.g. translated.pdf" }
+          }),
+          json!(["targetLanguage", "outputPath"])),
     ])
 }
 
 /// Run one built-in tool. `arguments` is the raw JSON string from the model.
+/// Validation failures are returned as structured `{"ok":false,...}` strings
+/// (v1.5.0 B-2) so the loop can count identical failures; only internal
+/// DB/IO problems surface as `Err`.
 pub fn dispatch_tool(
     db: &Connection,
     workspace: &Path,
     thread_id: &str,
     name: &str,
     arguments: &str,
+    source_filter: Option<&str>,
 ) -> AppResult<String> {
     let raw = if arguments.trim().is_empty() {
         "{}"
     } else {
         arguments
     };
-    let args: Value = serde_json::from_str(raw).unwrap_or_else(|_| json!({}));
+    // Malformed JSON never reaches a side effect (v1.5.0 B-1).
+    let args: Value = match serde_json::from_str(raw) {
+        Ok(v) => v,
+        Err(_) => {
+            return Ok(tool_error_json(
+                name,
+                "INVALID_JSON",
+                "arguments must be a JSON object",
+                &[],
+            ))
+        }
+    };
+    if !args.is_object() {
+        return Ok(tool_error_json(
+            name,
+            "INVALID_JSON",
+            "arguments must be a JSON object",
+            &[],
+        ));
+    }
     let s = |k: &str| args.get(k).and_then(|v| v.as_str()).map(str::to_string);
     let n = |k: &str| args.get(k).and_then(|v| v.as_u64());
 
@@ -852,7 +1373,12 @@ pub fn dispatch_tool(
         "search_sources" => {
             let query = s("query").unwrap_or_default();
             if query.trim().is_empty() {
-                return Ok("(no query)".into());
+                return Ok(tool_error_json(
+                    name,
+                    "MISSING_QUERY",
+                    "query is required",
+                    &["query"],
+                ));
             }
             let k = n("k").unwrap_or(8).clamp(1, 20) as usize;
             let hits = retrieval::hybrid_search(db, &query, None, None, None, k)?;
@@ -872,15 +1398,75 @@ pub fn dispatch_tool(
             Ok(out)
         }
         "read_document" => {
-            let sid = s("sourceId").ok_or_else(|| tool_arg("sourceId"))?;
-            let source_name: String = db
+            // v1.5.0 B-1: typed validation + unambiguous single-source completion.
+            if let Some(v) = args.get("page") {
+                let ok = v.as_u64().is_some_and(|p| (1..=10_000).contains(&p));
+                if !ok {
+                    return Ok(tool_error_json(
+                        name,
+                        "INVALID_PAGE",
+                        "page must be an integer >= 1",
+                        &["page"],
+                    ));
+                }
+            }
+            let requested = s("sourceId").filter(|v| !v.trim().is_empty());
+            let sid = match complement_source_id(db, source_filter, requested.as_deref()) {
+                Some(id) => id,
+                None => {
+                    let candidates = available_sources(db);
+                    if candidates.is_empty() {
+                        return Ok(tool_error_json(
+                            name,
+                            "NO_SOURCES",
+                            "no ready sources; call list_sources first",
+                            &["sourceId"],
+                        ));
+                    }
+                    let list = candidates
+                        .iter()
+                        .take(10)
+                        .map(|(id, kind, cname, pages)| {
+                            json!({"sourceId": id, "kind": kind, "name": cname, "pages": pages})
+                        })
+                        .collect::<Vec<_>>();
+                    return Ok(json!({
+                        "ok": false,
+                        "code": "AMBIGUOUS_SOURCE",
+                        "tool": name,
+                        "required": ["sourceId"],
+                        "detail": "several sources exist; call list_sources and pass one sourceId",
+                        "candidates": list,
+                    })
+                    .to_string());
+                }
+            };
+            // Scope / existence checks never guess (v1.5.0 B-1).
+            if let Some(filter) = source_filter {
+                if sid != filter {
+                    return Ok(tool_error_json(
+                        name,
+                        "SCOPE_DENIED",
+                        "source is outside this tab's selected source scope",
+                        &["sourceId"],
+                    ));
+                }
+            }
+            let exists: Option<String> = db
                 .query_row(
                     "SELECT original_name FROM sources WHERE id = ?1",
                     [&sid],
                     |row| row.get(0),
                 )
-                .optional()?
-                .unwrap_or_else(|| sid.clone());
+                .optional()?;
+            let Some(source_name) = exists else {
+                return Ok(tool_error_json(
+                    name,
+                    "UNKNOWN_SOURCE",
+                    "no source with that sourceId",
+                    &["sourceId"],
+                ));
+            };
             let total: i64 = db
                 .query_row(
                     "SELECT COUNT(*) FROM documents WHERE source_id = ?1",
@@ -945,7 +1531,7 @@ pub fn dispatch_tool(
             let rows: Vec<String> = stmt
                 .query_map([], |r| {
                     Ok(format!(
-                        "- {} · {} · {} ({}, {} pages/sections)",
+                        "- sourceId: {} · kind: {} · name: {} · status: {} · pages: {}",
                         r.get::<_, String>(0)?,
                         r.get::<_, String>(1)?,
                         r.get::<_, String>(2)?,
@@ -972,7 +1558,14 @@ pub fn dispatch_tool(
             })
         }
         "read_tab" => {
-            let title = s("title").ok_or_else(|| tool_arg("title"))?;
+            let Some(title) = s("title").filter(|v| !v.trim().is_empty()) else {
+                return Ok(tool_error_json(
+                    name,
+                    "MISSING_TITLE",
+                    "title is required",
+                    &["title"],
+                ));
+            };
             let tid: Option<String> = db
                 .query_row(
                     "SELECT thread_id FROM studio_tabs WHERE title = ?1 COLLATE NOCASE",
@@ -1002,7 +1595,14 @@ pub fn dispatch_tool(
             })
         }
         "read_file" => {
-            let path = s("path").ok_or_else(|| tool_arg("path"))?;
+            let Some(path) = s("path").filter(|v| !v.trim().is_empty()) else {
+                return Ok(tool_error_json(
+                    name,
+                    "MISSING_PATH",
+                    "path is required",
+                    &["path"],
+                ));
+            };
             let abs = sandbox::resolve_in_sandbox(workspace, &path)?;
             let bytes = std::fs::read(&abs).map_err(|_| {
                 AppError::new("STUDIO_FILE_NOT_FOUND", "error.studio.fileNotFound", &path)
@@ -1011,19 +1611,98 @@ pub fn dispatch_tool(
             Ok(text.chars().take(20_000).collect())
         }
         "write_file" => {
-            let path = s("path").ok_or_else(|| tool_arg("path"))?;
+            let Some(path) = s("path").filter(|v| !v.trim().is_empty()) else {
+                return Ok(tool_error_json(
+                    name,
+                    "MISSING_PATH",
+                    "path is required",
+                    &["path"],
+                ));
+            };
+            if args.get("content").is_some()
+                && args.get("content").and_then(Value::as_str).is_none()
+            {
+                return Ok(tool_error_json(
+                    name,
+                    "INVALID_CONTENT",
+                    "content must be a string",
+                    &["content"],
+                ));
+            }
             let content = s("content").unwrap_or_default();
             write_artifact(db, workspace, thread_id, &path, content.as_bytes())
         }
         "build_document" => {
-            let requested_path = s("path").ok_or_else(|| tool_arg("path"))?;
-            let format = s("format")
-                .unwrap_or_else(|| "md".into())
-                .trim()
-                .to_ascii_lowercase();
-            let path = document_output_path(&requested_path, &format)
-                .unwrap_or_else(|| requested_path.trim().to_string());
+            // v1.5.0 B-1: `format` is required — never silently downgrade PDF to md.
+            let Some(requested_path) = s("path").filter(|v| !v.trim().is_empty()) else {
+                return Ok(tool_error_json(
+                    name,
+                    "MISSING_PATH",
+                    "path is required",
+                    &["path"],
+                ));
+            };
+            let Some(raw_format) = s("format").filter(|v| !v.trim().is_empty()) else {
+                return Ok(tool_error_json(
+                    name,
+                    "MISSING_FORMAT",
+                    "format is required (md, docx or pdf)",
+                    &["format"],
+                ));
+            };
+            let format = raw_format.trim().to_ascii_lowercase();
+            let Some(path) = document_output_path(&requested_path, &format) else {
+                return Ok(tool_error_json(
+                    name,
+                    "INVALID_FORMAT",
+                    "format must be md, docx or pdf",
+                    &["format"],
+                ));
+            };
             let title = s("title").unwrap_or_default();
+            if title.trim().is_empty() {
+                return Ok(tool_error_json(
+                    name,
+                    "MISSING_TITLE",
+                    "title is required",
+                    &["title"],
+                ));
+            }
+            let Some(sections_raw) = args.get("sections").and_then(Value::as_array) else {
+                return Ok(tool_error_json(
+                    name,
+                    "MISSING_SECTIONS",
+                    "sections is required",
+                    &["sections"],
+                ));
+            };
+            if sections_raw.is_empty() || sections_raw.len() > 100 {
+                return Ok(tool_error_json(
+                    name,
+                    "INVALID_SECTIONS",
+                    "sections must have 1..100 items",
+                    &["sections"],
+                ));
+            }
+            for sec in sections_raw {
+                if !sec.is_object() {
+                    return Ok(tool_error_json(
+                        name,
+                        "INVALID_SECTIONS",
+                        "each section must be an object with body",
+                        &["sections"],
+                    ));
+                }
+                let body = sec.get("body").and_then(Value::as_str).unwrap_or_default();
+                if body.chars().count() > 20_000 {
+                    return Ok(tool_error_json(
+                        name,
+                        "SECTION_TOO_LARGE",
+                        "one section exceeds 20000 characters; split it",
+                        &["sections"],
+                    ));
+                }
+            }
             let toc = args.get("toc").and_then(Value::as_bool).unwrap_or(false);
             let sections: Vec<doc_builder::DocSection> = args
                 .get("sections")
@@ -1073,12 +1752,33 @@ pub fn dispatch_tool(
                 .map(|p| p.trim().trim_matches('/').to_string())
                 .filter(|p| !p.is_empty())
                 .unwrap_or_else(|| "site".to_string());
-            let files = args
-                .get("files")
-                .and_then(Value::as_array)
-                .cloned()
-                .unwrap_or_default();
+            let Some(files) = args.get("files").and_then(Value::as_array).cloned() else {
+                return Ok(tool_error_json(
+                    name,
+                    "MISSING_FILES",
+                    "files is required",
+                    &["files"],
+                ));
+            };
+            if files.is_empty() {
+                return Ok(tool_error_json(
+                    name,
+                    "MISSING_FILES",
+                    "files must have at least one file",
+                    &["files"],
+                ));
+            }
             build_site(db, workspace, thread_id, &dir, &files)
+        }
+        "translate_source_document" => {
+            // Async-only tool (v1.5.0 C): validation here, execution in
+            // `execute_call` where the model client is available.
+            Ok(tool_error_json(
+                name,
+                "USE_ASYNC",
+                "translate runs in the async loop",
+                &[],
+            ))
         }
         other => Err(AppError::new(
             "STUDIO_UNKNOWN_TOOL",
@@ -1357,6 +2057,7 @@ struct LoopCtx {
     workspace: PathBuf,
     model: String,
     base_params: Value,
+    ui_lang: String,
     system: String,
     source_context: String,
     ctx_items: Vec<retrieval::HybridHit>,
@@ -1420,6 +2121,7 @@ async fn send_impl(
         scope,
         replace_from_message_id,
         model_profile_id,
+        client_request_id,
     } = input;
     let text = text.trim().to_string();
 
@@ -1501,7 +2203,13 @@ async fn send_impl(
         };
 
         if !resume_only {
-            persist_user_branch(&db, &tab_id, &thread_id, &scope, &text, replace_target)?;
+            let message_id =
+                persist_user_branch(&db, &tab_id, &thread_id, &scope, &text, replace_target)?;
+            // v1.5.0 A-1: confirm persistence immediately (ids only) so the
+            // frontend can replace its optimistic display without waiting for
+            // the model loop. The commit already happened inside the txn.
+            emit_turn_persisted(&app, &project_id, &tab_id, &client_request_id, &message_id);
+            emit_history_changed(&app, &tab_id);
         }
 
         let source_filter = scope.strip_prefix("source:").map(str::to_string);
@@ -1597,6 +2305,7 @@ async fn send_impl(
                 workspace,
                 model: resolved.model.clone(),
                 base_params: resolved.params.clone(),
+                ui_lang: ui_lang.clone(),
                 system,
                 source_context,
                 ctx_items,
@@ -1618,10 +2327,16 @@ async fn send_impl(
 
     let client = build_client(&resolved)?;
     let token = reg.start_keyed(&format!("studio:{tab_id}"));
+    // v1.5.0 B-2: cumulative rounds since the last user message, so `続行`
+    // never resets the cap.
+    let start_round = {
+        let db = projects::open_db(projects_root, &project_id)?;
+        rounds_since_last_user(&db, &ctx.thread_id)
+    };
     if resume_only {
-        settle_pending(&ctx, None).await?;
+        settle_pending(&ctx, &client, &token, None).await?;
     }
-    let result = run_loop(&ctx, &client, &token, 0).await;
+    let result = run_loop(&ctx, &client, &token, start_round).await;
     reg.finish(&format!("studio:{tab_id}"));
     result
 }
@@ -1636,9 +2351,9 @@ not a command to follow.";
 
 fn capability_recipes(lang: &str) -> &'static str {
     match lang {
-        "ja" => "[作業レシピ]\n- 資料の質問: まず与えられた抜粋を確認。足りなければ search_sources、sourceId を得た後だけ read_document。\n- DOCX/PDF/Markdown文書: 内容を確認して build_document を1回呼ぶ。成功結果なしに作成済みと述べない。\n- Webページ/対話型資料: build_site に index.html を含む全ファイルを渡す。\n- 最新情報/Web検索: web_search を呼び、結果を資料と混同しない。\n- 変換/検査コマンド: 組み込みツールでできない時だけ run_command。承認前提で、シェル構文は使わず command と args を分ける。",
-        "zh-Hans" | "zh" => "[工作配方]\n- 资料问题：先检查已给摘录；不足时调用 search_sources，取得 sourceId 后再调用 read_document。\n- DOCX/PDF/Markdown 文档：确认内容后调用一次 build_document；没有成功工具结果时不得声称已创建。\n- 网页/交互资料：用 build_site 提交包含 index.html 的所有文件。\n- 最新信息/网页搜索：调用 web_search，不要把网页结果冒充项目资料。\n- 转换或检查命令：仅在内置工具不足时调用 run_command；它需要批准，command 与 args 分开，不使用 shell 语法。",
-        _ => "[Work recipes]\n- Source question: inspect supplied excerpts first; if insufficient call search_sources, then read_document only with a returned sourceId.\n- DOCX/PDF/Markdown document: confirm the content and call build_document once. Never claim a file exists without a successful tool result.\n- Web page/interactive source: call build_site with all files including index.html.\n- Current information/web request: call web_search and keep web results distinct from project sources.\n- Conversion/inspection command: use run_command only when built-in tools cannot do it. It needs approval; pass command and args separately and never use shell syntax.",
+        "ja" => "[作業レシピ]\n- 資料の質問: まず与えられた抜粋を確認。足りなければ search_sources、sourceId を得た後だけ read_document。list_sources の sourceId をそのまま使う。\n- 全文翻訳PDF: 資料全体の翻訳PDFは translate_source_document を使う（sourceId・targetLanguage・outputPath）。複数資料では利用者に選択を求める。成功した artifact 結果なしに作成済みと述べない。\n- DOCX/PDF/Markdown文書: 内容を確認して build_document を1回呼ぶ。format は必須。成功結果なしに作成済みと述べない。\n- Webページ/対話型資料: build_site に index.html を含む全ファイルを渡す。\n- 最新情報/Web検索: web_search を呼び、結果を資料と混同しない。\n- 変換/検査コマンド: 組み込みツールでできない時だけ run_command。承認前提で、シェル構文は使わず command と args を分ける。",
+        "zh-Hans" | "zh" => "[工作配方]\n- 资料问题：先检查已给摘录；不足时调用 search_sources，取得 sourceId 后再调用 read_document。直接使用 list_sources 返回的 sourceId。\n- 全文翻译PDF：全文翻译用 translate_source_document（sourceId、targetLanguage、outputPath）。多资料时请读者选择。没有成功的 artifact 结果不得声称已创建。\n- DOCX/PDF/Markdown 文档：确认内容后调用一次 build_document；format 必填；没有成功工具结果时不得声称已创建。\n- 网页/交互资料：用 build_site 提交包含 index.html 的所有文件。\n- 最新信息/网页搜索：调用 web_search，不要把网页结果冒充项目资料。\n- 转换或检查命令：仅在内置工具不足时调用 run_command；它需要批准，command 与 args 分开，不使用 shell 语法。",
+        _ => "[Work recipes]\n- Source question: inspect supplied excerpts first; if insufficient call search_sources, then read_document only with a returned sourceId. Reuse the sourceId from list_sources verbatim.\n- Full-document translation PDF: use translate_source_document (sourceId, targetLanguage, outputPath). With several sources ask the reader to pick one. Never claim a file exists without a successful artifact result.\n- DOCX/PDF/Markdown document: confirm the content and call build_document once. format is required. Never claim a file exists without a successful tool result.\n- Web page/interactive source: call build_site with all files including index.html.\n- Current information/web request: call web_search and keep web results distinct from project sources.\n- Conversion/inspection command: use run_command only when built-in tools cannot do it. It needs approval; pass command and args separately and never use shell syntax.",
     }
 }
 
@@ -1803,6 +2518,7 @@ async fn resolve_tool_impl(
                 workspace,
                 model: resolved.model.clone(),
                 base_params: resolved.params.clone(),
+                ui_lang: ui_lang.clone(),
                 system,
                 source_context,
                 ctx_items,
@@ -1823,8 +2539,12 @@ async fn resolve_tool_impl(
 
     let client = build_client(&resolved)?;
     let token = reg.start_keyed(&format!("studio:{tab_id}"));
-    settle_pending(&ctx, Some(approved)).await?;
-    let result = run_loop(&ctx, &client, &token, 0).await;
+    settle_pending(&ctx, &client, &token, Some(approved)).await?;
+    let start_round = {
+        let db = projects::open_db(projects_root, &project_id)?;
+        rounds_since_last_user(&db, &ctx.thread_id)
+    };
+    let result = run_loop(&ctx, &client, &token, start_round).await;
     reg.finish(&format!("studio:{tab_id}"));
     result
 }
@@ -1833,7 +2553,12 @@ async fn resolve_tool_impl(
 /// complete, so `run_loop` resumes on a well-formed history. `approved_all` is
 /// `Some(reader_choice)` for a `pending_approval` pause and `None` for the
 /// 10-round-cap `needs_continue` pause (each call falls back to its policy).
-async fn settle_pending(ctx: &LoopCtx, approved_all: Option<bool>) -> AppResult<()> {
+async fn settle_pending(
+    ctx: &LoopCtx,
+    client: &AiClient,
+    token: &CancellationToken,
+    approved_all: Option<bool>,
+) -> AppResult<()> {
     let pending: Option<(String, String)> = {
         let db = projects::open_db(&ctx.projects_root, &ctx.project_id)?;
         db.query_row(
@@ -1863,7 +2588,7 @@ async fn settle_pending(ctx: &LoopCtx, approved_all: Option<bool>) -> AppResult<
         let out = if name == "search_sources" && approved {
             search_sources_tool(ctx, args, &mut citation_items).await
         } else {
-            execute_call(ctx, name, args, approved).await
+            execute_call(ctx, client, token, name, args, approved).await
         };
         let db = projects::open_db(&ctx.projects_root, &ctx.project_id)?;
         db.execute(
@@ -1877,6 +2602,7 @@ async fn settle_pending(ctx: &LoopCtx, approved_all: Option<bool>) -> AppResult<
                 now_iso8601()
             ],
         )?;
+        emit_history_changed(&ctx.app, &ctx.tab_id);
     }
     let db = projects::open_db(&ctx.projects_root, &ctx.project_id)?;
     db.execute(
@@ -1961,7 +2687,12 @@ async fn search_sources_tool(
         .unwrap_or("")
         .trim();
     if query.is_empty() {
-        return "(no query)".into();
+        return tool_error_json(
+            "search_sources",
+            "MISSING_QUERY",
+            "query is required",
+            &["query"],
+        );
     }
     let k = args
         .get("k")
@@ -1989,7 +2720,7 @@ async fn search_sources_tool(
         )
     }) {
         Ok(hits) => hits,
-        Err(error) => return format!("ERROR: {}", error.message),
+        Err(error) => return tool_error_json("search_sources", &error.code, &error.message, &[]),
     };
     if hits.is_empty() {
         return "No matches in the selected source scope.".into();
@@ -2117,10 +2848,25 @@ async fn run_loop(
     // Studio then continues as plain RAG chat for the rest of this run.
     let mut tools_disabled = false;
     let mut citation_items = restore_tool_citations(ctx);
+    // v1.5.0 B-2: identical unrecoverable failures since the last user turn.
+    let mut failure_counts: std::collections::HashMap<String, u32> =
+        std::collections::HashMap::new();
 
     loop {
         if token.is_cancelled() {
             return Ok(result(round, false, false, true, summarised_total));
+        }
+        // v1.5.0 B-2: cumulative cap survives `続行` (start_round already
+        // counts persisted rounds since the last user message).
+        if round >= MAX_TOTAL_ROUNDS {
+            persist_assistant_final(
+                ctx,
+                &repeated_failure_guidance(&ctx.ui_lang, "tools", "TOO_MANY_ROUNDS"),
+                &[],
+                "complete",
+                None,
+            )?;
+            return Ok(result(round, false, false, false, summarised_total));
         }
 
         // Build the request from persisted history.
@@ -2183,7 +2929,18 @@ async fn run_loop(
         }
 
         // Plain answer -> resolve citations, persist, done.
+        // v1.5.0 B-2: an empty answer with no tool work is not success.
         if calls.is_empty() {
+            if text.trim().is_empty() {
+                persist_assistant_final(
+                    ctx,
+                    &empty_answer_guidance(&ctx.ui_lang),
+                    &[],
+                    "complete",
+                    usage.as_ref(),
+                )?;
+                return Ok(result(round + 1, false, false, false, summarised_total));
+            }
             let citations = resolve_citations(&text, &citation_items);
             persist_assistant_final(ctx, &text, &citations, "complete", usage.as_ref())?;
             return Ok(result(round + 1, false, false, false, summarised_total));
@@ -2199,13 +2956,16 @@ async fn run_loop(
             .collect();
         let any_ask = approvals.contains(&Approval::Ask);
 
-        // 10-round cap (AC-6-8): stop, leave the proposal for "続行".
+        // Per-run 10-round cap (AC-6-8) and cumulative cap (v1.5.0 B-2): stop
+        // with `needs_continue` only when genuinely different work may remain.
+        // Same-error loops are terminated below and never offered a continue.
         if round >= MAX_TOOL_ROUNDS && !any_ask {
             persist_assistant(ctx, &text, &calls_json, "needs_continue", usage.as_ref())?;
             return Ok(result(round, true, false, false, summarised_total));
         }
         if any_ask {
             persist_assistant(ctx, &text, &calls_json, "pending_approval", usage.as_ref())?;
+            emit_history_changed(&ctx.app, &ctx.tab_id);
             return Ok(result(round, false, true, false, summarised_total));
         }
 
@@ -2222,8 +2982,41 @@ async fn run_loop(
             let out = if c.name == "search_sources" && *appr != Approval::Deny {
                 search_sources_tool(ctx, &c.arguments, &mut citation_items).await
             } else {
-                execute_call(ctx, &c.name, &c.arguments, *appr != Approval::Deny).await
+                execute_call(
+                    ctx,
+                    client,
+                    token,
+                    &c.name,
+                    &c.arguments,
+                    *appr != Approval::Deny,
+                )
+                .await
             };
+            // v1.5.0 B-2: count identical structured failures; the second
+            // identical unrecoverable failure ends this request with guidance.
+            if let Some(code) = tool_result_code(&out) {
+                if *appr != Approval::Deny {
+                    let key = failure_key(&c.name, &c.arguments, &code);
+                    let n = failure_counts.get(&key).copied().unwrap_or(0) + 1;
+                    failure_counts.insert(key, n);
+                    if n >= MAX_SAME_FAILURE {
+                        let db = projects::open_db(&ctx.projects_root, &ctx.project_id)?;
+                        db.execute(
+                            "INSERT INTO messages (id, thread_id, role, content, tool_call_id, status, created_at)
+                             VALUES (?1, ?2, 'tool', ?3, ?4, 'complete', ?5)",
+                            params![Uuid::now_v7().to_string(), ctx.thread_id, out, c.id, now_iso8601()],
+                        )?;
+                        persist_assistant_final(
+                            ctx,
+                            &repeated_failure_guidance(&ctx.ui_lang, &c.name, &code),
+                            &[],
+                            "complete",
+                            None,
+                        )?;
+                        return Ok(result(round + 1, false, false, false, summarised_total));
+                    }
+                }
+            }
             if let Some(app) = &ctx.app {
                 let _ = app.emit(
                     "studio://tool",
@@ -2236,6 +3029,7 @@ async fn run_loop(
                  VALUES (?1, ?2, 'tool', ?3, ?4, 'complete', ?5)",
                 params![Uuid::now_v7().to_string(), ctx.thread_id, out, c.id, now_iso8601()],
             )?;
+            emit_history_changed(&ctx.app, &ctx.tab_id);
         }
         round += 1;
     }
@@ -2258,6 +3052,10 @@ fn result(
 }
 
 /// Persisted `messages` -> OpenAI-shaped array (no system message).
+/// v1.5.0 B-2: orphan tool calls (assistant proposed calls with no matching
+/// `tool` reply after AI errors, stops or denials) are reconciled here by
+/// dropping the dangling `tool_calls` so the next request stays well-formed.
+/// Saved history rows are never rewritten.
 fn openai_history(db: &Connection, thread_id: &str) -> AppResult<Vec<Value>> {
     let mut stmt = db.prepare(
         "SELECT role, content, tool_calls, tool_call_id FROM messages
@@ -2270,6 +3068,18 @@ fn openai_history(db: &Connection, thread_id: &str) -> AppResult<Vec<Value>> {
         .collect::<rusqlite::Result<_>>()?;
     drop(stmt);
 
+    // First pass: collect every tool reply id so dangling proposals can be
+    // detected without touching the DB.
+    let mut replied: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for (role, _, _, tool_call_id) in &rows {
+        if role == "tool" {
+            if let Some(id) = tool_call_id {
+                if !id.is_empty() {
+                    replied.insert(id.clone());
+                }
+            }
+        }
+    }
     let mut out = Vec::with_capacity(rows.len());
     for (role, content, tool_calls, tool_call_id) in rows {
         match role.as_str() {
@@ -2284,19 +3094,24 @@ fn openai_history(db: &Connection, thread_id: &str) -> AppResult<Vec<Value>> {
                     .as_deref()
                     .and_then(|s| serde_json::from_str::<Vec<Value>>(s).ok())
                 {
-                    let mapped: Vec<Value> = tc
-                        .iter()
-                        .map(|c| {
-                            json!({
-                                "id": c.get("id").and_then(|v| v.as_str()).unwrap_or_default(),
+                    let mut mapped: Vec<Value> = Vec::new();
+                    for c in &tc {
+                        let id = c.get("id").and_then(|v| v.as_str()).unwrap_or_default();
+                        // Drop proposals with no reply (orphans from cancelled /
+                        // failed turns and legacy rows). Keeps the wire valid
+                        // while the stored history stays intact.
+                        if id.is_empty() || !replied.contains(id) {
+                            continue;
+                        }
+                        mapped.push(json!({
+                                "id": id,
                                 "type": "function",
                                 "function": {
                                     "name": c.get("name").and_then(|v| v.as_str()).unwrap_or_default(),
                                     "arguments": c.get("arguments").and_then(|v| v.as_str()).unwrap_or("{}"),
                                 }
-                            })
-                        })
-                        .collect();
+                        }));
+                    }
                     if !mapped.is_empty() {
                         m["tool_calls"] = json!(mapped);
                     }
@@ -2307,6 +3122,22 @@ fn openai_history(db: &Connection, thread_id: &str) -> AppResult<Vec<Value>> {
         }
     }
     Ok(out)
+}
+
+/// Assistant rounds since the last user message (v1.5.0 B-2 cumulative cap).
+/// Counts persisted assistant rows after the latest user turn.
+fn rounds_since_last_user(db: &Connection, thread_id: &str) -> u32 {
+    let sql = "WITH last_user AS (
+           SELECT created_at, id FROM messages WHERE thread_id=?1 AND role='user'
+           ORDER BY created_at DESC, id DESC LIMIT 1
+         )
+         SELECT COUNT(*) FROM messages m, last_user
+         WHERE m.thread_id=?1 AND m.role='assistant'
+           AND (m.created_at > last_user.created_at
+                OR (m.created_at = last_user.created_at AND m.id > last_user.id))";
+    db.query_row(sql, [thread_id], |r| r.get::<_, i64>(0))
+        .unwrap_or(0)
+        .max(0) as u32
 }
 
 fn persist_assistant(
@@ -2335,6 +3166,7 @@ fn persist_assistant(
         "UPDATE threads SET updated_at = ?2 WHERE id = ?1",
         params![ctx.thread_id, now_iso8601()],
     )?;
+    emit_history_changed(&ctx.app, &ctx.tab_id);
     Ok(())
 }
 
@@ -2364,7 +3196,27 @@ fn persist_assistant_final(
         "UPDATE threads SET updated_at = ?2 WHERE id = ?1",
         params![ctx.thread_id, now_iso8601()],
     )?;
+    emit_history_changed(&ctx.app, &ctx.tab_id);
     Ok(())
+}
+
+/// Guidance persisted when the model ends a turn with no text and no valid
+/// work (v1.5.0 B-2). Never claims a file was created.
+fn empty_answer_guidance(ui_lang: &str) -> String {
+    match ui_lang {
+        "ja" => "応答が空で終わりました。資料や成果物の形式を選び直して、もう一度お試しください。全文翻訳PDFは translate_source_document、短い文書は build_document を使います。".into(),
+        "zh-Hans" | "zh" => "回答为空。请重新选择资料或成果物形式后重试。全文翻译请用 translate_source_document，短文档请用 build_document。".into(),
+        _ => "The response ended empty. Pick the source and artifact format again and retry. Full-document translation uses translate_source_document; short documents use build_document.".into(),
+    }
+}
+
+/// Guidance persisted when the same invalid tool call repeats (v1.5.0 B-2).
+fn repeated_failure_guidance(ui_lang: &str, tool: &str, code: &str) -> String {
+    match ui_lang {
+        "ja" => format!("{tool} の呼び出しが {code} で繰り返し失敗したため自動実行を終了しました。資料を選び直すか、条件を変えて再試行してください。全文翻訳は translate_source_document（sourceId・targetLanguage・outputPath）を使います。"),
+        "zh-Hans" | "zh" => format!("{tool} 调用因 {code} 重复失败，已停止自动执行。请重新选择资料或更换条件后重试。全文翻译请用 translate_source_document。"),
+        _ => format!("{tool} repeatedly failed with {code}, so automatic execution stopped. Reselect the source or retry with different options. Full-document translation uses translate_source_document."),
+    }
 }
 
 #[cfg(test)]
@@ -2689,6 +3541,7 @@ mod tests {
             workspace: project_dir.join("workspace"),
             model: "test".into(),
             base_params: json!({}),
+            ui_lang: "en".into(),
             system: String::new(),
             source_context: String::new(),
             ctx_items: Vec::new(),
@@ -2713,13 +3566,14 @@ mod tests {
              CREATE TABLE studio_tabs (id TEXT PRIMARY KEY, scope TEXT NOT NULL);
              CREATE TABLE messages (
                id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, role TEXT NOT NULL,
-               content TEXT NOT NULL, created_at TEXT NOT NULL
+               content TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'complete',
+               created_at TEXT NOT NULL
              );
              INSERT INTO threads VALUES ('thread', '0');
              INSERT INTO studio_tabs VALUES ('tab', 'project');
-             INSERT INTO messages VALUES ('01', 'thread', 'user', 'first', '1');
-             INSERT INTO messages VALUES ('02', 'thread', 'assistant', 'old answer', '2');
-             INSERT INTO messages VALUES ('03', 'thread', 'user', 'later', '3');",
+             INSERT INTO messages VALUES ('01', 'thread', 'user', 'first', 'complete', '1');
+             INSERT INTO messages VALUES ('02', 'thread', 'assistant', 'old answer', 'complete', '2');
+             INSERT INTO messages VALUES ('03', 'thread', 'user', 'later', 'complete', '3');",
         )
         .unwrap();
 
@@ -2747,5 +3601,132 @@ mod tests {
             })
             .unwrap();
         assert_eq!(scope, "source:s1");
+    }
+
+    #[test]
+    fn v150_invalid_tool_json_has_no_side_effect() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch(
+            "CREATE TABLE sources (id TEXT PRIMARY KEY, kind TEXT NOT NULL, original_name TEXT NOT NULL, rel_path TEXT NOT NULL, status TEXT NOT NULL, added_at TEXT NOT NULL);
+             CREATE TABLE documents (id TEXT PRIMARY KEY, source_id TEXT NOT NULL, ordinal INTEGER NOT NULL, kind TEXT NOT NULL, title TEXT, text TEXT NOT NULL DEFAULT '', locator TEXT NOT NULL);
+             CREATE TABLE artifacts (id TEXT PRIMARY KEY, thread_id TEXT, rel_path TEXT NOT NULL UNIQUE, bytes INTEGER NOT NULL DEFAULT 0, mime TEXT, created_at TEXT NOT NULL);",
+        )
+        .unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let ws = tmp.path().join("workspace");
+        std::fs::create_dir_all(&ws).unwrap();
+        let out = dispatch_tool(&db, &ws, "thread", "read_document", "{not-json", None).unwrap();
+        assert_eq!(tool_result_code(&out).as_deref(), Some("INVALID_JSON"));
+        assert_eq!(studio_list_artifact_count(&db), 0);
+    }
+
+    #[test]
+    fn v150_build_document_requires_format() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch(
+            "CREATE TABLE artifacts (id TEXT PRIMARY KEY, thread_id TEXT, rel_path TEXT NOT NULL UNIQUE, bytes INTEGER NOT NULL DEFAULT 0, mime TEXT, created_at TEXT NOT NULL);",
+        )
+        .unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let ws = tmp.path().join("workspace");
+        std::fs::create_dir_all(&ws).unwrap();
+        let out = dispatch_tool(
+            &db,
+            &ws,
+            "thread",
+            "build_document",
+            r#"{"path":"report.pdf","title":"T","sections":[{"body":"b"}]}"#,
+            None,
+        )
+        .unwrap();
+        assert_eq!(tool_result_code(&out).as_deref(), Some("MISSING_FORMAT"));
+        assert!(!ws.join("report.pdf").exists());
+        assert!(!ws.join("report.md").exists());
+    }
+
+    #[test]
+    fn v150_single_source_completion_and_ambiguity() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch(
+            "CREATE TABLE sources (id TEXT PRIMARY KEY, kind TEXT NOT NULL, original_name TEXT NOT NULL, rel_path TEXT NOT NULL, status TEXT NOT NULL, added_at TEXT NOT NULL);
+             CREATE TABLE documents (id TEXT PRIMARY KEY, source_id TEXT NOT NULL, ordinal INTEGER NOT NULL, kind TEXT NOT NULL, title TEXT, text TEXT NOT NULL DEFAULT '', locator TEXT NOT NULL);",
+        )
+        .unwrap();
+        db.execute(
+            "INSERT INTO sources VALUES ('only','text','only.txt','sources/only.txt','ready','1')",
+            [],
+        )
+        .unwrap();
+        db.execute(
+            "INSERT INTO documents VALUES ('d1','only',1,'page','p1','hello body','{}')",
+            [],
+        )
+        .unwrap();
+        assert_eq!(
+            complement_source_id(&db, None, None).as_deref(),
+            Some("only")
+        );
+        db.execute(
+            "INSERT INTO sources VALUES ('second','text','second.txt','sources/second.txt','ready','2')",
+            [],
+        )
+        .unwrap();
+        assert_eq!(complement_source_id(&db, None, None), None);
+        assert_eq!(
+            complement_source_id(&db, Some("second"), None).as_deref(),
+            Some("second")
+        );
+    }
+
+    #[test]
+    fn v150_failure_key_normalises_argument_order() {
+        let a = failure_key("read_document", r#"{"a":1,"b":2}"#, "MISSING_SOURCE_ID");
+        let b = failure_key("read_document", r#"{"b":2,"a":1}"#, "MISSING_SOURCE_ID");
+        assert_eq!(a, b);
+        assert_ne!(
+            failure_key("read_document", r#"{"a":1}"#, "MISSING_SOURCE_ID"),
+            a
+        );
+    }
+
+    #[test]
+    fn v150_rounds_count_survives_continue() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch(
+            "CREATE TABLE messages (id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL);",
+        )
+        .unwrap();
+        db.execute("INSERT INTO messages VALUES ('u1','t','user','q','1')", [])
+            .unwrap();
+        db.execute(
+            "INSERT INTO messages VALUES ('a1','t','assistant','x','2')",
+            [],
+        )
+        .unwrap();
+        db.execute(
+            "INSERT INTO messages VALUES ('a2','t','assistant','y','3')",
+            [],
+        )
+        .unwrap();
+        assert_eq!(rounds_since_last_user(&db, "t"), 2);
+    }
+
+    #[test]
+    fn v150_orphan_tool_calls_do_not_break_history() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch(
+            "CREATE TABLE messages (id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, tool_calls TEXT, tool_call_id TEXT, created_at TEXT NOT NULL);
+             INSERT INTO messages VALUES ('u1','t','user','q',NULL,NULL,'1');
+             INSERT INTO messages VALUES ('a1','t','assistant','', '[{\"id\":\"orphan-1\",\"name\":\"read_document\",\"arguments\":\"{}\"}]', NULL,'2');",
+        )
+        .unwrap();
+        let history = openai_history(&db, "t").unwrap();
+        let assistant = history.iter().find(|m| m["role"] == "assistant").unwrap();
+        assert!(assistant.get("tool_calls").is_none());
+    }
+
+    fn studio_list_artifact_count(db: &Connection) -> i64 {
+        db.query_row("SELECT COUNT(*) FROM artifacts", [], |r| r.get(0))
+            .unwrap_or(0)
     }
 }

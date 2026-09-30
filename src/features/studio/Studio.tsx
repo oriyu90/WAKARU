@@ -27,6 +27,27 @@ import styles from "./Studio.module.css";
 type StudioToolCall = { id: string; name: string; arguments: unknown };
 type StudioDelta = { tabId: string; kind: string; text: string };
 type StudioToolEvent = { tabId: string; name: string; state: "running" | "complete" };
+type TurnPersisted = { projectId: string; tabId: string; clientRequestId: string | null; messageId: string };
+type HistoryChanged = { tabId: string };
+type DocProgress = { tabId: string; done: number; total: number; phase: string };
+
+export function newClientRequestId(): string {
+  try {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  } catch { /* fallback below */ }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** Pre-persist failures must restore the draft; post-persist keeps the formal turn. */
+export function isPrePersistStudioError(code: string): boolean {
+  return [
+    "STUDIO_EMPTY_MESSAGE",
+    "STUDIO_REWIND_LOCKED",
+    "STUDIO_MESSAGE_NOT_FOUND",
+    "STUDIO_TAB_NOT_FOUND",
+    "AI_NOT_CONFIGURED",
+  ].includes(code);
+}
 
 export function shouldSubmitStudioKey(key: string, shiftKey: boolean, isComposing: boolean) {
   return key === "Enter" && !shiftKey && !isComposing;
@@ -71,6 +92,13 @@ export function Studio({
   const [runningTool, setRunningTool] = useState("");
   const [dropActive, setDropActive] = useState(false);
   const [editingTurn, setEditingTurn] = useState<{ id: string; content: string } | null>(null);
+  // v1.5.0 A-2: optimistic send display keyed by clientRequestId, per tab.
+  const [optimisticByTab, setOptimisticByTab] = useState<Record<string, { clientRequestId: string; text: string }>>({});
+  const [sendTargetId, setSendTargetId] = useState("");
+  const draftBackup = useRef<{ text: string; editing: { id: string; content: string } | null } | null>(null);
+  const [liveMsg, setLiveMsg] = useState("");
+  const [docProgress, setDocProgress] = useState<DocProgress | null>(null);
+  const historyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
 
@@ -171,43 +199,95 @@ export function Studio({
     },
   });
   const send = useMutation({
-    mutationFn: ({ payload, replaceFrom }: { payload: string; replaceFrom?: string }) =>
+    mutationFn: ({ payload, replaceFrom, targetTabId, scopeSnapshot, profileSnapshot, clientRequestId }: {
+      payload: string; replaceFrom?: string; targetTabId: string; scopeSnapshot: string;
+      profileSnapshot?: string; clientRequestId: string;
+    }) =>
       studioApi.send(
         projectId,
-        activeTabId,
+        targetTabId,
         payload,
-        scope,
+        scopeSnapshot,
         replaceFrom,
-        modelProfileId ?? undefined,
+        profileSnapshot,
+        clientRequestId,
       ),
-    onMutate: () => {
-      // The turn is persisted before the model call, so clearing the composer
-      // now can't lose it — and it stops the sent text lingering in the box
-      // (esp. when the model call then fails).
+    onMutate: (vars) => {
+      // Freeze the destination so a tab switch mid-flight never retargets.
+      setSendTargetId(vars.targetTabId);
+      draftBackup.current = { text: vars.payload, editing: editingTurn };
+      setOptimisticByTab((prev) => ({
+        ...prev,
+        [vars.targetTabId]: { clientRequestId: vars.clientRequestId, text: vars.payload },
+      }));
+      setLiveMsg(t("studio.sending"));
       setText("");
       setProvisional("");
       setRunningTool("");
+      setDocProgress(null);
       setEditingTurn(null);
     },
-    onSuccess: async () => {
-      setProvisional("");
-      setRunningTool("");
+    onSuccess: async (_res, vars) => {
+      setLiveMsg(t("studio.sent"));
       await Promise.all([refreshTabs(), refreshArtifacts()]);
-      composerRef.current?.focus();
+      // Drop the optimistic row once the formal history converges. The
+      // turn-persisted / history-changed refetch usually already did this;
+      // this covers a missed event.
+      setOptimisticByTab((prev) => {
+        if (!prev[vars.targetTabId]) return prev;
+        const next = { ...prev };
+        delete next[vars.targetTabId];
+        return next;
+      });
+      if (vars.targetTabId === activeTabId) composerRef.current?.focus();
     },
-    onError: async (e) => {
+    onError: async (e, vars) => {
+      const code = e instanceof IpcError ? e.code : "";
+      await refreshTabs();
+      if (isPrePersistStudioError(code)) {
+        // Persistence never happened: restore the draft verbatim.
+        setOptimisticByTab((prev) => {
+          if (!prev[vars.targetTabId]) return prev;
+          const next = { ...prev };
+          delete next[vars.targetTabId];
+          return next;
+        });
+        const backup = draftBackup.current;
+        if (backup) {
+          setText(backup.text);
+          setEditingTurn(backup.editing);
+        }
+        draftBackup.current = null;
+        setLiveMsg(t("studio.sendFailed"));
+      } else {
+        // Post-persist failure/cancel: keep the formal turn, show state.
+        setOptimisticByTab((prev) => {
+          if (!prev[vars.targetTabId]) return prev;
+          const next = { ...prev };
+          delete next[vars.targetTabId];
+          return next;
+        });
+        draftBackup.current = null;
+        setLiveMsg(code === "CANCELLED" || (e instanceof Error && e.message === "cancelled") ? t("studio.cancelled") : t("studio.sendFailed"));
+      }
       setProvisional("");
       setRunningTool("");
-      // Surface the persisted user turn + its error even though the send failed.
-      await refreshTabs();
       toast.push({ tone: "error", message: aiErrorText(e) });
     },
   });
 
   useEffect(() => {
-    if (!inTauri || !activeTabId) return;
+    if (!inTauri) return;
     let disposed = false;
     const cleanups: Array<() => void> = [];
+    const scheduleHistory = (tabId: string) => {
+      if (historyTimer.current) clearTimeout(historyTimer.current);
+      historyTimer.current = setTimeout(() => {
+        void qc.invalidateQueries({ queryKey: ["studio-tabs", projectId] });
+        void qc.invalidateQueries({ queryKey: ["studio-tab", projectId, tabId] });
+        void qc.invalidateQueries({ queryKey: ["studio-artifacts", projectId] });
+      }, 150);
+    };
     void Promise.all([
       listen<StudioDelta>("studio://delta", ({ payload }) => {
         if (payload.tabId === activeTabId && payload.kind === "text") {
@@ -217,6 +297,34 @@ export function Studio({
       listen<StudioToolEvent>("studio://tool", ({ payload }) => {
         if (payload.tabId !== activeTabId) return;
         setRunningTool(payload.state === "running" ? payload.name : "");
+        if (payload.state === "complete") scheduleHistory(payload.tabId);
+      }),
+      listen<TurnPersisted>("studio://turn-persisted", ({ payload }) => {
+        if (payload.projectId !== projectId) return;
+        scheduleHistory(payload.tabId);
+        // Reconcile the optimistic row once the formal turn is refetched.
+        setTimeout(() => {
+          setOptimisticByTab((prev) => {
+            const opt = prev[payload.tabId];
+            if (!opt) return prev;
+            if (payload.clientRequestId && opt.clientRequestId !== payload.clientRequestId) return prev;
+            const data = qc.getQueryData<{ messages?: Array<{ id?: string; content?: string }> }>(["studio-tab", projectId, payload.tabId]);
+            const found = (data?.messages ?? []).some((m) =>
+              m.id === payload.messageId || (typeof m.content === "string" && opt.text.trim() !== "" && m.content.includes(opt.text.slice(0, 24))),
+            );
+            if (!found) return prev;
+            const next = { ...prev };
+            delete next[payload.tabId];
+            return next;
+          });
+        }, 400);
+      }),
+      listen<HistoryChanged>("studio://history-changed", ({ payload }) => {
+        scheduleHistory(payload.tabId);
+      }),
+      listen<DocProgress>("studio://document-progress", ({ payload }) => {
+        if (payload.tabId !== activeTabId && payload.tabId !== sendTargetId) return;
+        setDocProgress(payload);
       }),
     ]).then((unlisten) => {
       if (disposed) unlisten.forEach((fn) => fn());
@@ -225,8 +333,9 @@ export function Studio({
     return () => {
       disposed = true;
       cleanups.forEach((fn) => fn());
+      if (historyTimer.current) clearTimeout(historyTimer.current);
     };
-  }, [activeTabId]);
+  }, [activeTabId, projectId, sendTargetId, qc]);
   const resolveTool = useMutation({
     mutationFn: (approved: boolean) =>
       studioApi.resolveTool(projectId, activeTabId, approved, modelProfileId ?? undefined),
@@ -312,15 +421,25 @@ export function Studio({
     },
   });
 
-  // Follow the conversation as it grows.
+  // Follow the conversation as it grows, but never yank the reader away
+  // from history they are reviewing (v1.5.0 A-2).
   useEffect(() => {
     const node = messagesRef.current;
-    if (node) node.scrollTop = node.scrollHeight;
-  }, [messages.length, send.isPending]);
+    if (!node) return;
+    const nearBottom = node.scrollHeight - node.scrollTop - node.clientHeight < 140;
+    if (nearBottom) node.scrollTop = node.scrollHeight;
+  }, [messages.length, send.isPending, provisional]);
 
   function submit() {
     if (!text.trim() || !active || locked || send.isPending) return;
-    send.mutate({ payload: text.trim(), replaceFrom: editingTurn?.id });
+    send.mutate({
+      payload: text.trim(),
+      replaceFrom: editingTurn?.id,
+      targetTabId: activeTabId,
+      scopeSnapshot: scope,
+      profileSnapshot: modelProfileId ?? undefined,
+      clientRequestId: newClientRequestId(),
+    });
   }
 
   function editFrom(message: ChatMessage) {
@@ -454,16 +573,40 @@ export function Studio({
               onCitation={onCitation}
               onAllow={() => resolveTool.mutate(true)}
               onDeny={() => resolveTool.mutate(false)}
-              onContinue={() => send.mutate({ payload: "" })}
+              onContinue={() => send.mutate({
+                payload: "",
+                targetTabId: activeTabId,
+                scopeSnapshot: scope,
+                profileSnapshot: modelProfileId ?? undefined,
+                clientRequestId: newClientRequestId(),
+              })}
               onEdit={() => editFrom(m)}
               busy={resolveTool.isPending || send.isPending}
             />
           ))}
+          {activeTabId && optimisticByTab[activeTabId] ? (
+            <article className={styles.message} data-role="user" data-optimistic="true">
+              <div className={styles.messageHead}>
+                <span className={styles.role}>{t("studio.role.user")}</span>
+                <span className={styles.toolMeta}>{t("studio.sending")}</span>
+              </div>
+              <Markdown>{optimisticByTab[activeTabId].text}</Markdown>
+            </article>
+          ) : null}
           {streaming && provisional ? (
             <div className={styles.streaming} aria-label={t("studio.streaming")}><Markdown>{provisional}</Markdown></div>
           ) : null}
           {streaming ? <p className={styles.thinking}>{runningTool ? t("studio.runningTool", { name: runningTool }) : t("studio.thinking")}</p> : null}
+          {sendTargetId && send.isPending && sendTargetId !== activeTabId ? (
+            <p className={styles.thinking} role="status">{t("studio.workingTab")}</p>
+          ) : null}
+          {docProgress && (docProgress.tabId === activeTabId) ? (
+            <p className={styles.thinking} role="status">
+              {t("studio.translateProgress", { done: docProgress.done, total: docProgress.total })}
+            </p>
+          ) : null}
         </div>
+        <p className={styles.liveRegion} aria-live="polite" role="status">{liveMsg}</p>
 
         {/* AC-6-11: the working directory is always on screen, even when the
             workspace column is collapsed on a narrow window. */}
@@ -528,7 +671,7 @@ export function Studio({
               }}
             />
             {send.isPending ? (
-              <Button variant="quiet" size="sm" onClick={() => studioApi.cancel(activeTabId)}>
+              <Button variant="quiet" size="sm" onClick={() => studioApi.cancel(sendTargetId || activeTabId)}>
                 {t("studio.stop")}
               </Button>
             ) : (

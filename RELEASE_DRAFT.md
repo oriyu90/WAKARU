@@ -1,3 +1,55 @@
+# v1.5.0 release record
+
+Prepared 2026-10-01. Scope: Studio send persistence reconciliation, tool
+validation with finite recovery, and whole-document translation PDF.
+See `RELEASE_NOTES.md`, `DESIGN_v1.5.0.md` and `QUALITY_REPORT.md`.
+
+## Verified artifact
+
+- App: `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, macOS 12+,
+  version 1.5.0, ad-hoc signed with runtime option)
+- DMG: `WAKARU_1.5.0_aarch64.dmg` (23,253,659 bytes)
+- Checksum: `WAKARU_1.5.0_aarch64.dmg.sha256`
+- SHA-256: `eca4749c566c9380cfbfd5a4478d94c03a8314d04232c5a4b7d72c85cc0d0bae`
+- `codesign --verify --deep --strict` passed on the built app and mounted DMG
+  app. `hdiutil verify` was VALID. The mounted app reached
+  `WAKARU backend ready version="1.5.0"`.
+- No credentials are embedded in tracked source, new documentation or DMG.
+
+The Tauri bundler skipped a complete app signature. The app was ad-hoc signed
+with identifier `com.yukiorita.wakaru`, then the DMG was rebuilt from the
+signed app (convert to UDRW, replace app, convert back to UDZO) before image
+and mounted-app verification.
+
+## Verification summary
+
+- Frontend: typecheck, lint/design/hardcoded checks, 38 tests, contrast,
+  i18n parity (433 keys × 3 languages), production build and production npm
+  audit (0 vulnerabilities) passed.
+- Rust: fmt, clippy with denied warnings, 225 library tests passed (1 ignored),
+  nonignored integration suites, bindings and cargo-deny passed.
+- Translation PDF: 9-page mock translation renders verified `%PDF-` artifact
+  in order; over-limit/empty/render failures report without partial artifacts.
+- Live real-model acceptance (owner LAN) remains for owner-side confirmation;
+  automated mock translation covers the new path.
+
+## Publication sequence
+
+1. Commit and tag `v1.5.0` on `main`.
+2. Publish the GitHub release with the verified DMG and checksum; re-download
+   the assets and compare hash and size.
+3. Publish four localized Studio RIZI pages and release/news metadata after
+   the site tests.
+4. Record the release in the private common-rules maintenance document.
+
+## Limits
+
+- No Developer ID signature or Apple notarisation credentials were supplied.
+- Windows and Linux are not built or verified.
+- The GitHub repository remains private.
+
+---
+
 # v1.4.0 release record
 
 Prepared 2026-09-30. Scope: generation-aware MLXBar connection checking,

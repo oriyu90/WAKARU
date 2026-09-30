@@ -222,7 +222,14 @@
     "WEBSITE_INVALID": "The folder could not be imported as a website.",
     "STUDIO_SITE_INVALID": "The site could not be built (check the file set).",
     "STUDIO_REWIND_LOCKED": "Finish or stop the active response before editing history.",
-    "STUDIO_MESSAGE_NOT_FOUND": "The message to edit could not be found."
+    "STUDIO_MESSAGE_NOT_FOUND": "The message to edit could not be found.",
+    "STUDIO_TOOL_ARG": "Missing tool argument.",
+    "STUDIO_TRANSLATE_NO_SOURCE": "Source not found.",
+    "STUDIO_TRANSLATE_EMPTY": "No translatable text in the source.",
+    "STUDIO_TRANSLATE_ARG": "Invalid translation request.",
+    "STUDIO_TRANSLATE_TOO_LARGE": "Source is too large. Split it and retry.",
+    "STUDIO_TRANSLATE_RENDER": "PDF rendering failed.",
+    "STUDIO_TRANSLATE_TRUNCATED": "Translation was cut off. Split and retry."
   },
   "viewer": {
     "readonly": "Read-only",
@@ -407,7 +414,12 @@
     "pickConversation": "Pick a conversation",
     "pickConversationBody": "Open a conversation from the list, or start a new one. Past conversations stay hidden until you open them.",
     "toolResultLines_one": "{{count}} line",
-    "toolResultLines_other": "{{count}} lines"
+    "toolResultLines_other": "{{count}} lines",
+    "sending": "Sending…",
+    "sent": "Sent",
+    "sendFailed": "Send failed",
+    "workingTab": "Working in another conversation",
+    "translateProgress": "Translating page {{done}} of {{total}}"
   },
   "mcp": {
     "transportSupport": "Supports stdio and MCP Streamable HTTP. A connection failure is isolated to that server.",

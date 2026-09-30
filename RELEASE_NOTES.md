@@ -1,3 +1,30 @@
+# WAKARU v1.5.0
+
+WAKARU v1.5.0 makes Studio sends reliable and completes full-document translation PDFs.
+
+## What changed
+
+- Sent text appears immediately in its conversation with persistence reconciliation;
+  pre-persist failures restore the draft, post-persist failures keep the formal turn.
+- Invalid tool calls are validated before side effects, return structured errors,
+  and stop after one repeat with reselect/retry guidance; cumulative round caps
+  survive “continue”, and empty answers are never treated as success.
+- `translate_source_document` translates every extracted page in order and renders
+  one verified `%PDF-` artifact; missing pages, limits, and render failures are
+  reported without claiming completion. `build_document` now requires `format`.
+- Japanese, English and Simplified Chinese UI remain in parity, with live-region
+  send status, per-tab working indication, and scroll-preserving history.
+
+## Compatibility
+
+Existing projects, settings, conversations, sessions and AI profiles remain
+compatible. No database migration is required.
+
+## Distribution
+
+Apple Silicon Mac, macOS 12 or later. Ad-hoc signed, not Apple-notarised.
+Repository remains private; first launch needs Privacy & Security approval.
+
 # WAKARU v1.4.0
 
 WAKARU v1.4.0 improves local AI connection checks, source-grounded answers, and

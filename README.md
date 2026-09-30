@@ -55,6 +55,9 @@ so on first launch right-click WAKARU → **Open**.
   ingest them into the project; completed tool work stays in expandable activity rows.
   Enter sends, Shift+Enter inserts a newline, and an earlier user turn can be edited.
   Follow-up searches respect the selected source and only cite retrieved chunks.
+  Sent text appears immediately with persistence reconciliation, invalid tool calls
+  stop after a repeat with guidance, and a whole source can be translated into a
+  verified PDF via `translate_source_document`.
 - **MCP** — local stdio servers (a bare `npx` / `uvx` / `node` command is found
   in the usual install locations; a SearXNG web-search preset is built in) and
   policy-checked Streamable HTTP servers. Connected SearXNG/Tavily search tools are

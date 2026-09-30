@@ -17,6 +17,7 @@ pub mod search;
 pub mod settings;
 pub mod sources;
 pub mod studio;
+pub mod studio_translate;
 pub mod viewer;
 pub mod vision;
 pub mod website;

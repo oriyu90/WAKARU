@@ -255,6 +255,7 @@ understanding-check question.";
             scope: "project".into(),
             replace_from_message_id: None,
             model_profile_id: None,
+            client_request_id: None,
         },
         "ja".into(),
     )

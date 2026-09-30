@@ -341,7 +341,12 @@ replaceFromMessageId: string | null,
  * this turn instead of the chat role binding. Never persisted, so
  * reopening the tab falls back to the configured default.
  */
-modelProfileId: string | null, };
+modelProfileId: string | null, 
+/**
+ * Client-generated idempotency key for the optimistic send display
+ * (v1.5.0 A-1). Omitted by older frontends; never persisted.
+ */
+clientRequestId: string | null, };
 
 /**
  * Returned by `studio_send` / `studio_resolve_tool`. The frontend refetches

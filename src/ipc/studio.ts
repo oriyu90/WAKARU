@@ -29,6 +29,7 @@ export const studioApi = {
     scope: string,
     replaceFromMessageId?: string,
     modelProfileId?: string,
+    clientRequestId?: string,
   ) =>
     call<StudioSendResult>("studio_send", {
       input: {
@@ -38,6 +39,7 @@ export const studioApi = {
         scope,
         replaceFromMessageId: replaceFromMessageId ?? null,
         modelProfileId: modelProfileId ?? null,
+        clientRequestId: clientRequestId ?? null,
       },
       uiLang: lang(),
     }),

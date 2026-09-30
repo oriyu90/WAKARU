@@ -77,4 +77,19 @@ pub struct StudioSendInput {
     /// reopening the tab falls back to the configured default.
     #[serde(default)]
     pub model_profile_id: Option<String>,
+    /// Client-generated idempotency key for the optimistic send display
+    /// (v1.5.0 A-1). Omitted by older frontends; never persisted.
+    #[serde(default)]
+    pub client_request_id: Option<String>,
+}
+
+/// Payload of `studio://turn-persisted` (v1.5.0 A-1). Carries ids only —
+/// never the message body or credentials.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TurnPersistedEvent {
+    pub project_id: String,
+    pub tab_id: String,
+    pub client_request_id: Option<String>,
+    pub message_id: String,
 }

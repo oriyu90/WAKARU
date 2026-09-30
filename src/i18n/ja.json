@@ -220,7 +220,14 @@
     "WEBSITE_INVALID": "フォルダを Web サイトとして取り込めませんでした。",
     "STUDIO_SITE_INVALID": "サイトの生成に失敗しました（ファイル構成を確認してください）。",
     "STUDIO_REWIND_LOCKED": "処理中の応答を完了または停止してから履歴を編集してください。",
-    "STUDIO_MESSAGE_NOT_FOUND": "編集するメッセージが見つかりません。"
+    "STUDIO_MESSAGE_NOT_FOUND": "編集するメッセージが見つかりません。",
+    "STUDIO_TOOL_ARG": "ツールの入力が不足しています。",
+    "STUDIO_TRANSLATE_NO_SOURCE": "指定の資料が見つかりません。",
+    "STUDIO_TRANSLATE_EMPTY": "資料に翻訳できる本文がありません。",
+    "STUDIO_TRANSLATE_ARG": "翻訳の指定が正しくありません。",
+    "STUDIO_TRANSLATE_TOO_LARGE": "資料が大きすぎます。分割して再試行してください。",
+    "STUDIO_TRANSLATE_RENDER": "PDFの生成に失敗しました。",
+    "STUDIO_TRANSLATE_TRUNCATED": "翻訳が途中で切れました。分割して再試行してください。"
   },
   "viewer": {
     "readonly": "閲覧専用",
@@ -402,7 +409,12 @@
     "cancelled": "停止しました。",
     "pickConversation": "会話を選んでください",
     "pickConversationBody": "左の一覧から会話を開くか、新しい会話を始めます。過去の会話は開くまで表示されません。",
-    "toolResultLines_other": "{{count}} 行"
+    "toolResultLines_other": "{{count}} 行",
+    "sending": "送信中…",
+    "sent": "送信しました",
+    "sendFailed": "送信に失敗しました",
+    "workingTab": "別の会話で処理中です",
+    "translateProgress": "翻訳中 {{done}}/{{total}} ページ"
   },
   "mcp": {
     "transportSupport": "stdio と MCP Streamable HTTP に対応します。接続失敗はそのサーバだけに隔離されます。",

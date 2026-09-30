@@ -2,6 +2,34 @@
 
 Cumulative; newest release first.
 
+## v1.5.0 verification — 2026-10-01
+
+Scope: Studio send reconciliation, tool validation/finite loop, whole-document translation PDF. No DB migration.
+
+| Gate | Current result |
+|---|---|
+| Frontend typecheck, lint, design/hardcoded checks, i18n, build | pass; 433 keys × 3 languages |
+| Frontend tests and contrast | pass; 38 tests, light/dark contrast |
+| Rust fmt, clippy, library and integration tests | pass; 225 library tests passed, 1 ignored; integration suite passed |
+| Rust advisories and npm production audit | pass; 0 npm vulnerabilities |
+| Translation PDF path | pass; 9-page mock translation renders verified `%PDF-` artifact in order; limits/empty/render failures report without partial artifacts |
+| Release app/DMG signature and mounted startup | pass; arm64 v1.5.0, macOS 12+, strict signature passes for build and mounted app; DMG checksum VALID (`eca4749c…0bae`, 23,253,659 bytes); mounted app logged `backend ready version="1.5.0"` |
+
+### Release artifact
+
+| Item | Value |
+|---|---|
+| App | arm64 `WAKARU.app`, version `1.5.0`, minimum macOS 12; ad-hoc signed with runtime option |
+| Signature | `codesign --verify --deep --strict` passes for build output and mounted-image app |
+| DMG | `WAKARU_1.5.0_aarch64.dmg`, 23,253,659 bytes; `hdiutil verify` VALID |
+| SHA-256 | `eca4749c566c9380cfbfd5a4478d94c03a8314d04232c5a4b7d72c85cc0d0bae` |
+| Startup probe | mounted app remained healthy and logged `WAKARU backend ready version="1.5.0"` |
+| Secret scan | no credentials in tracked source, new documents, or DMG |
+| Platform | macOS 12+, Apple Silicon; Windows/Linux not built or verified; not notarised |
+
+Design review: sends reconcile via `clientRequestId`/`messageId` without duplicating turns; invalid tool calls end after one repeat with guidance and cumulative caps survive continue; translation PDFs verify `%PDF-` before a single artifact is registered. See `DESIGN_v1.5.0.md` and `IMPLEMENTATION_PLAN_v1.5.0.md`.
+
+
 ## v1.4.0 verification — 2026-09-30
 
 Scope: MLXBar connection diagnostics, Viewer width/zoom, Studio/Live source grounding. No DB, IPC or profile migration.

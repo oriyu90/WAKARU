@@ -117,6 +117,7 @@ fn ac_6_10_closing_a_tab_keeps_its_workspace_files_and_artifacts() {
         &tab.thread_id,
         "write_file",
         r#"{ "path": "summary.md", "content": "Notes hello" }"#,
+        None,
     )
     .unwrap();
     assert!(out.contains("summary.md"));
@@ -159,6 +160,7 @@ fn write_file_rejects_paths_outside_the_workspace() {
         &tab.thread_id,
         "write_file",
         r#"{ "path": "../escape.txt", "content": "x" }"#,
+        None,
     )
     .unwrap_err();
     assert_eq!(err.code, "SANDBOX_PATH_DENIED");
@@ -191,7 +193,8 @@ fn read_only_tools_report_project_state() {
     .unwrap();
     let tab = studio::create_tab(&db, None).unwrap();
 
-    let sources = studio::dispatch_tool(&db, &ws, &tab.thread_id, "list_sources", "{}").unwrap();
+    let sources =
+        studio::dispatch_tool(&db, &ws, &tab.thread_id, "list_sources", "{}", None).unwrap();
     assert!(sources.contains("notes.md"));
 
     studio::dispatch_tool(
@@ -200,12 +203,20 @@ fn read_only_tools_report_project_state() {
         &tab.thread_id,
         "write_file",
         r#"{"path":"a.txt","content":"AAA"}"#,
+        None,
     )
     .unwrap();
-    let files = studio::dispatch_tool(&db, &ws, &tab.thread_id, "list_files", "{}").unwrap();
+    let files = studio::dispatch_tool(&db, &ws, &tab.thread_id, "list_files", "{}", None).unwrap();
     assert!(files.contains("a.txt"));
-    let body = studio::dispatch_tool(&db, &ws, &tab.thread_id, "read_file", r#"{"path":"a.txt"}"#)
-        .unwrap();
+    let body = studio::dispatch_tool(
+        &db,
+        &ws,
+        &tab.thread_id,
+        "read_file",
+        r#"{"path":"a.txt"}"#,
+        None,
+    )
+    .unwrap();
     assert_eq!(body, "AAA");
 }
 
@@ -247,6 +258,7 @@ fn read_tab_lets_one_conversation_read_another() {
         &here.thread_id,
         "read_tab",
         r#"{"title":"research"}"#,
+        None,
     )
     .unwrap();
     assert!(dump.contains("the market doubled"));
@@ -282,7 +294,8 @@ fn build_document_writes_a_docx_artifact_and_guards_the_path() {
     })
     .to_string();
 
-    let out = studio::dispatch_tool(&db, &ws, &tab.thread_id, "build_document", &args).unwrap();
+    let out =
+        studio::dispatch_tool(&db, &ws, &tab.thread_id, "build_document", &args, None).unwrap();
     assert!(out.contains("report.docx"), "{out}");
 
     let file = ws.join("report.docx");
@@ -297,6 +310,7 @@ fn build_document_writes_a_docx_artifact_and_guards_the_path() {
         &tab.thread_id,
         "build_document",
         r#"{ "path": "../evil.md", "format": "md", "title": "T", "sections": [{ "body": "b" }] }"#,
+        None,
     )
     .unwrap_err();
     assert_eq!(err.code, "SANDBOX_PATH_DENIED");
@@ -308,7 +322,8 @@ fn build_document_writes_a_docx_artifact_and_guards_the_path() {
         "sections": [{ "body": "hello" }]
     })
     .to_string();
-    let out = studio::dispatch_tool(&db, &ws, &tab.thread_id, "build_document", &pdf_args).unwrap();
+    let out =
+        studio::dispatch_tool(&db, &ws, &tab.thread_id, "build_document", &pdf_args, None).unwrap();
     let pdf = ws.join("note.pdf");
     let md = ws.join("note.md");
     assert!(
@@ -329,6 +344,7 @@ fn build_document_writes_a_docx_artifact_and_guards_the_path() {
         &tab.thread_id,
         "write_file",
         r##"{"path":"summary.md","content":"# Summary\n\nViewer-ready body"}"##,
+        None,
     )
     .unwrap();
     let import_paths = [ws.join("summary.md"), if pdf.is_file() { pdf } else { md }];

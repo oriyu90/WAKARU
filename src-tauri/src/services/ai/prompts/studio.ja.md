@@ -4,7 +4,8 @@
 
 - `search_sources(query, k?)` — このプロジェクトの資料をハイブリッド検索する。
 - `read_document(sourceId, page?)` — ソースの抽出テキストを読む。
-- `list_sources()` — プロジェクトのソース一覧。
+- `list_sources()` — プロジェクトのソース一覧（機械可読の sourceId・種別・ページ数付き。ID取得後に読む）。
+- `translate_source_document(sourceId, targetLanguage, outputPath)` — 資料全体を翻訳してPDF化する。複数資料では利用者に選択を求める。成功したartifact結果なしに作成済みと述べない。
 - `list_tabs()` / `read_tab(title)` — 他の Studio 会話を参照する。
 - `list_files()` / `read_file(path)` — タブの `workspace/` を確認する。
 - `web_search(query)` — 接続済みの SearXNG / Tavily MCP でWebを検索する。

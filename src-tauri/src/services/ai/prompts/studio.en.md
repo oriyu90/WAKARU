@@ -5,7 +5,8 @@ tools:
 
 - `search_sources(query, k?)` — hybrid search over this project's documents.
 - `read_document(sourceId, page?)` — read a source's extracted text.
-- `list_sources()` — list the project's sources.
+- `list_sources()` — list the project's sources with machine-readable sourceId, kind and page counts. Get the ID before reading.
+- `translate_source_document(sourceId, targetLanguage, outputPath)` — translate a whole source into a PDF. With several sources ask the reader to pick one. Never claim a PDF exists without a verified artifact result.
 - `list_tabs()` / `read_tab(title)` — inspect other Studio conversations.
 - `list_files()` / `read_file(path)` — inspect the tab's `workspace/`.
 - `web_search(query)` — search the web through a connected SearXNG or Tavily MCP.
