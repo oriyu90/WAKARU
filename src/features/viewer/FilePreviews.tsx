@@ -210,6 +210,35 @@ export function ScrollNav({ targetRef }: { targetRef: React.RefObject<HTMLElemen
   );
 }
 
+/** Pinch (trackpad, `ctrlKey`) and Shift+wheel zoom for document viewports.
+ * Plain wheel scrolling is untouched. The listener is non-passive so the
+ * gesture never scrolls while zooming. */
+export function usePinchZoom(
+  targetRef: React.RefObject<HTMLElement | null>,
+  zoom: number,
+  onZoom: (zoom: number) => void,
+  min: number,
+  max: number,
+) {
+  const live = useRef({ zoom, onZoom, min, max });
+  live.current = { zoom, onZoom, min, max };
+  useEffect(() => {
+    const el = targetRef.current;
+    if (!el) return;
+    function onWheel(e: WheelEvent) {
+      if (!e.ctrlKey && !e.shiftKey) return;
+      e.preventDefault();
+      const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+      if (!Number.isFinite(delta) || delta === 0) return;
+      const { zoom: z, onZoom: set, min: mn, max: mx } = live.current;
+      const next = Math.min(mx, Math.max(mn, +(z * Math.exp(-delta * 0.01)).toFixed(3)));
+      if (next !== z) set(next);
+    }
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [targetRef]);
+}
+
 export function PdfFilePreview({
   detail,
   projectId,
@@ -230,6 +259,9 @@ export function PdfFilePreview({
   const [pdf, setPdf] = useState<Awaited<ReturnType<typeof import("pdfjs-dist")["getDocument"]>["promise"]> | null>(null);
   const [page, setPage] = useState(Math.max(1, initialPage));
   const [zoom, setZoom] = useState(1);
+  // Fit shows the whole page (portrait pages are never cut at the bottom);
+  // fill covers the viewport. The manual zoom multiplies on top of either.
+  const [mode, setMode] = useState<"fit" | "fill">("fit");
   const inverted = useUiStore((s) => s.docInverted);
   const clarity = useUiStore((s) => s.docClarity);
   const [error, setError] = useState<unknown>(null);
@@ -248,18 +280,22 @@ export function PdfFilePreview({
     setPage((p) => Math.min(Math.max(p + d, 1), pdf?.numPages ?? detail.pageCount ?? p)),
   );
   const [availWidth, setAvailWidth] = useState(0);
+  const [availHeight, setAvailHeight] = useState(0);
   const onPageRef = useRef(onPage);
   onPageRef.current = onPage;
+  usePinchZoom(viewportRef, zoom, setZoom, 0.25, 4);
 
-  // Track the usable width so the page can be drawn fit-to-width and re-fit as
-  // the window resizes (P1). `zoom` stays a manual multiplier on top of the fit.
+  // Track the usable area so the page re-fits as the window resizes (P1).
+  // `zoom` stays a manual multiplier on top of the fit.
   useEffect(() => {
     const el = viewportRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const measure = () => {
       const cs = getComputedStyle(el);
-      const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
-      setAvailWidth(Math.max(0, el.clientWidth - pad));
+      const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+      const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      setAvailWidth(Math.max(0, el.clientWidth - padX));
+      setAvailHeight(Math.max(0, el.clientHeight - padY));
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -338,14 +374,17 @@ export function PdfFilePreview({
       const pdfPage = await pdf.getPage(page);
       if (cancelled || !canvasRef.current) return;
       const preferredRaster = Math.min(window.devicePixelRatio || 1, 2);
-      // Fit the page to the available width; `zoom` (the − / + control) multiplies
-      // on top. Clamp so a small page doesn't balloon and a huge one still fits.
+      // Fit the whole page into the viewport, or cover it edge to edge.
+      // `zoom` (buttons, pinch, Shift+wheel) multiplies on top. Clamp so a
+      // small page doesn't balloon and a huge one still fits.
       const base = pdfPage.getViewport({ scale: 1 });
       if (![base.width, base.height].every(Number.isFinite) || base.width <= 0 || base.height <= 0) {
         throw new Error("invalid-pdf-page-dimensions");
       }
-      const fit = availWidth > 0 ? availWidth / base.width : 1;
-      const cssScale = Math.min(Math.max(fit * zoom, 0.1), 4, MAX_PDF_DISPLAY_SIDE / Math.max(base.width, base.height));
+      const fitW = availWidth > 0 ? availWidth / base.width : 1;
+      const fitH = availHeight > 0 ? availHeight / base.height : 1;
+      const baseScale = mode === "fit" ? Math.min(fitW, fitH) : Math.max(fitW, fitH);
+      const cssScale = Math.min(Math.max(baseScale * zoom, 0.1), 4, MAX_PDF_DISPLAY_SIDE / Math.max(base.width, base.height));
       const display = pdfPage.getViewport({ scale: cssScale });
       // Large windows and high display scale can otherwise allocate a canvas
       // of hundreds of megabytes. Keep the displayed zoom while bounding the
@@ -377,7 +416,7 @@ export function PdfFilePreview({
       cancelled = true;
       renderTask.current?.cancel();
     };
-  }, [page, pdf, zoom, availWidth, clarity]);
+  }, [page, pdf, zoom, mode, availWidth, availHeight, clarity]);
 
   const qc = useQueryClient();
   const toast = useToast();
@@ -455,7 +494,25 @@ export function PdfFilePreview({
             {t("viewer.ocrRun")}
           </Button>
         ) : null}
-        <ZoomControls zoom={zoom} onZoom={setZoom} />
+        <div className={styles.zoomControls} role="group" aria-label={t("viewer.zoomMode")}>
+          <Button
+            size="sm"
+            variant={mode === "fit" ? "primary" : "quiet"}
+            aria-pressed={mode === "fit"}
+            onClick={() => { setMode("fit"); setZoom(1); }}
+          >
+            {t("viewer.zoomFit")}
+          </Button>
+          <Button
+            size="sm"
+            variant={mode === "fill" ? "primary" : "quiet"}
+            aria-pressed={mode === "fill"}
+            onClick={() => { setMode("fill"); setZoom(1); }}
+          >
+            {t("viewer.zoomFill")}
+          </Button>
+        </div>
+        <ZoomControls zoom={zoom} onZoom={setZoom} min={0.25} max={4} />
       </div>
       <div ref={viewportRef} className={styles.canvasViewport} aria-label={t("viewer.pdfPreview")}>
         {!pdf && !error ? <div className={styles.centered}>{t("states.analyzing")}…</div> : null}

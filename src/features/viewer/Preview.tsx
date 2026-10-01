@@ -10,7 +10,7 @@ import { Button } from "../../components/Button";
 import { ChevronRightIcon, CloseIcon } from "../../app/Icons";
 import { documentApi, viewerApi } from "../../ipc/viewer";
 import type { SourceDetail, SourceKind, ViewerTab } from "../../ipc/types.gen";
-import { DocxFilePreview, PdfFilePreview, PptxFilePreview, ScrollNav, WorkbookPreview } from "./FilePreviews";
+import { DocxFilePreview, PdfFilePreview, PptxFilePreview, ScrollNav, WorkbookPreview, usePinchZoom } from "./FilePreviews";
 import { WebsitePreview } from "./WebsitePreview";
 import { ZoomControls } from "./ZoomControls";
 import styles from "./previews.module.css";
@@ -347,16 +347,76 @@ function PagedPreview({
 
 /* ───────────────────────── image ───────────────────────── */
 
-function ImagePreview({ url }: { url: string }) {
+/** Exported for tests; the Preview dispatcher uses it for image sources. */
+export function ImagePreview({ url }: { url: string }) {
+  const { t } = useTranslation();
   const [zoom, setZoom] = useState(1);
+  const [mode, setMode] = useState<"fit" | "fill">("fit");
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  const [avail, setAvail] = useState({ w: 0, h: 0 });
+  const boxRef = useRef<HTMLDivElement>(null);
+  usePinchZoom(boxRef, zoom, setZoom, 0.25, 4);
+
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      const cs = getComputedStyle(el);
+      setAvail({
+        w: Math.max(0, el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)),
+        h: Math.max(0, el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)),
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [url]);
+
+  const base =
+    natural && avail.w > 0 && avail.h > 0
+      ? mode === "fit"
+        ? Math.min(avail.w / natural.w, avail.h / natural.h)
+        : Math.max(avail.w / natural.w, avail.h / natural.h)
+      : 1;
+  const width = natural ? Math.max(1, Math.round(natural.w * base * zoom)) : undefined;
   return (
     <div className={styles.wrap}>
       <Toolbar>
+        <div className={styles.zoomControls} role="group" aria-label={t("viewer.zoomMode")}>
+          <Button
+            size="sm"
+            variant={mode === "fit" ? "primary" : "quiet"}
+            aria-pressed={mode === "fit"}
+            onClick={() => { setMode("fit"); setZoom(1); }}
+          >
+            {t("viewer.zoomFit")}
+          </Button>
+          <Button
+            size="sm"
+            variant={mode === "fill" ? "primary" : "quiet"}
+            aria-pressed={mode === "fill"}
+            onClick={() => { setMode("fill"); setZoom(1); }}
+          >
+            {t("viewer.zoomFill")}
+          </Button>
+        </div>
         <ZoomControls zoom={zoom} onZoom={setZoom} min={0.25} max={4} />
       </Toolbar>
-      <div className={styles.body}>
+      <div className={styles.body} ref={boxRef} aria-label={t("viewer.imagePreview")}>
         <div className={styles.imageBody}>
-          <img src={url} alt="" style={{ zoom }} />
+          <img
+            src={url}
+            alt=""
+            width={width}
+            style={{ maxWidth: "none" }}
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                setNatural({ w: img.naturalWidth, h: img.naturalHeight });
+              }
+            }}
+          />
         </div>
       </div>
     </div>

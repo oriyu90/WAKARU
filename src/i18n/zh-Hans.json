@@ -297,7 +297,11 @@
     "windowNext": "下一段",
     "windowedNotice": "文件较大,分页显示。原件保持不变。",
     "sheetPosition": "第 {{first}}–{{last}} 行",
-    "largeOfficeNotice": "文件较大,按节显示提取文本。复杂排版、嵌入媒体、宏和修订记录不会还原。"
+    "largeOfficeNotice": "文件较大,按节显示提取文本。复杂排版、嵌入媒体、宏和修订记录不会还原。",
+    "zoomMode": "缩放模式",
+    "zoomFit": "显示整页",
+    "zoomFill": "填满屏幕",
+    "imagePreview": "图像预览"
   },
   "ai": {
     "connections": "连接",

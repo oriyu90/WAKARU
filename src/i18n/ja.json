@@ -297,7 +297,11 @@
     "windowNext": "次へ",
     "windowedNotice": "大きなファイルのため分割表示しています。原本はそのまま保存されています。",
     "sheetPosition": "{{first}}–{{last}} 行",
-    "largeOfficeNotice": "大きなファイルのため節単位の抽出テキストを表示しています。複雑な配置・埋め込みメディア・マクロ・変更履歴は再現されません。"
+    "largeOfficeNotice": "大きなファイルのため節単位の抽出テキストを表示しています。複雑な配置・埋め込みメディア・マクロ・変更履歴は再現されません。",
+    "zoomMode": "ズーム方式",
+    "zoomFit": "全体を表示",
+    "zoomFill": "画面いっぱい",
+    "imagePreview": "画像プレビュー"
   },
   "ai": {
     "connections": "接続先",

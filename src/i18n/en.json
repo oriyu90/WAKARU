@@ -299,7 +299,11 @@
     "windowNext": "Next",
     "windowedNotice": "Large file: showing one window at a time. The original is intact.",
     "sheetPosition": "Rows {{first}}–{{last}}",
-    "largeOfficeNotice": "Large file: showing extracted text by section. Complex layout, embedded media, macros and change history are not reproduced."
+    "largeOfficeNotice": "Large file: showing extracted text by section. Complex layout, embedded media, macros and change history are not reproduced.",
+    "zoomMode": "Zoom mode",
+    "zoomFit": "Fit whole",
+    "zoomFill": "Fill screen",
+    "imagePreview": "Image preview"
   },
   "ai": {
     "connections": "Connections",
