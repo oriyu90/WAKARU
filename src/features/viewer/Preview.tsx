@@ -186,7 +186,7 @@ function TextPreview({
           <ZoomControls zoom={zoom} onZoom={setZoom} />
         </Toolbar>
         {windowed ? <p className={styles.note}>{t("viewer.windowedNotice")}</p> : null}
-        <div className={styles.body} ref={bodyRef}>
+        <div className={styles.body} data-note-scroll ref={bodyRef}>
           <div className={styles.reading} style={{ zoom }}>
             <Markdown>{text}</Markdown>
           </div>
@@ -212,7 +212,7 @@ function TextPreview({
         <ZoomControls zoom={zoom} onZoom={setZoom} />
       </Toolbar>
       {windowed ? <p className={styles.note}>{t("viewer.windowedNotice")}</p> : null}
-      <div className={styles.body} ref={bodyRef}>
+      <div className={styles.body} data-note-scroll ref={bodyRef}>
         {findOpen ? (
           <div className={styles.findBar} role="search">
             <input
@@ -326,7 +326,7 @@ function PagedPreview({
           <ChevronRightIcon size={16} />
         </IconButton>
       </Toolbar>
-      <div className={styles.body}>
+      <div className={styles.body} data-note-scroll>
         <p className={styles.note}>{t("viewer.extractedTextFallback")}</p>
         {doc.isLoading ? (
           <LoadingRows />
@@ -403,7 +403,7 @@ export function ImagePreview({ url }: { url: string }) {
         </div>
         <ZoomControls zoom={zoom} onZoom={setZoom} min={0.25} max={4} />
       </Toolbar>
-      <div className={styles.body} ref={boxRef} aria-label={t("viewer.imagePreview")}>
+      <div className={styles.body} data-note-scroll ref={boxRef} aria-label={t("viewer.imagePreview")}>
         <div className={styles.imageBody}>
           <img
             src={url}
@@ -455,7 +455,7 @@ function SheetPreview({ projectId, tab, sizeBytes }: { projectId: string; tab: V
     return (
       <div className={styles.wrap}>
         <Toolbar />
-        <div className={styles.body}>
+        <div className={styles.body} data-note-scroll>
           <SheetTable head={rows[0] ?? []} rows={rows.slice(1, 2000)} startRow={2} />
         </div>
       </div>
@@ -514,7 +514,7 @@ function SheetPreview({ projectId, tab, sizeBytes }: { projectId: string; tab: V
         ) : null}
       </Toolbar>
       <p className={styles.note}>{t("viewer.windowedNotice")}</p>
-      <div className={styles.body}>
+      <div className={styles.body} data-note-scroll>
         <SheetTable head={head} rows={rows.slice(0, 500)} startRow={startRow} />
       </div>
     </div>
@@ -625,7 +625,7 @@ function ReadingPreview({
           </>
         ) : null}
       </Toolbar>
-      <div className={styles.body} ref={bodyRef}>
+      <div className={styles.body} data-note-scroll ref={bodyRef}>
         {showLive ? (
           <div className={styles.liveWrap}>
             <iframe

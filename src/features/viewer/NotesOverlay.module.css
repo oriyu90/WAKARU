@@ -54,14 +54,17 @@
 
 .lane {
   position: absolute;
-  top: 0;
   left: 0;
   right: 0;
-  /* The lane itself never blocks the material: only its chrome and cards
-   * take pointer events, so page controls underneath stay clickable. */
+  bottom: 0;
+  /* The lane is its own bar with a solid face: it never mingles with the
+   * material toolbar or page buttons above it. Only its chrome and cards
+   * take pointer events, so the document stays clickable around them. */
   pointer-events: none;
   padding: var(--space-xs);
   z-index: 1;
+  background: var(--color-paper);
+  border-top: var(--rule-1) solid var(--color-rule);
 }
 
 .laneHead,
@@ -75,6 +78,7 @@
   align-items: center;
   gap: var(--gap-tight);
   margin-bottom: var(--space-2xs);
+  flex-wrap: wrap;
 }
 
 .laneToggle {
@@ -245,4 +249,36 @@
   display: flex;
   gap: var(--gap-tight);
   flex-wrap: wrap;
+}
+
+/* Responsive buckets from the stack width (set as data-size on the layer):
+ * dots, cards and controls scale with narrow / standard / wide windows. */
+.layer[data-size="sm"] .marker {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.layer[data-size="lg"] .marker {
+  width: 1rem;
+  height: 1rem;
+}
+
+.layer[data-size="sm"] .card {
+  width: 14rem;
+}
+
+.layer[data-size="lg"] .card {
+  width: 22rem;
+}
+
+.layer[data-size="sm"] .laneToggle,
+.layer[data-size="sm"] .retry,
+.layer[data-size="sm"] .jump {
+  min-height: 2.5rem;
+  font-size: 0.8125rem;
+}
+
+.layer[data-size="sm"] .cardOpen,
+.layer[data-size="sm"] .editor {
+  font-size: 0.8125rem;
 }

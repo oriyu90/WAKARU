@@ -149,6 +149,28 @@ describe("NotesOverlay", () => {
     expect(screen.queryByText("other")).toBeNull();
   });
 
+  it("hides the lane entirely when there are no notes", async () => {
+    setup([]);
+    await waitFor(() => expect(notesListed()).toBe(true));
+    expect(screen.queryByText(/hideLane|showLane/)).toBeNull();
+  });
+
+  it("clicking outside an open note closes it, scrolling does not", async () => {
+    setup([note("n1", 3, "first"), note("n2", 3, "second")]);
+    await waitFor(() => expect(screen.getByText("first")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("first"));
+    await waitFor(() => expect(document.querySelector("textarea")).not.toBeNull());
+    expect(screen.queryByText("second")).toBeNull();
+    // A click anywhere outside the card ends the edit and restores the list.
+    fireEvent.click(document.body);
+    await waitFor(() => expect(document.querySelector("textarea")).toBeNull());
+    await waitFor(() => expect(screen.getByText("second")).toBeInTheDocument());
+  });
+
+  function notesListed() {
+    return document.querySelector("[data-note-ui='lane']") == null;
+  }
+
   it("overlay chrome is tagged so material right-clicks never hit it", async () => {
     setup([note("n1", 3, "hello")]);
     await waitFor(() => expect(screen.getByText("hello")).toBeInTheDocument());

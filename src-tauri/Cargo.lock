@@ -7070,7 +7070,7 @@ dependencies = [
 
 [[package]]
 name = "wakaru"
-version = "1.6.2"
+version = "1.6.3"
 dependencies = [
  "base64 0.22.1",
  "calamine",

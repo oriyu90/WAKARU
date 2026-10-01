@@ -38,6 +38,22 @@ function currentPageOf(locator: unknown): number | null {
   return null;
 }
 
+/** Scroll metrics of the material scroller (`data-note-scroll`). Markers
+ * live in document fractions and are projected into the viewport, so they
+ * scroll together with the document. */
+type ScrollMetrics = {
+  sl: number;
+  st: number;
+  sw: number;
+  sh: number;
+  cw: number;
+  ch: number;
+};
+
+function clamp01(v: number) {
+  return Math.min(1, Math.max(0, v));
+}
+
 function sameLocator(a: unknown, b: unknown) {
   return JSON.stringify(a ?? {}) === JSON.stringify(b ?? {});
 }
@@ -94,6 +110,56 @@ export function NotesOverlay({
   });
   const notes = useMemo(() => notesQuery.data ?? [], [notesQuery.data]);
   const page = currentPageOf(tab.locator);
+
+  // Material scroll tracking: markers are stored in document fractions and
+  // re-projected on every scroll/resize, so they travel with the document.
+  // Without a tagged scroller (e.g. website iframe) viewport fractions apply.
+  const [metrics, setMetrics] = useState<ScrollMetrics | null>(null);
+  useEffect(() => {
+    const stack = layerRef.current?.parentElement;
+    const scroller = stack?.querySelector("[data-note-scroll]") as HTMLElement | null;
+    if (!stack || !scroller) {
+      setMetrics(null);
+      return;
+    }
+    let raf = 0;
+    const update = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        setMetrics({
+          sl: scroller.scrollLeft,
+          st: scroller.scrollTop,
+          sw: scroller.scrollWidth,
+          sh: scroller.scrollHeight,
+          cw: scroller.clientWidth,
+          ch: scroller.clientHeight,
+        });
+      });
+    };
+    update();
+    scroller.addEventListener("scroll", update, { passive: true });
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    ro?.observe(scroller);
+    return () => {
+      cancelAnimationFrame(raf);
+      scroller.removeEventListener("scroll", update);
+      ro?.disconnect();
+    };
+  }, [projectId, tab.sourceId, tab.locator]);
+
+  // Responsive buckets from the stack width: dots, cards and controls scale
+  // with narrow / standard / wide windows.
+  const [sizeBucket, setSizeBucket] = useState<"sm" | "md" | "lg">("md");
+  useEffect(() => {
+    const stack = layerRef.current?.parentElement;
+    if (!stack || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0;
+      setSizeBucket(w < 480 ? "sm" : w < 900 ? "md" : "lg");
+    });
+    ro.observe(stack);
+    return () => ro.disconnect();
+  }, []);
 
   const invalidate = useCallback(() => {
     void qc.invalidateQueries({ queryKey: ["notes", projectId, tab.sourceId] });
@@ -244,12 +310,56 @@ export function NotesOverlay({
     setSaveErrorId(null);
   }
 
+  /** End the edit and release the single-note focus (draft already saved). */
+  function closeNote() {
+    flush();
+    setEditingId(null);
+    setSelectedId(null);
+    setDraft("");
+    setPendingBody(null);
+  }
+
   /** Open one note from the list or its dot: reveal the lane, hide the
    * rest, and start editing. */
   function openNote(note: Note) {
     setLaneOpen(true);
     setSelectedId(note.id);
     beginEdit(note);
+  }
+
+  /** Convert a viewport point into document fractions for storage. */
+  function toDoc(clientX: number, clientY: number): { x: number; y: number } {
+    const layer = layerRef.current;
+    const scroller = layer?.parentElement?.querySelector(
+      "[data-note-scroll]",
+    ) as HTMLElement | null;
+    if (layer && scroller && scroller.scrollWidth > 0 && scroller.scrollHeight > 0) {
+      const r = scroller.getBoundingClientRect();
+      return {
+        x: clamp01((clientX - r.left + scroller.scrollLeft) / scroller.scrollWidth),
+        y: clamp01((clientY - r.top + scroller.scrollTop) / scroller.scrollHeight),
+      };
+    }
+    const box = layer?.getBoundingClientRect();
+    if (!box || box.width <= 0 || box.height <= 0) return { x: 0.5, y: 0.5 };
+    return {
+      x: clamp01((clientX - box.left) / box.width),
+      y: clamp01((clientY - box.top) / box.height),
+    };
+  }
+
+  /** Project stored document fractions back into viewport percentages.
+   * Returns null while scrolled out of view (reappears on scroll-back). */
+  function toViewport(a: Anchor): { left: number; top: number } | null {
+    const x = typeof a.x === "number" && Number.isFinite(a.x) ? clamp01(a.x) : 0.5;
+    const y = typeof a.y === "number" && Number.isFinite(a.y) ? clamp01(a.y) : 0.08;
+    if (!metrics || metrics.sw <= 0 || metrics.sh <= 0 || metrics.cw <= 0 || metrics.ch <= 0) {
+      return { left: x * 100, top: y * 100 };
+    }
+    const left = ((x * metrics.sw - metrics.sl) / metrics.cw) * 100;
+    const top = ((y * metrics.sh - metrics.st) / metrics.ch) * 100;
+    if (left < -5 || left > 105 || top < -5 || top > 105) return null;
+    return { left, top };
   }
 
   // The overlay layer itself is pointer-transparent, so creation listens on
@@ -278,10 +388,7 @@ export function NotesOverlay({
       }
       e.preventDefault();
       e.stopPropagation();
-      const box = layerRef.current?.getBoundingClientRect();
-      if (!box || box.width <= 0 || box.height <= 0) return;
-      const x = Math.min(0.98, Math.max(0.02, (e.clientX - box.left) / box.width));
-      const y = Math.min(0.98, Math.max(0.02, (e.clientY - box.top) / box.height));
+      const { x, y } = toDoc(e.clientX, e.clientY);
       createMut.mutate({ x, y });
     }
     parent.addEventListener("contextmenu", onMenu);
@@ -289,20 +396,22 @@ export function NotesOverlay({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, tab.sourceId, page]);
 
-  // Editing outside the card ends the edit: a pointer down anywhere but
-  // the open card blurs the field (the blur flush saves first).
+  // An open note closes on any click outside it — except material scrolling,
+  // which fires no click (wheel, scrollbar drag and touch scrolls keep the
+  // note open). Overlay chrome manages itself and is skipped here.
   useEffect(() => {
     if (editingId == null) return;
-    const id = editingId;
-    function onDown(e: PointerEvent) {
-      const card = document.querySelector(`[data-note-card="${id}"]`);
+    function onClick(e: MouseEvent) {
       const target = e.target as HTMLElement | null;
+      if (target && target.closest("[data-note-ui]")) return;
+      const card = document.querySelector(`[data-note-card="${editingId}"]`);
       if (card && target && !card.contains(target)) {
-        (document.activeElement as HTMLElement | null)?.blur?.();
+        closeNote();
       }
     }
-    document.addEventListener("pointerdown", onDown, true);
-    return () => document.removeEventListener("pointerdown", onDown, true);
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingId]);
 
   // Shift+F10 / Menu key on focused material → note at the current position.
@@ -359,11 +468,10 @@ export function NotesOverlay({
   }, [hiddenByPage]);
 
   return (
-    <div ref={layerRef} className={styles.layer}>
+    <div ref={layerRef} className={styles.layer} data-size={sizeBucket}>
       {visible.map((n) => {
-        const a = asAnchor(n);
-        const x = typeof a.x === "number" ? a.x * 100 : 50;
-        const y = typeof a.y === "number" ? a.y * 100 : 8;
+        const pos = toViewport(asAnchor(n));
+        if (!pos) return null;
         return (
           <button
             key={n.id}
@@ -372,7 +480,7 @@ export function NotesOverlay({
             data-note-ui="marker"
             data-color={n.color}
             data-editing={editingId === n.id || undefined}
-            style={{ left: `${x}%`, top: `${y}%` }}
+            style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
             aria-label={t("notes.markerLabel", { color: t(`notes.color_${n.color}`) })}
             onClick={() => openNote(n)}
             onContextMenu={(e) => {
@@ -384,13 +492,17 @@ export function NotesOverlay({
         );
       })}
 
+      {notes.length > 0 ? (
       <div className={styles.lane} data-note-ui="lane" data-open={laneOpen || undefined}>
         <div className={styles.laneHead}>
           <button
             type="button"
             className={styles.laneToggle}
             aria-expanded={laneOpen}
-            onClick={() => setLaneOpen((v) => !v)}
+            onClick={() => {
+              if (laneOpen) closeNote();
+              setLaneOpen((v) => !v);
+            }}
           >
             {laneOpen ? t("notes.hideLane") : t("notes.showLane", { count: visible.length })}
           </button>
@@ -438,8 +550,7 @@ export function NotesOverlay({
                       onKeyDown={(e) => {
                         if (e.key === "Escape") {
                           e.stopPropagation();
-                          flush();
-                          setEditingId(null);
+                          closeNote();
                         }
                       }}
                     />
@@ -491,6 +602,7 @@ export function NotesOverlay({
           </ul>
         ) : null}
       </div>
+      ) : null}
     </div>
   );
 }

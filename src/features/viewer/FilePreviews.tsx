@@ -514,7 +514,7 @@ export function PdfFilePreview({
         </div>
         <ZoomControls zoom={zoom} onZoom={setZoom} min={0.25} max={4} />
       </div>
-      <div ref={viewportRef} className={styles.canvasViewport} aria-label={t("viewer.pdfPreview")}>
+      <div ref={viewportRef} className={styles.canvasViewport} data-note-scroll aria-label={t("viewer.pdfPreview")}>
         {!pdf && !error ? <div className={styles.centered}>{t("states.analyzing")}…</div> : null}
         <canvas
           ref={canvasRef}
@@ -572,7 +572,7 @@ export function DocxFilePreview({ detail, fallback }: { detail: SourceDetail; fa
         <ZoomControls zoom={zoom} onZoom={setZoom} />
       </div>
       <div
-        className={styles.officeViewport}
+        className={styles.officeViewport} data-note-scroll
         aria-label={t("viewer.docxPreview")}
         ref={host}
         data-inverted={inverted}
@@ -657,7 +657,7 @@ export function PptxFilePreview({
         <span className={styles.toolbarSpacer} />
         <ZoomControls zoom={zoom} onZoom={setZoom} />
       </div>
-      <div className={styles.slideViewport} aria-label={t("viewer.pptxPreview")}>
+      <div className={styles.slideViewport} data-note-scroll aria-label={t("viewer.pptxPreview")}>
         <div
           ref={host}
           className={styles.slideHost}
@@ -692,7 +692,7 @@ export function WorkbookPreview({ projectId, detail }: { projectId: string; deta
         <span className={styles.toolbarSpacer} />
         <ZoomControls zoom={zoom} onZoom={setZoom} />
       </div>
-      <div className={styles.body} style={{ "--document-zoom": zoom } as React.CSSProperties}>{docs.isLoading ? <div className={styles.centered}>{t("states.analyzing")}…</div> : <MarkdownTable text={tables[selected]?.text ?? ""} />}</div>
+      <div className={styles.body} data-note-scroll style={{ "--document-zoom": zoom } as React.CSSProperties}>{docs.isLoading ? <div className={styles.centered}>{t("states.analyzing")}…</div> : <MarkdownTable text={tables[selected]?.text ?? ""} />}</div>
     </div>
   );
 }
