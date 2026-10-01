@@ -342,6 +342,12 @@ export function NotesOverlay({
   // opens it for editing; the list button returns to the side-by-side view.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const listed = selectedId ? visible.filter((n) => n.id === selectedId) : visible;
+  // Moving to another page/locator releases the focus; a pending autosave
+  // still flushes through the shared draft timer.
+  useEffect(() => {
+    setSelectedId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, tab.sourceId, tab.locator]);
   const hiddenByPage = notes.filter((n) => !visible.includes(n));
   const hiddenCounts = useMemo(() => {
     const map = new Map<number, number>();
