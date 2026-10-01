@@ -24,11 +24,23 @@
 }
 
 .marker[data-color="blue"] {
-  background: var(--color-accent);
+  background: var(--color-note-blue);
 }
 
 .marker[data-color="green"] {
   background: var(--color-success);
+}
+
+.marker[data-color="orange"] {
+  background: var(--color-note-orange);
+}
+
+.marker[data-color="purple"] {
+  background: var(--color-note-purple);
+}
+
+.marker[data-color="teal"] {
+  background: var(--color-note-teal);
 }
 
 .marker[data-editing] {
@@ -115,11 +127,23 @@
 }
 
 .card[data-color="blue"] {
-  border-left-color: var(--color-accent);
+  border-left-color: var(--color-note-blue);
 }
 
 .card[data-color="green"] {
   border-left-color: var(--color-success);
+}
+
+.card[data-color="orange"] {
+  border-left-color: var(--color-note-orange);
+}
+
+.card[data-color="purple"] {
+  border-left-color: var(--color-note-purple);
+}
+
+.card[data-color="teal"] {
+  border-left-color: var(--color-note-teal);
 }
 
 .cardOpen {
@@ -190,7 +214,6 @@
 }
 
 .retry,
-.delete,
 .jump {
   border: var(--rule-1) solid var(--color-rule-strong);
   border-radius: var(--radius-sm);
@@ -203,7 +226,6 @@
 }
 
 .retry:focus-visible,
-.delete:focus-visible,
 .jump:focus-visible {
   outline: var(--focus-ring) solid var(--color-focus);
   outline-offset: var(--focus-offset);

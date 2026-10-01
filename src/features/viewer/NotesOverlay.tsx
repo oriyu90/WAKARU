@@ -12,6 +12,16 @@ import styles from "./NotesOverlay.module.css";
 /** Client-side note body ceiling mirrors the backend (plan §5.1). */
 const BODY_MAX = 4000;
 const SAVE_DEBOUNCE_MS = 600;
+/** Band colours shared by the dot and the card edge (backend-validated). */
+const NOTE_COLORS = [
+  "yellow",
+  "pink",
+  "blue",
+  "green",
+  "orange",
+  "purple",
+  "teal",
+] as const;
 
 type Anchor = { page?: number; x?: number; y?: number; [k: string]: unknown };
 
@@ -56,6 +66,9 @@ export function NotesOverlay({
   const [saveErrorId, setSaveErrorId] = useState<string | null>(null);
   const [pendingBody, setPendingBody] = useState<{ id: string; body: string } | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Last assigned band colour: consecutive notes spread across the palette
+  // instead of colliding on one colour.
+  const lastColor = useRef<number>(-1);
   // Latest draft for the unmount/switch flush below (closures would go stale
   // mid-typing and drop keystrokes).
   const latest = useRef<{ id: string | null; body: string }>({ id: null, body: "" });
@@ -86,16 +99,24 @@ export function NotesOverlay({
   }, [qc, projectId, tab.sourceId]);
 
   const createMut = useMutation({
-    mutationFn: (input: { x: number; y: number }) =>
-      notesApi.create({
+    mutationFn: (input: { x: number; y: number }) => {
+      // Random band colour, never repeating the previous one twice in a row.
+      let pick = Math.floor(Math.random() * NOTE_COLORS.length);
+      if (pick === lastColor.current) {
+        pick = (pick + 1) % NOTE_COLORS.length;
+      }
+      lastColor.current = pick;
+      const color = NOTE_COLORS[pick] ?? "yellow";
+      return notesApi.create({
         projectId,
         sourceId: tab.sourceId,
         locator: (tab.locator ?? {}) as unknown as null,
         anchorKind: "page",
         anchorJson: { page: page ?? 1, x: input.x, y: input.y } as unknown as null,
         body: "",
-        color: "yellow",
-      }),
+        color,
+      });
+    },
     onSuccess: (note) => {
       invalidate();
       setEditingId(note.id);
@@ -258,6 +279,22 @@ export function NotesOverlay({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, tab.sourceId, page]);
 
+  // Editing outside the card ends the edit: a pointer down anywhere but
+  // the open card blurs the field (the blur flush saves first).
+  useEffect(() => {
+    if (editingId == null) return;
+    const id = editingId;
+    function onDown(e: PointerEvent) {
+      const card = document.querySelector(`[data-note-card="${id}"]`);
+      const target = e.target as HTMLElement | null;
+      if (card && target && !card.contains(target)) {
+        (document.activeElement as HTMLElement | null)?.blur?.();
+      }
+    }
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [editingId]);
+
   // Shift+F10 / Menu key on focused material → note at the current position.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -337,13 +374,6 @@ export function NotesOverlay({
           >
             {laneOpen ? t("notes.hideLane") : t("notes.showLane", { count: visible.length })}
           </button>
-          <button
-            type="button"
-            className={styles.laneToggle}
-            onClick={() => createMut.mutate({ x: 0.5, y: 0.4 })}
-          >
-            {t("notes.addHere")}
-          </button>
           {savingId ? <span className={styles.status}>{t("notes.saving")}</span> : null}
         </div>
         {laneOpen ? (
@@ -356,6 +386,7 @@ export function NotesOverlay({
                 <li
                   key={n.id}
                   className={styles.card}
+                  data-note-card={n.id}
                   data-color={n.color}
                   style={{ marginLeft: `${Math.min(i, 8) * 28}px`, marginTop: i === 0 ? 0 : 10 }}
                 >
@@ -413,14 +444,6 @@ export function NotesOverlay({
                         {t("notes.retry")}
                       </button>
                     ) : null}
-                    <button
-                      type="button"
-                      className={styles.delete}
-                      aria-label={t("notes.deleteLabel")}
-                      onClick={() => deleteMut.mutate(n.id)}
-                    >
-                      {t("notes.delete")}
-                    </button>
                   </span>
                 </li>
               );

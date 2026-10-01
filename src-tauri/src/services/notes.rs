@@ -12,7 +12,9 @@ use std::path::Path;
 use uuid::Uuid;
 
 pub const NOTE_BODY_MAX: usize = 4000;
-const NOTE_COLORS: [&str; 4] = ["yellow", "pink", "blue", "green"];
+const NOTE_COLORS: [&str; 7] = [
+    "yellow", "pink", "blue", "green", "orange", "purple", "teal",
+];
 const ANCHOR_KINDS: [&str; 3] = ["page", "text", "section"];
 
 fn row_to_note(r: &rusqlite::Row) -> rusqlite::Result<Note> {

@@ -104,11 +104,20 @@ describe("NotesOverlay", () => {
     // Material right-click (bubbles to the stack listener) creates.
     fireEvent.contextMenu(screen.getByTestId("material"));
     await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    // The band colour is one of the seven validated colours.
+    const color = (create.mock.calls[0]?.[0] as { color?: unknown } | undefined)?.color;
+    expect(["yellow", "pink", "blue", "green", "orange", "purple", "teal"]).toContain(color);
     // Marker right-click is overlay chrome: no creation, only delete.
     const remove = vi.spyOn(notesApi, "remove").mockResolvedValue(note("n1", 3, "hello") as never);
     fireEvent.contextMenu(screen.getByLabelText(/markerLabel/));
     await waitFor(() => expect(remove).toHaveBeenCalled());
     expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("cards offer no delete button; deletion stays on the marker", async () => {
+    setup([note("n1", 3, "hello")]);
+    await waitFor(() => expect(screen.getByText("hello")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /delete/i })).toBeNull();
   });
 
   it("overlay chrome is tagged so material right-clicks never hit it", async () => {

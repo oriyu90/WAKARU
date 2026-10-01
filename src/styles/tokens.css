@@ -137,6 +137,12 @@
   --color-warning: oklch(60% 0.120 75);
   --color-danger: oklch(53% 0.180 25);
 
+  /* Sticky-note band colours — the deliberate colour accents. */
+  --color-note-blue: oklch(55% 0.130 260);
+  --color-note-orange: oklch(60% 0.130 55);
+  --color-note-purple: oklch(60% 0.140 310);
+  --color-note-teal: oklch(55% 0.110 195);
+
   --overlay-scrim: oklch(0% 0 0 / 0.32);
   --overlay-panel: oklch(97% 0 0 / 0.96);
   --topbar: oklch(100% 0 0);
@@ -170,6 +176,12 @@
   --color-success: oklch(74% 0.115 150);
   --color-warning: oklch(80% 0.115 75);
   --color-danger: oklch(70% 0.150 25);
+
+  /* Sticky-note band colours — the deliberate colour accents. */
+  --color-note-blue: oklch(72% 0.120 260);
+  --color-note-orange: oklch(75% 0.120 55);
+  --color-note-purple: oklch(75% 0.130 310);
+  --color-note-teal: oklch(72% 0.100 195);
 
   --overlay-scrim: oklch(0% 0 0 / 0.62);
   --overlay-panel: oklch(8% 0 0 / 0.96);
