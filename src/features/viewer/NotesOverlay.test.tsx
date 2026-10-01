@@ -120,6 +120,35 @@ describe("NotesOverlay", () => {
     expect(screen.queryByRole("button", { name: /delete/i })).toBeNull();
   });
 
+  it("tapping a card hides the rest and edits it; the list button restores all", async () => {
+    const update = vi.spyOn(notesApi, "update").mockResolvedValue(note("n1", 3, "hello") as never);
+    setup([note("n1", 3, "first"), note("n2", 3, "second")]);
+    await waitFor(() => expect(screen.getByText("first")).toBeInTheDocument());
+    expect(screen.getByText("second")).toBeInTheDocument();
+    // Tap the first card: the other one disappears and the editor opens.
+    fireEvent.click(screen.getByText("first"));
+    await waitFor(() => expect(screen.queryByText("second")).toBeNull());
+    expect(document.querySelector("textarea")).not.toBeNull();
+    // The list button brings every card back.
+    fireEvent.click(screen.getByText(/showAll/));
+    await waitFor(() => expect(screen.getByText("second")).toBeInTheDocument());
+    // Opening a card schedules its (unchanged) autosave flush.
+    await waitFor(() => expect(update).toHaveBeenCalled());
+  });
+
+  it("tapping a dot opens its note even when the lane is closed", async () => {
+    setup([note("n1", 3, "hello"), note("n2", 3, "other")]);
+    await waitFor(() => expect(screen.getByText("hello")).toBeInTheDocument());
+    // Close the lane, then tap the dot: the lane reopens on that note.
+    fireEvent.click(screen.getByText(/hideLane/));
+    await waitFor(() => expect(screen.queryByText("hello")).toBeNull());
+    const marker = screen.getAllByLabelText(/markerLabel/)[0];
+    if (!marker) throw new Error("no marker");
+    fireEvent.click(marker);
+    await waitFor(() => expect(screen.getByText("hello")).toBeInTheDocument());
+    expect(screen.queryByText("other")).toBeNull();
+  });
+
   it("overlay chrome is tagged so material right-clicks never hit it", async () => {
     setup([note("n1", 3, "hello")]);
     await waitFor(() => expect(screen.getByText("hello")).toBeInTheDocument());

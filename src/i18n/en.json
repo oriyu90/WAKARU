@@ -553,7 +553,8 @@
     "color_green": "green",
     "color_orange": "orange",
     "color_purple": "purple",
-    "color_teal": "teal"
+    "color_teal": "teal",
+    "showAll": "Show all"
   },
   "visual": {
     "loading": "Loading figure…",

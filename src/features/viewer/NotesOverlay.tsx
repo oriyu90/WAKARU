@@ -79,6 +79,7 @@ export function NotesOverlay({
   // switch flush above saves first via effect cleanup order).
   useEffect(() => {
     setEditingId(null);
+    setSelectedId(null);
     setDraft("");
     setBaseUpdatedAt(null);
     setConflictId(null);
@@ -168,6 +169,7 @@ export function NotesOverlay({
         setEditingId(null);
         setDraft("");
       }
+      if (selectedId === id) setSelectedId(null);
       invalidate();
       toast.push({
         tone: "info",
@@ -240,6 +242,14 @@ export function NotesOverlay({
     setBaseUpdatedAt(note.updatedAt);
     setConflictId(null);
     setSaveErrorId(null);
+  }
+
+  /** Open one note from the list or its dot: reveal the lane, hide the
+   * rest, and start editing. */
+  function openNote(note: Note) {
+    setLaneOpen(true);
+    setSelectedId(note.id);
+    beginEdit(note);
   }
 
   // The overlay layer itself is pointer-transparent, so creation listens on
@@ -328,6 +338,10 @@ export function NotesOverlay({
     if (page == null) return true;
     return a.page === page;
   });
+  // Single-note focus: tapping one card (or its dot) hides the rest and
+  // opens it for editing; the list button returns to the side-by-side view.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const listed = selectedId ? visible.filter((n) => n.id === selectedId) : visible;
   const hiddenByPage = notes.filter((n) => !visible.includes(n));
   const hiddenCounts = useMemo(() => {
     const map = new Map<number, number>();
@@ -354,7 +368,7 @@ export function NotesOverlay({
             data-editing={editingId === n.id || undefined}
             style={{ left: `${x}%`, top: `${y}%` }}
             aria-label={t("notes.markerLabel", { color: t(`notes.color_${n.color}`) })}
-            onClick={() => beginEdit(n)}
+            onClick={() => openNote(n)}
             onContextMenu={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -374,11 +388,20 @@ export function NotesOverlay({
           >
             {laneOpen ? t("notes.hideLane") : t("notes.showLane", { count: visible.length })}
           </button>
+          {selectedId ? (
+            <button
+              type="button"
+              className={styles.laneToggle}
+              onClick={() => setSelectedId(null)}
+            >
+              {t("notes.showAll")}
+            </button>
+          ) : null}
           {savingId ? <span className={styles.status}>{t("notes.saving")}</span> : null}
         </div>
         {laneOpen ? (
           <ol className={styles.cards}>
-            {visible.map((n, i) => {
+            {listed.map((n, i) => {
               const needsCheck =
                 n.anchorKind === "text" && !sameLocator(n.locator, tab.locator);
               const editing = editingId === n.id;
@@ -388,7 +411,7 @@ export function NotesOverlay({
                   className={styles.card}
                   data-note-card={n.id}
                   data-color={n.color}
-                  style={{ marginLeft: `${Math.min(i, 8) * 28}px`, marginTop: i === 0 ? 0 : 10 }}
+                  style={{ marginTop: `${Math.min(i, 8) * 14}px` }}
                 >
                   {needsCheck ? (
                     <span className={styles.needsCheck}>{t("notes.needsCheck")}</span>
@@ -419,7 +442,7 @@ export function NotesOverlay({
                       type="button"
                       className={styles.cardOpen}
                       aria-label={t("notes.editLabel")}
-                      onClick={() => beginEdit(n)}
+                      onClick={() => openNote(n)}
                     >
                       <span className={styles.body}>{n.body || t("notes.emptyHint")}</span>
                     </button>

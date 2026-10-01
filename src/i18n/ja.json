@@ -548,7 +548,8 @@
     "color_green": "緑",
     "color_orange": "橙",
     "color_purple": "紫",
-    "color_teal": "青緑"
+    "color_teal": "青緑",
+    "showAll": "一覧表示"
   },
   "visual": {
     "loading": "図解を読み込み中…",
