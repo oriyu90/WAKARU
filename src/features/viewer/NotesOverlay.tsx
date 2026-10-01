@@ -373,7 +373,10 @@ export function NotesOverlay({
     function onMenu(e: MouseEvent) {
       // Create only on the material itself: never on toolbars, page buttons,
       // links, form controls, note chrome, or while the reader has text
-      // selected (the native selection menu keeps priority there).
+      // selected (the native selection menu keeps priority there). The click
+      // must land inside the tagged material scroller — and on real content,
+      // not the bare viewport (margins, letterboxing, toolbar gaps), whose
+      // clamped coordinates would never match the click point.
       const target = e.target as HTMLElement;
       if (
         target.closest(
@@ -385,6 +388,10 @@ export function NotesOverlay({
       const sel = window.getSelection();
       if (sel && !sel.isCollapsed) {
         return;
+      }
+      const scroller = parent?.querySelector("[data-note-scroll]") as HTMLElement | null;
+      if (scroller) {
+        if (!scroller.contains(target) || target === scroller) return;
       }
       e.preventDefault();
       e.stopPropagation();

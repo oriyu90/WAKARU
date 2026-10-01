@@ -75,11 +75,25 @@ describe("NotesOverlay", () => {
       height: 600,
       toJSON: () => "",
     });
+    // jsdom reports zero scroll sizes: emulate a scrolled document.
+    const scrollSizes: Record<string, number> = {
+      scrollWidth: 800,
+      scrollHeight: 2000,
+      clientWidth: 800,
+      clientHeight: 600,
+      scrollLeft: 0,
+      scrollTop: 400,
+    };
+    for (const [prop, value] of Object.entries(scrollSizes)) {
+      vi.spyOn(HTMLElement.prototype, prop as "scrollWidth", "get").mockReturnValue(value);
+    }
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={qc}>
         <div data-testid="stack" style={{ position: "relative" }}>
-          <div data-testid="material">material</div>
+          <div data-testid="material" data-note-scroll>
+            <p data-testid="content">material</p>
+          </div>
           <NotesOverlay projectId="p1" tab={tab} />
         </div>
       </QueryClientProvider>,
@@ -97,12 +111,16 @@ describe("NotesOverlay", () => {
     expect(screen.queryByText("elsewhere")).toBeNull();
   });
 
-  it("right-click on the material creates a note; on a marker it does not", async () => {
+  it("right-click on content creates a note; on bare viewport or marker it does not", async () => {
     const create = vi.spyOn(notesApi, "create").mockResolvedValue(note("n9", 3, "") as never);
     setup([note("n1", 3, "hello")]);
     await waitFor(() => expect(screen.getByText("hello")).toBeInTheDocument());
-    // Material right-click (bubbles to the stack listener) creates.
+    // Bare viewport (margins, letterboxing) never creates: its clamped
+    // coordinates could never match the click point.
     fireEvent.contextMenu(screen.getByTestId("material"));
+    expect(create).not.toHaveBeenCalled();
+    // Real content (bubbles to the stack listener) creates.
+    fireEvent.contextMenu(screen.getByTestId("content"));
     await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
     // The band colour is one of the seven validated colours.
     const color = (create.mock.calls[0]?.[0] as { color?: unknown } | undefined)?.color;

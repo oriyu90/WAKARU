@@ -97,8 +97,8 @@ textarea {
 }
 
 ::selection {
-  background: var(--color-accent-weak);
-  color: var(--color-ink-strong);
+  background: var(--color-ink);
+  color: var(--color-paper);
 }
 
 /* Custom scrollbars — native ones ignore the monochrome filter on some platforms
