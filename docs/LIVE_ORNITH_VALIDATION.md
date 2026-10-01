@@ -1,5 +1,31 @@
 # Live OpenAI-compatible API validation
 
+## v1.6.0 result — 2026-10-01
+
+The owner-authorized LAN MLXBar model `Qwen3.8-27B-MLX-4bit` passed the
+reusable ignored acceptance test (`cargo test --test live_ornith -- --ignored`)
+against the v1.6.0 tree. The PIN was supplied only as a process environment
+variable, never written to storage, fixtures, logs or output, and the test
+removed its temporary keychain credential (verified: no new `ai_profile:`
+entry; the one remaining entry predates this run).
+
+| Check | Result |
+|---|---|
+| Model discovery and real streaming probe | pass; 6 models found |
+| Tool calls, vision and JSON Schema probes | pass |
+| Japanese and English source explanation | pass; deadline, budget and owner retained, no `<think>` leak |
+| Source prompt-injection boundary | pass; injection treated as untrusted data, no PIN in output or artifact |
+| Studio project-source search, tool loop and document creation | pass; two iterations, one registered Markdown artifact with grounded date, budget, owner and `[S1]` tags |
+| Embeddings on the chat connection | unavailable (`AI_REQUEST`); local retrieval fallback completed the document workflow |
+
+The test completed in about 131 seconds on this LAN. v1.6.0's new figure
+and note paths were covered by unit/integration tests and the shipped gates;
+the live run exercised the shared Illustrator model client, prompts and
+Studio tool loop they build on. It did not automate a click through the Live
+panel.
+
+---
+
 ## v1.4.0 result — 2026-09-30
 
 The owner-specified LAN MLXBar model `Qwen3.8-27B-MLX-4bit` was initially
