@@ -7,15 +7,52 @@ use crate::error::{AppError, AppResult};
 use std::path::Path;
 
 const BLOCK_CHARS: usize = 1500;
+/// Full-index ceiling for the text family (plan §3.1/§3.2). The file itself is
+/// always copied verbatim; only the searchable index is windowed. Beyond this
+/// the parser indexes the head and the caller marks `ready_partial` with the
+/// unparsed range instead of claiming "fully indexed".
+pub const TEXT_INDEX_MAX_BYTES: u64 = 8 * 1024 * 1024;
 
 pub fn read_to_string(path: &Path) -> AppResult<String> {
-    let bytes = std::fs::read(path)?;
+    read_to_string_capped(path, TEXT_INDEX_MAX_BYTES)
+}
+
+/// Capped read used by the text family: never pulls more than `max` bytes
+/// into memory, truncates to a UTF-8 boundary, and lets the caller mark the
+/// remainder as unparsed.
+pub fn read_to_string_capped(path: &Path, max: u64) -> AppResult<String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = std::fs::File::open(path)?;
+    let total = f.metadata().map(|m| m.len()).unwrap_or(0);
+    let take = total.min(max);
+    let mut buf = vec![0u8; take as usize];
+    let mut n = 0usize;
+    while n < buf.len() {
+        match f.read(&mut buf[n..]) {
+            Ok(0) => break,
+            Ok(k) => n += k,
+            Err(e) => return Err(e.into()),
+        }
+    }
+    buf.truncate(n);
+    while !buf.is_empty() && std::str::from_utf8(&buf).is_err() {
+        buf.pop();
+    }
+    let _ = f.seek(SeekFrom::Start(0));
     // BOM / heuristic charset detection (docs/04 §7).
     let mut det = chardetng::EncodingDetector::new();
-    det.feed(&bytes, true);
+    det.feed(&buf, total <= max);
     let enc = det.guess(None, true);
-    let (text, _, _) = enc.decode(&bytes);
+    let (text, _, _) = enc.decode(&buf);
     Ok(text.into_owned())
+}
+
+/// True when the file is larger than the full-index ceiling, i.e. the index
+/// covers a head window and the UI must show the unparsed range.
+pub fn is_truncated_for_index(path: &Path) -> bool {
+    std::fs::metadata(path)
+        .map(|m| m.len() > TEXT_INDEX_MAX_BYTES)
+        .unwrap_or(false)
 }
 
 pub fn parse_text(kind: SourceKind, path: &Path) -> AppResult<Vec<Unit>> {

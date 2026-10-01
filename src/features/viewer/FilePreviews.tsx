@@ -94,9 +94,14 @@ function sanitizeRenderedOffice(root: HTMLElement) {
 function FileLimit({ detail, fallback }: { detail: SourceDetail; fallback: React.ReactNode }) {
   const { t } = useTranslation();
   if (detail.bytes <= MAX_INTERACTIVE_BYTES) return fallback;
+  // Large Office files keep a staged text view; complex layout, embedded
+  // media, macros and change history are not reproduced — stated, never
+  // silently blank (plan §3.2).
+  const office = detail.kind === "doc" || detail.kind === "slides" || detail.kind === "sheet";
   return (
     <div className={styles.previewFallback} role="status">
       <p>{t("viewer.fileTooLarge")}</p>
+      {office ? <p>{t("viewer.largeOfficeNotice")}</p> : null}
       {fallback}
     </div>
   );
@@ -229,6 +234,16 @@ export function PdfFilePreview({
   const clarity = useUiStore((s) => s.docClarity);
   const [error, setError] = useState<unknown>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  // External jumps (citation, sticky-note page list) arrive as a new
+  // initialPage; internal paging leaves the prop value unchanged, so this
+  // only fires for real external moves.
+  const initialRef = useRef(initialPage);
+  useEffect(() => {
+    if (initialPage !== initialRef.current) {
+      initialRef.current = initialPage;
+      setPage(Math.max(1, initialPage));
+    }
+  }, [initialPage]);
   usePageKeys((d) =>
     setPage((p) => Math.min(Math.max(p + d, 1), pdf?.numPages ?? detail.pageCount ?? p)),
   );
@@ -253,13 +268,38 @@ export function PdfFilePreview({
   }, []);
 
   useEffect(() => {
-    if (!asset.data) return;
     let cancelled = false;
     let task: ReturnType<typeof import("pdfjs-dist")["getDocument"]> | undefined;
     void (async () => {
       const pdfjs = await import("pdfjs-dist");
       const worker = await import("pdfjs-dist/build/pdf.worker.mjs?url");
       pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+      // Ranged URL loading first (plan §3.2): pages stream in 256 KiB
+      // chunks instead of one arrayBuffer copy. The custom protocol may not
+      // forward Range on every WebView, so any failure falls back to the
+      // bounded buffer path below — and beyond 96 MiB to extracted text.
+      const url = detail.primaryAssetUrl ?? undefined;
+      if (url && detail.bytes > 8 * 1024 * 1024) {
+        try {
+          task = pdfjs.getDocument({
+            url,
+            rangeChunkSize: 256 * 1024,
+            disableStream: true,
+            disableAutoFetch: true,
+          });
+          const loaded = await task.promise;
+          if (!cancelled) {
+            setPdf(loaded);
+            setPage((current) => Math.min(current, loaded.numPages));
+          }
+          return;
+        } catch {
+          task = undefined;
+          if (cancelled) return;
+          // Fall through to the bounded buffer path.
+        }
+      }
+      if (!asset.data) return;
       task = pdfjs.getDocument({ data: asset.data.slice(0) });
       const loaded = await task.promise;
       if (!cancelled) {
@@ -271,7 +311,8 @@ export function PdfFilePreview({
       cancelled = true;
       void task?.destroy();
     };
-  }, [asset.data]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asset.data, detail.primaryAssetUrl, detail.bytes]);
 
   useEffect(() => {
     if (!pdf || !canvasRef.current) return;
@@ -373,8 +414,17 @@ export function PdfFilePreview({
     }
   }
 
-  if (detail.bytes > MAX_INTERACTIVE_BYTES) return <FileLimit detail={detail} fallback={fallback} />;
-  if (asset.isError || error) return <div className={styles.previewFallback}><ErrorState error={asset.error ?? error} onRetry={() => { setError(null); void asset.refetch(); }} />{fallback}</div>;
+  // Large PDFs page in over Range (plan §3.2) instead of one arrayBuffer;
+  // every other format keeps the 96 MiB interactive ceiling and falls back
+  // to extracted text. Unbounded single GETs are refused above 512 MiB.
+  const PDF_RANGE_MAX = 512 * 1024 * 1024;
+  if (detail.bytes > MAX_INTERACTIVE_BYTES && detail.bytes > PDF_RANGE_MAX) {
+    return <FileLimit detail={detail} fallback={fallback} />;
+  }
+  if (detail.bytes > MAX_INTERACTIVE_BYTES && asset.isError) {
+    return <div className={styles.previewFallback}><ErrorState error={asset.error} onRetry={() => { void asset.refetch(); }} />{fallback}</div>;
+  }
+  if (error) return <div className={styles.previewFallback}><ErrorState error={error} onRetry={() => { setError(null); void asset.refetch(); }} />{fallback}</div>;
 
   return (
     <div className={styles.filePreview}>
@@ -482,6 +532,14 @@ export function PptxFilePreview({
   const clarity = useUiStore((s) => s.docClarity);
   const onPageRef = useRef(onPage);
   onPageRef.current = onPage;
+  // Same external-jump contract as the PDF renderer (citation, notes).
+  const initialRef = useRef(initialPage);
+  useEffect(() => {
+    if (initialPage !== initialRef.current) {
+      initialRef.current = initialPage;
+      setPage(Math.max(1, initialPage));
+    }
+  }, [initialPage]);
   usePageKeys((d) => setPage((p) => Math.min(Math.max(p + d, 1), total)));
 
   useEffect(() => {

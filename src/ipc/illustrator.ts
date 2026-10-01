@@ -3,9 +3,11 @@ import i18n from "../i18n";
 import type {
   Thread,
   GenerateStarted,
+  GenerateVisualInput,
   DetailLevel,
   Scope,
   ImportToStudioInput,
+  VisualPreview,
 } from "./types.gen";
 
 const lang = () => i18n.language;
@@ -29,4 +31,8 @@ export const illustratorApi = {
   cancel: (streamId: string) => call<void>("illustrator_cancel", { streamId }),
   importToStudio: (input: ImportToStudioInput) =>
     call<string>("illustrator_import_to_studio", { input }),
+  /** Explicit figure creation (plan §4.2). The explanation stream stays
+   *  Markdown-only; this stores one typed visual for the current range. */
+  generateVisual: (input: GenerateVisualInput) =>
+    call<VisualPreview>("illustrator_generate_visual", { input }),
 };

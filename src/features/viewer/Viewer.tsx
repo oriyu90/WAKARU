@@ -18,6 +18,7 @@ import type { Citation, SourceStatusEvent, ViewerTab } from "../../ipc/types.gen
 import { SourceListPanel } from "../project/SourceListPanel";
 import { Preview } from "./Preview";
 import { IllustratorDrawer } from "./IllustratorDrawer";
+import { NotesOverlay } from "./NotesOverlay";
 import styles from "./Viewer.module.css";
 
 export type PreviewContext = {
@@ -466,7 +467,10 @@ export function Viewer({
           {active === HOME || !activeTab ? (
             <SourceListPanel projectId={projectId} onOpen={openTab} />
           ) : (
-            <Preview projectId={projectId} tab={activeTab} onContext={setCtx} />
+            <div className={styles.previewStack}>
+              <Preview projectId={projectId} tab={activeTab} onContext={setCtx} />
+              <NotesOverlay projectId={projectId} tab={activeTab} />
+            </div>
           )}
         </div>
 

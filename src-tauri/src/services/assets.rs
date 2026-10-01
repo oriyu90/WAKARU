@@ -38,6 +38,19 @@ pub fn resolve(projects_root: &Path, request_path: &str) -> AppResult<PathBuf> {
     }
     let rel = parts[2..].join("/");
 
+    // Plan §3.2 audit: an explicit `sources/<otherId>/...` (or
+    // `derived/<otherId>/...`) must not resolve beyond the source id named in
+    // the URL. The figure iframe and other sandboxed frames therefore cannot
+    // walk into a sibling source by guessing its path.
+    for prefix in ["sources/", "derived/"] {
+        if let Some(rest) = rel.strip_prefix(prefix) {
+            let first = rest.split('/').next().unwrap_or("");
+            if !first.is_empty() && first != source_id.as_str() {
+                return Err(deny("asset path crosses into another source"));
+            }
+        }
+    }
+
     // Only these two trees are ever readable.
     let project_dir = projects_root.join(project_id);
     let allowed_roots = [project_dir.join("sources"), project_dir.join("derived")];

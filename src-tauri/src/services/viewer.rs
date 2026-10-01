@@ -254,3 +254,128 @@ pub fn source_detail(
         ocr_status: s.ocr_status,
     })
 }
+
+/// Windowed text read for huge sources (plan §3.2). The UI pages 64–256 KiB
+/// instead of `fetch().text()` on a 1 GiB file. Byte offsets are UTF-8 safe:
+/// a window never splits a char; `next_offset` is None at EOF.
+pub fn read_text_window(
+    project_db: &Connection,
+    projects_root: &std::path::Path,
+    project_id: &str,
+    source_id: &str,
+    offset: u64,
+    limit: u64,
+) -> AppResult<crate::domain::visual::TextWindow> {
+    use std::io::{Read, Seek, SeekFrom};
+    let limit = limit.clamp(1024, 256 * 1024);
+    let (rel_path, kind): (String, String) = project_db
+        .query_row(
+            "SELECT rel_path, kind FROM sources WHERE id = ?1",
+            [source_id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()?
+        .ok_or_else(|| AppError::new("SOURCE_NOT_FOUND", "error.source.notFound", source_id))?;
+    // Derived reader text is preferred for weblinks; otherwise the original.
+    let mut candidates = Vec::new();
+    if kind == "weblink" {
+        candidates.push(
+            crate::services::projects::project_dir(projects_root, project_id)
+                .join(format!("derived/{source_id}/reader.md")),
+        );
+    }
+    candidates
+        .push(crate::services::projects::project_dir(projects_root, project_id).join(&rel_path));
+    // Derived canonical markdown is a second fallback for parsed sources.
+    candidates.push(
+        crate::services::projects::project_dir(projects_root, project_id)
+            .join(format!("derived/{source_id}/document.md")),
+    );
+    let path = candidates
+        .into_iter()
+        .find(|p| p.is_file())
+        .ok_or_else(|| {
+            AppError::new(
+                "ASSET_DENIED",
+                "error.asset.denied",
+                "no readable text for this source",
+            )
+        })?;
+    let total = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    if offset >= total && total > 0 {
+        return Ok(crate::domain::visual::TextWindow {
+            source_id: source_id.to_string(),
+            offset,
+            total_bytes: total,
+            text: String::new(),
+            next_offset: None,
+            is_truncated: true,
+            start_line: count_lines_before(&path, offset)? + 1,
+        });
+    }
+    let mut f = std::fs::File::open(&path)?;
+    f.seek(SeekFrom::Start(offset))?;
+    let mut buf = vec![0u8; limit as usize];
+    let mut n = 0usize;
+    while n < buf.len() {
+        match f.read(&mut buf[n..]) {
+            Ok(0) => break,
+            Ok(k) => n += k,
+            Err(e) => return Err(e.into()),
+        }
+    }
+    buf.truncate(n);
+    // Back off to a char boundary at the tail.
+    while !buf.is_empty() && std::str::from_utf8(&buf).is_err() {
+        buf.pop();
+    }
+    let consumed = buf.len() as u64;
+    // If we cut mid-line, extend to the next newline within 4 KiB so rows do
+    // not split (CSV keeps header + row numbers on the UI side).
+    let mut text = String::from_utf8_lossy(&buf).into_owned();
+    let eof = offset + consumed >= total;
+    let mut next = if eof { None } else { Some(offset + consumed) };
+    if !eof {
+        let mut tail = [0u8; 4096];
+        let k = f.read(&mut tail).unwrap_or(0);
+        if k > 0 {
+            if let Some(pos) = tail[..k].iter().position(|&b| b == b'\n') {
+                let extra = &tail[..=pos];
+                if let Ok(s) = std::str::from_utf8(extra) {
+                    text.push_str(s);
+                    next = Some(offset + consumed + (pos as u64) + 1);
+                }
+            }
+        }
+    }
+    Ok(crate::domain::visual::TextWindow {
+        source_id: source_id.to_string(),
+        offset,
+        total_bytes: total,
+        text,
+        next_offset: next,
+        is_truncated: next.is_some(),
+        start_line: count_lines_before(&path, offset)? + 1,
+    })
+}
+
+/// Count `\n` bytes before `offset` with a bounded streaming scan (plan
+/// §3.2 — CSV keeps absolute row numbers without loading the file).
+fn count_lines_before(path: &std::path::Path, offset: u64) -> AppResult<u64> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = std::fs::File::open(path)?;
+    f.seek(SeekFrom::Start(0))?;
+    let mut remaining = offset;
+    let mut buf = [0u8; 1024 * 1024];
+    let mut lines = 0u64;
+    while remaining > 0 {
+        let want = remaining.min(buf.len() as u64) as usize;
+        let n = f.read(&mut buf[..want])?;
+        if n == 0 {
+            break;
+        }
+        lines += buf[..n].iter().filter(|&&b| b == b'\n').count() as u64;
+        remaining -= n as u64;
+    }
+    Ok(lines)
+}

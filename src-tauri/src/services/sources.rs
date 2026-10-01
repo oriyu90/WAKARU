@@ -283,7 +283,40 @@ pub fn add_one(
         .and_then(|n| n.to_str())
         .unwrap_or("file")
         .to_string();
-    let bytes = std::fs::metadata(src_path).map(|m| m.len()).unwrap_or(0);
+    // Finder/iCloud placeholders are not the real bytes: fail distinctly from
+    // a generic read error so the UI can tell the user to download first.
+    if original_name.ends_with(".icloud")
+        || src_path
+            .as_os_str()
+            .to_string_lossy()
+            .contains(".com~apple~clouddocs")
+            && std::fs::metadata(src_path).map(|m| m.len()).unwrap_or(0) == 0
+    {
+        return Err(AppError::new(
+            "SOURCE_NOT_DOWNLOADED",
+            "error.source.notDownloaded",
+            format!("{original_name} is not downloaded yet"),
+        ));
+    }
+    let meta = std::fs::metadata(src_path).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::PermissionDenied {
+            AppError::new(
+                "SOURCE_PERMISSION",
+                "error.source.permission",
+                format!("cannot read {original_name}: permission denied"),
+            )
+        } else if e.kind() == std::io::ErrorKind::NotFound {
+            AppError::new(
+                "SOURCE_NOT_FOUND",
+                "error.source.notFound",
+                format!("{original_name} no longer exists"),
+            )
+        } else {
+            AppError::new("IO", "error.io", e.to_string())
+        }
+    })?;
+    let bytes = meta.len();
+    check_space(&project_dir, bytes, &original_name)?;
     let sha = sha256_file(src_path).ok();
 
     if let Some(ref s) = sha {
@@ -615,6 +648,35 @@ fn emit_status(app: &AppHandle, project_id: &str, source: &Source) {
             error_code: source.error_code.clone(),
         },
     );
+}
+
+/// Pre-copy capacity check (plan §3.1): refuse with the needed/missing bytes
+/// instead of dying mid-copy. `need` = file bytes + 64 MiB headroom for the
+/// copy, derived files and WAL growth. Unknown filesystems skip the check.
+fn check_space(project_dir: &Path, file_bytes: u64, name: &str) -> AppResult<()> {
+    const HEADROOM: u64 = 64 * 1024 * 1024;
+    let need = file_bytes.saturating_add(HEADROOM);
+    #[cfg(unix)]
+    {
+        if let Ok(vfs) = nix::sys::statvfs::statvfs(project_dir) {
+            let avail = u64::from(vfs.blocks_available()) * vfs.fragment_size();
+            if avail < need {
+                let missing = need.saturating_sub(avail);
+                return Err(AppError::new(
+                    "SOURCE_NO_SPACE",
+                    "error.source.noSpace",
+                    format!("not enough disk space for {name}"),
+                )
+                .with_details(serde_json::json!({
+                    "neededBytes": need,
+                    "missingBytes": missing,
+                    "fileBytes": file_bytes,
+                })));
+            }
+        }
+    }
+    let _ = (need, name);
+    Ok(())
 }
 
 pub fn kind_to_str(k: SourceKind) -> &'static str {

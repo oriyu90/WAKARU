@@ -2,6 +2,31 @@
 
 Cumulative; newest release first.
 
+## v1.6.0 verification — 2026-10-01
+
+Scope: large-source staging (Range/HEAD, text windows, index ceilings, ZIP
+streaming), typed interactive figures (Studio + Live, isolated renderer),
+source-bound sticky notes. `PROJECT_SCHEMA_VERSION 1.1.0` (`004_notes_visuals`).
+
+| Gate | Current result |
+|---|---|
+| Frontend typecheck, lint, design/hardcoded checks, i18n, build | pass; 485 keys × 3 languages |
+| Frontend tests and contrast | pass; 42 tests, light/dark contrast |
+| Rust fmt, clippy, library and integration tests | pass; 235 library tests passed, 1 ignored; all phase suites passed |
+| Rust advisories and npm production audit | pass; 0 npm vulnerabilities |
+| Bindings | pass; additive only (+Note/Visual/TextWindow/GenerateVisualInput) |
+| Migration and archives | pass; 1.0.0 project migrates forward, notes/visuals CRUD + conflict/delete/restore, old ZIP shape imports as zero counts, export/import streaming with integrity and anchor gates |
+| Release app/DMG signature and mounted startup | pass; arm64 v1.6.0, macOS 12+, strict signature passes for build and mounted app; DMG checksum VALID (`abc2ff79…9d56c`, 23,341,800 bytes); mounted app logged `backend ready version="1.6.0"` |
+
+### Release artifact
+
+| Item | Value |
+|---|---|
+| App | arm64 `WAKARU.app`, version `1.6.0`, minimum macOS 12; ad-hoc signed with runtime option |
+| Signature | `codesign --verify --deep --strict` passes for build output and mounted-image app |
+| DMG | `WAKARU_1.6.0_aarch64.dmg`, 23,341,800 bytes; `hdiutil verify` VALID |
+| SHA-256 | `abc2ff797e5c1ae3416e0556fccf8a3f256267703111bdfaacc558f52d69d56c` |
+
 ## v1.5.0 verification — 2026-10-01
 
 Scope: Studio send reconciliation, tool validation/finite loop, whole-document translation PDF. No DB migration.

@@ -227,7 +227,23 @@
     "STUDIO_TRANSLATE_ARG": "翻訳の指定が正しくありません。",
     "STUDIO_TRANSLATE_TOO_LARGE": "資料が大きすぎます。分割して再試行してください。",
     "STUDIO_TRANSLATE_RENDER": "PDFの生成に失敗しました。",
-    "STUDIO_TRANSLATE_TRUNCATED": "翻訳が途中で切れました。分割して再試行してください。"
+    "STUDIO_TRANSLATE_TRUNCATED": "翻訳が途中で切れました。分割して再試行してください。",
+    "SOURCE_NO_SPACE": "ディスク容量が足りません。",
+    "SOURCE_NOT_DOWNLOADED": "このファイルはまだダウンロードされていません。",
+    "SOURCE_PERMISSION": "ファイルを読み取れません（権限がありません）。",
+    "NOTE_INVALID_ANCHOR": "付箋の位置が不正です。",
+    "NOTE_TOO_LONG": "付箋が長すぎます。",
+    "NOTE_INVALID_COLOR": "不明な付箋の色です。",
+    "NOTE_CONFLICT": "付箋は他で編集されました。",
+    "NOTE_DELETED": "付箋は削除済みです。",
+    "NOTE_NOT_FOUND": "付箋が見つかりません。",
+    "VISUAL_TOO_LARGE": "図解がサイズ上限を超えています。",
+    "VISUAL_FORBIDDEN": "図解にオフラインで許可されない要素があります。",
+    "VISUAL_INVALID": "図解の要求が不正です。",
+    "VISUAL_INVALID_REF": "図解が不明な資料を引用しています。",
+    "VISUAL_NOT_FOUND": "図解が見つかりません。",
+    "IMPORT_BAD_DB": "アーカイブのデータベース検証に失敗しました。",
+    "EXPORT_TOO_LARGE": "ファイルが書き出し上限を超えています。"
   },
   "viewer": {
     "readonly": "閲覧専用",
@@ -274,7 +290,14 @@
     "websiteReload": "再読み込み",
     "websiteOpenExternal": "ブラウザで開く",
     "websitePreview": "Web サイトのプレビュー",
-    "websiteEntry": "入口ページ"
+    "websiteEntry": "入口ページ",
+    "windowPosition": "{{total}} バイト中 {{offset}} バイト目・{{startLine}} 行目から",
+    "windowFirst": "先頭",
+    "windowPrev": "前へ",
+    "windowNext": "次へ",
+    "windowedNotice": "大きなファイルのため分割表示しています。原本はそのまま保存されています。",
+    "sheetPosition": "{{first}}–{{last}} 行",
+    "largeOfficeNotice": "大きなファイルのため節単位の抽出テキストを表示しています。複雑な配置・埋め込みメディア・マクロ・変更履歴は再現されません。"
   },
   "ai": {
     "connections": "接続先",
@@ -349,7 +372,8 @@
     "rewriteAs": "別の詳しさで作り直す",
     "toStudio": "Studioへ引き継ぐ",
     "handoffSuccess": "ライブ解説をStudioへ引き継ぎました",
-    "handoffFailed": "Studioへの引き継ぎに失敗しました"
+    "handoffFailed": "Studioへの引き継ぎに失敗しました",
+    "makeVisual": "図解を作る"
   },
   "studio": {
     "title": "Studio",
@@ -503,5 +527,37 @@
     "use": "使う",
     "download": "ダウンロード",
     "diskShort": "ディスク残量が不足しています。約 {{needed}} 必要、空き {{free}}。"
+  },
+  "notes": {
+    "markerLabel": "{{color}}の付箋",
+    "editLabel": "付箋を編集",
+    "emptyHint": "空の付箋 — クリックして記入",
+    "chars": "{{count}} / {{max}}",
+    "conflict": "他で編集されました — 再読込しました。文をコピーして再試行してください。",
+    "retry": "再試行",
+    "delete": "削除",
+    "deleteLabel": "付箋を削除",
+    "deleted": "付箋を削除しました",
+    "undo": "元に戻す",
+    "saving": "保存中…",
+    "hideLane": "付箋を隠す",
+    "showLane": "付箋 ({{count}}件)",
+    "addHere": "ここに付箋",
+    "needsCheck": "位置を確認",
+    "otherPage": "ページ {{page}} に{{count}}件",
+    "color_yellow": "黄",
+    "color_pink": "桃",
+    "color_blue": "青",
+    "color_green": "緑"
+  },
+  "visual": {
+    "loading": "図解を読み込み中…",
+    "failed": "図解を表示できませんでした。",
+    "retry": "再試行",
+    "copy": "コピー",
+    "copied": "図解のソースをコピーしました",
+    "reset": "リセット",
+    "expand": "拡大",
+    "shrink": "縮小"
   }
 }

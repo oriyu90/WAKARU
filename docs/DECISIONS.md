@@ -508,3 +508,12 @@
 - **理由**: 表示・永続化・回復を分離し、弱いモデルや状況依存の引数欠落でも有限回で終わらせる。長文翻訳を単一モデル出力に載せない。
 - **影響**: DB移行なし（IPCは追加任意項目のみ）。承認境界・sandbox・引用再解決は維持。日英中UI同時対応。
 - **残る制約**: 原PDFの画像・配置は再現しない。OCRなし頁は全訳完了と扱わない。
+
+## D-47 · 大容量は段階表示・図解は型付き成果物・付箋は資料に結び付ける
+
+- **日付**: 2026-10-01（v1.6.0）
+- **論点**: 1GB級資料を「受け付けた」だけで成功にすると、WebViewへの丸ごと受け渡しで固まる。会話文へHTMLを混ぜると親DOM・IPCへ届く。可変レイアウトへ `%` 位置だけの付箋は再配置に弱い。
+- **採用**: 原本は verbatim コピーのまま索引だけ上限化し、超過は `ready_partial` と未解析範囲で示す。UIは text window（64–256 KiB）・単一 Range（206/416）・PDF.js `rangeChunkSize` で段階取得し、96 MiB / 16M 画素の上限は維持する。図解は `VisualPreview`（合計 256 KiB・state 16 KiB、remote/CDN/import/fetch/form 禁止）を `visual_previews` に保存し、Studio の `create_visual_preview` と Live の `illustrator_generate_visual` から同じ `InteractivePreview`（`sandbox="allow-scripts"` の不透明 origin、CSP、token 照合の state 通知のみ）で表示する。通常の説明文ストリームへ HTML は混ぜない。付箋は `notes` に資料 ID・locator・有限 `x/y`・本文（4,000 字）・削除/復元を持ち、表面割合で再投影する。テキスト系は節/offset + fingerprint を主 anchor とし、解決できない場合は「位置の確認が必要」と出す。付箋は AI の検索・プロンプトへ自動投入しない。
+- **理由**: 巨大ファイルを UI プロセスへ複製しない設計を優先し、生成コードは親 React DOM・IPC・他資料から隔離する。付箋は閲覧者の私的メモとして保存・ZIP 往復・再起動の復元を保証する。
+- **影響**: `PROJECT_SCHEMA_VERSION` を `1.1.0` とする forward migration（`004_notes_visuals.sql`）。旧 project は起動時移行、旧 ZIP は 0 件として import。IPC は追加のみ。日英中 UI 同時対応（485 キー）。
+- **残る制約**: コピー+ハッシュの background job 化・進捗/取消 UI は未実装（空き容量検査・上限・部分成功で代替）。3D と任意 npm 実行は対象外。外部 Web の iframe 内座標への付箋は対象外。

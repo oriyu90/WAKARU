@@ -11,6 +11,7 @@ pub mod illustrator;
 pub mod job;
 pub mod locator;
 pub mod mcp;
+pub mod notes;
 pub mod project;
 pub mod search;
 pub mod settings;
@@ -18,6 +19,7 @@ pub mod source;
 pub mod studio;
 pub mod transcription;
 pub mod viewer;
+pub mod visual;
 
 pub use job::*;
 

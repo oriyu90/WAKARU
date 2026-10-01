@@ -93,6 +93,15 @@ pub fn run() {
             commands::viewer_update_locator,
             commands::viewer_pin_tab,
             commands::viewer_reorder_tabs,
+            commands::notes_list,
+            commands::notes_create,
+            commands::notes_update,
+            commands::notes_delete,
+            commands::notes_restore,
+            commands::visual_create,
+            commands::visual_get,
+            commands::visual_list_for_message,
+            commands::source_read_window,
             commands::ai_list_profiles,
             commands::ai_upsert_profile,
             commands::ai_delete_profile,
@@ -119,6 +128,7 @@ pub fn run() {
             commands::illustrator_ask,
             commands::illustrator_cancel,
             commands::illustrator_import_to_studio,
+            commands::illustrator_generate_visual,
             commands::studio_list_tabs,
             commands::studio_get_tab,
             commands::studio_create_tab,
@@ -200,14 +210,145 @@ fn asset_response(
                 .unwrap();
         }
     };
-    match std::fs::read(&resolved) {
-        Ok(bytes) => Response::builder()
-            .status(StatusCode::OK)
-            .header("Content-Type", services::assets::content_type(&resolved))
-            .header("Cache-Control", "no-cache")
-            .header("Access-Control-Allow-Origin", "*")
-            .body(std::borrow::Cow::Owned(bytes))
-            .unwrap(),
-        Err(_) => not_found(),
+    match std::fs::metadata(&resolved) {
+        Ok(meta) if meta.is_file() => {
+            let total = meta.len();
+            let content_type = services::assets::content_type(&resolved).to_string();
+            // Single-range support (plan §3.2): `HEAD` + one `Range` → 206 with
+            // `Content-Range`; anything else → 416. One request is capped so a
+            // 1 GiB original is never handed to the WebView at once.
+            if *request.method() == Method::HEAD {
+                return Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", content_type)
+                    .header("Content-Length", total.to_string())
+                    .header("Accept-Ranges", "bytes")
+                    .header("Cache-Control", "no-cache")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .body(std::borrow::Cow::Borrowed(&b""[..]))
+                    .unwrap();
+            }
+            if let Some(range_header) = request.headers().get("range").and_then(|v| v.to_str().ok())
+            {
+                return range_response(&resolved, &content_type, total, range_header);
+            }
+            // Unbounded GET on a huge original would repeat the old full-read
+            // path; refuse it and force the UI onto the windowed/range path.
+            const UNBOUNDED_GET_MAX: u64 = 512 * 1024 * 1024;
+            if total > UNBOUNDED_GET_MAX {
+                return Response::builder()
+                    .status(StatusCode::FORBIDDEN)
+                    .header("Access-Control-Allow-Origin", "*")
+                    .body(std::borrow::Cow::Borrowed(&b""[..]))
+                    .unwrap();
+            }
+            match std::fs::read(&resolved) {
+                Ok(bytes) => Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", content_type)
+                    .header("Content-Length", bytes.len().to_string())
+                    .header("Accept-Ranges", "bytes")
+                    .header("Cache-Control", "no-cache")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .body(std::borrow::Cow::Owned(bytes))
+                    .unwrap(),
+                Err(_) => not_found(),
+            }
+        }
+        _ => not_found(),
     }
+}
+
+/// Single-range `206` responder. `RANGE_SINGLE_MAX` bounds one response so
+/// large PDFs page in via `rangeChunkSize` instead of a full copy.
+fn range_response(
+    path: &std::path::Path,
+    content_type: &str,
+    total: u64,
+    header: &str,
+) -> tauri::http::Response<std::borrow::Cow<'static, [u8]>> {
+    use tauri::http::{Response, StatusCode};
+    const RANGE_SINGLE_MAX: u64 = 32 * 1024 * 1024;
+    let denied = || {
+        Response::builder()
+            .status(StatusCode::RANGE_NOT_SATISFIABLE)
+            .header("Content-Range", format!("bytes */{total}"))
+            .header("Accept-Ranges", "bytes")
+            .header("Access-Control-Allow-Origin", "*")
+            .body(std::borrow::Cow::Borrowed(&b""[..]))
+            .unwrap()
+    };
+    let spec = header.trim().strip_prefix("bytes=").unwrap_or("").trim();
+    if spec.is_empty() || spec.contains(',') {
+        return denied();
+    }
+    let (start, end): (u64, u64) = if let Some(suffix) = spec.strip_prefix('-') {
+        let n: u64 = suffix.parse().unwrap_or(0);
+        if n == 0 || total == 0 {
+            return denied();
+        }
+        let n = n.min(total);
+        (total - n, total - 1)
+    } else {
+        let mut it = spec.splitn(2, '-');
+        let s: u64 = it.next().unwrap_or("").parse().unwrap_or(u64::MAX);
+        let e_opt = it.next().unwrap_or("");
+        if s == u64::MAX {
+            return denied();
+        }
+        let e: u64 = if e_opt.is_empty() {
+            total.saturating_sub(1)
+        } else {
+            e_opt.parse().unwrap_or(u64::MAX)
+        };
+        if s >= total || e < s {
+            return denied();
+        }
+        (s, e.min(total - 1))
+    };
+    let mut len = end - start + 1;
+    if len > RANGE_SINGLE_MAX {
+        len = RANGE_SINGLE_MAX;
+    }
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => {
+            return Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .header("Access-Control-Allow-Origin", "*")
+                .body(std::borrow::Cow::Borrowed(&b""[..]))
+                .unwrap();
+        }
+    };
+    if f.seek(SeekFrom::Start(start)).is_err() {
+        return denied();
+    }
+    let mut buf = vec![0u8; len as usize];
+    let mut read = 0usize;
+    while read < buf.len() {
+        match f.read(&mut buf[read..]) {
+            Ok(0) => break,
+            Ok(k) => read += k,
+            Err(_) => {
+                return Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .header("Access-Control-Allow-Origin", "*")
+                    .body(std::borrow::Cow::Borrowed(&b""[..]))
+                    .unwrap();
+            }
+        }
+    }
+    buf.truncate(read);
+    let end = start + (read as u64).saturating_sub(1);
+    Response::builder()
+        .status(StatusCode::PARTIAL_CONTENT)
+        .header("Content-Type", content_type)
+        .header("Content-Length", read.to_string())
+        .header("Content-Range", format!("bytes {start}-{end}/{total}"))
+        .header("Accept-Ranges", "bytes")
+        .header("Cache-Control", "no-cache")
+        .header("Access-Control-Allow-Origin", "*")
+        .body(std::borrow::Cow::Owned(buf))
+        .unwrap()
 }

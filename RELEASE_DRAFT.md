@@ -1,3 +1,50 @@
+# v1.6.0 release record
+
+Prepared 2026-10-01. Scope: large-source staging, interactive figures, sticky
+notes. See `RELEASE_NOTES.md`, `DESIGN_v1.6.0.md` and `QUALITY_REPORT.md`.
+
+## Verified artifact
+
+- App: `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, macOS 12+,
+  version 1.6.0, ad-hoc signed with runtime option)
+- DMG: `WAKARU_1.6.0_aarch64.dmg` (23,341,800 bytes)
+- Checksum: `WAKARU_1.6.0_aarch64.dmg.sha256`
+- SHA-256: `abc2ff797e5c1ae3416e0556fccf8a3f256267703111bdfaacc558f52d69d56c`
+- `codesign --verify --deep --strict` passed on the built app and mounted DMG
+  app. `hdiutil verify` was VALID. The mounted app reached
+  `WAKARU backend ready version="1.6.0"`.
+- No credentials are embedded in tracked source, new documentation or DMG.
+
+## Verification summary
+
+- Frontend: typecheck, lint/design/hardcoded checks, 42 tests, contrast,
+  i18n parity (485 keys × 3 languages), production build and production npm
+  audit (0 vulnerabilities) passed.
+- Rust: fmt, clippy with denied warnings, 235 library tests passed (1 ignored),
+  all phase integration suites, bindings (+additive) and cargo-deny passed.
+- Migration: pre-1.6.0 project DB migrates forward; notes CRUD/conflict/
+  delete/restore, visual validation blocklist, windowed text read with
+  absolute line numbers, and old-ZIP-as-zero import covered by tests.
+- Live real-model acceptance (owner LAN) remains for owner-side confirmation;
+  the Live figure path also renders a deterministic offline SVG summary.
+
+## Publication sequence
+
+1. Commit and tag `v1.6.0` on `main`.
+2. Publish the GitHub release with the verified DMG and checksum; re-download
+   the assets and compare hash and size.
+3. Publish four localized Studio RIZI pages and release/news metadata after
+   the site tests.
+4. Record the release in the private common-rules maintenance document.
+
+## Limits
+
+- No Developer ID signature or Apple notarisation credentials were supplied.
+- Windows and Linux are not built or verified.
+- The GitHub repository remains private.
+
+---
+
 # v1.5.0 release record
 
 Prepared 2026-10-01. Scope: Studio send persistence reconciliation, tool

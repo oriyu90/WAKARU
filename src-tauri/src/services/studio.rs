@@ -97,6 +97,10 @@ fn classify_call(ctx: &LoopCtx, name: &str, arguments: &str) -> Approval {
         // programs and reach the network.
         "run_command" => Approval::Ask,
         "web_search" => Approval::Auto,
+        // `create_visual_preview` only writes a bounded, validated row to the
+        // project DB (no workspace file, no network); it runs without asking
+        // but never bypasses validation.
+        "create_visual_preview" => Approval::Auto,
         "write_file" | "build_document" | "build_site" | "translate_source_document" => {
             let parsed = serde_json::from_str::<Value>(arguments).ok();
             let mut path = parsed
@@ -1326,6 +1330,19 @@ fn tool_defs() -> Value {
             "outputPath": { "type": "string", "description": "workspace-relative output path ending in .pdf, e.g. translated.pdf" }
           }),
           json!(["targetLanguage", "outputPath"])),
+        f("create_visual_preview",
+          "Create a small self-contained interactive figure (SVG/Canvas + optional inline script) shown inline in this conversation and in Live. Use this when the reader asks for a diagram, chart, timeline or animated explanation. Keep html+css+js under 256 KiB total. No remote URLs, CDN, external fonts, imports, network fetch, forms or nested frames. Cite sources via sourceRefs (sourceId + optional ordinal); figure text itself is never a citation. Returns a visualId on success; never present a figure that failed validation as complete.",
+          json!({
+            "title": { "type": "string" },
+            "html": { "type": "string", "description": "inline figure markup, e.g. <svg>…</svg>" },
+            "css": { "type": "string" },
+            "js": { "type": "string", "description": "optional inline script; no imports, fetch or DOM escape" },
+            "data": { "type": "object" },
+            "aspectRatio": { "type": "string", "description": "e.g. 16:9" },
+            "sourceRefs": { "type": "array", "items": { "type": "object" } },
+            "initialState": { "type": "object" }
+          }),
+          json!(["title", "html"])),
     ])
 }
 
@@ -1779,6 +1796,78 @@ pub fn dispatch_tool(
                 "translate runs in the async loop",
                 &[],
             ))
+        }
+        "create_visual_preview" => {
+            let title = s("title").unwrap_or_default();
+            if title.trim().is_empty() {
+                return Ok(tool_error_json(
+                    name,
+                    "MISSING_TITLE",
+                    "title is required",
+                    &["title"],
+                ));
+            }
+            let html = s("html").unwrap_or_default();
+            if html.trim().is_empty() {
+                return Ok(tool_error_json(
+                    name,
+                    "MISSING_HTML",
+                    "html is required",
+                    &["html"],
+                ));
+            }
+            let css = s("css").unwrap_or_default();
+            let js = s("js").unwrap_or_default();
+            let data = args.get("data").cloned().unwrap_or(json!({}));
+            let aspect = args
+                .get("aspectRatio")
+                .and_then(Value::as_str)
+                .unwrap_or("16:9");
+            let refs = args.get("sourceRefs").cloned().unwrap_or(json!([]));
+            let state = args.get("initialState").cloned().unwrap_or(json!({}));
+            // Clamp an explicit source filter to this tool's own refs: refs
+            // outside the active source scope are rejected, never widened.
+            let scoped_refs = match source_filter {
+                Some(only) => {
+                    let arr = refs.as_array().cloned().unwrap_or_default();
+                    let kept: Vec<Value> = arr
+                        .into_iter()
+                        .filter(|r| {
+                            r.get("sourceId")
+                                .and_then(Value::as_str)
+                                .map(|sid| sid == only)
+                                .unwrap_or(false)
+                        })
+                        .collect();
+                    // An explicit ref outside the scope is a hard error, not a
+                    // silent drop — the model must re-resolve inside the scope.
+                    if kept.len() != refs.as_array().map(|a| a.len()).unwrap_or(0) {
+                        return Ok(tool_error_json(
+                            name,
+                            "SOURCE_SCOPE",
+                            "sourceRefs must stay inside this conversation's source scope",
+                            &["sourceRefs"],
+                        ));
+                    }
+                    Value::Array(kept)
+                }
+                None => refs,
+            };
+            match crate::services::visuals::create_on_db(
+                db,
+                &title,
+                &html,
+                &css,
+                &js,
+                &data,
+                aspect,
+                &scoped_refs,
+                &state,
+                "",
+            ) {
+                Ok(v) => Ok(json!({ "ok": true, "visualId": v.id, "title": v.title }).to_string()),
+                Err(e) => Ok(tool_error_json(name, &e.code, &e.message, &[])),
+            }
         }
         other => Err(AppError::new(
             "STUDIO_UNKNOWN_TOOL",

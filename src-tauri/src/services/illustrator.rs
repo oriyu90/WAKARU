@@ -1236,6 +1236,132 @@ fn user_line(l: &str) -> &'static str {
     }
 }
 
+/// Explicit figure creation for Live (plan §4.2). The explanation stream stays
+/// Markdown-only; this path validates and stores one typed `VisualPreview`
+/// and links it to the saved illustration row when one exists for the same
+/// source + locator. With no caller-supplied markup it renders a
+/// deterministic SVG summary from the current range so the flow works
+/// offline; model-supplied code takes the same validation gate.
+pub fn generate_visual(
+    projects_root: &Path,
+    project_id: &str,
+    input: &GenerateVisualInput,
+) -> AppResult<crate::domain::visual::VisualPreview> {
+    let db = projects::open_db(projects_root, project_id)?;
+    let source_name: String = db
+        .query_row(
+            "SELECT original_name FROM sources WHERE id = ?1",
+            [&input.source_id],
+            |r| r.get(0),
+        )
+        .optional()?
+        .ok_or_else(|| {
+            AppError::new(
+                "SOURCE_NOT_FOUND",
+                "error.source.notFound",
+                &input.source_id,
+            )
+        })?;
+    let instruction = input.instruction.chars().take(500).collect::<String>();
+    let title = if input.title.trim().is_empty() {
+        format!("図解: {}", source_name.chars().take(24).collect::<String>())
+    } else {
+        input.title.chars().take(200).collect()
+    };
+    let (html, css, js) = if input.html.trim().is_empty() {
+        // Deterministic offline summary: section titles + head words.
+        let mut stmt = db.prepare(
+            "SELECT title, text FROM documents WHERE source_id = ?1 ORDER BY ordinal ASC LIMIT 5",
+        )?;
+        let rows: Vec<(Option<String>, String)> = stmt
+            .query_map([&input.source_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut items: Vec<String> = Vec::new();
+        for (t, text) in rows {
+            let label = t
+                .unwrap_or_else(|| text.chars().take(28).collect::<String>())
+                .chars()
+                .take(28)
+                .collect::<String>();
+            if !label.trim().is_empty() {
+                items.push(label);
+            }
+        }
+        if items.is_empty() {
+            items.push(source_name.chars().take(28).collect());
+        }
+        let caption = if instruction.trim().is_empty() {
+            String::new()
+        } else {
+            instruction.clone()
+        };
+        (
+            summary_svg(&title, &items, &caption),
+            String::new(),
+            String::new(),
+        )
+    } else {
+        (input.html.clone(), input.css.clone(), input.js.clone())
+    };
+    let refs = serde_json::json!([{ "sourceId": input.source_id }]);
+    let visual = crate::services::visuals::create_on_db(
+        &db,
+        &title,
+        &html,
+        &css,
+        &js,
+        &serde_json::json!({}),
+        "16:9",
+        &refs,
+        &serde_json::json!({}),
+        "",
+    )?;
+    // Link to the saved first illustration for this range when present.
+    let locator_key = Locator::key_from_value(&input.locator);
+    let _ = db.execute(
+        "UPDATE illustrations SET visual_id = ?3 WHERE source_id = ?1 AND locator_key = ?2",
+        rusqlite::params![input.source_id, locator_key, visual.id],
+    );
+    Ok(visual)
+}
+
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+/// Offline SVG summary: title + up to 5 rows + optional instruction caption.
+/// Fits the v1.6.0 figure contract (no network, no fonts, no scripts).
+fn summary_svg(title: &str, items: &[String], caption: &str) -> String {
+    let mut rows = String::new();
+    for (i, item) in items.iter().take(5).enumerate() {
+        let y = 96 + i * 44;
+        rows.push_str(&format!(
+            "<g><circle cx=\"48\" cy=\"{y}\" r=\"13\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><text x=\"48\" y=\"{yt}\" text-anchor=\"middle\" font-size=\"13\" fill=\"currentColor\">{n}</text><text x=\"74\" y=\"{yt}\" font-size=\"15\" fill=\"currentColor\">{label}</text></g>",
+            y = y,
+            yt = y + 5,
+            n = i + 1,
+            label = xml_escape(item),
+        ));
+    }
+    let cap = if caption.trim().is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<text x=\"32\" y=\"348\" font-size=\"13\" fill=\"currentColor\" opacity=\"0.75\">{}</text>",
+            xml_escape(&caption.chars().take(60).collect::<String>())
+        )
+    };
+    format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 640 384\" role=\"img\" aria-label=\"{title}\"><style>svg{{color:#111}}@media (prefers-color-scheme:dark){{svg{{color:#eee}}}}</style><text x=\"32\" y=\"48\" font-size=\"22\" font-weight=\"700\" fill=\"currentColor\">{title}</text>{rows}{cap}</svg>",
+        title = xml_escape(&title.chars().take(60).collect::<String>()),
+        rows = rows,
+        cap = cap,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

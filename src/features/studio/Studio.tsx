@@ -7,8 +7,10 @@ import { EmptyState } from "../../components/EmptyState";
 import { Input } from "../../components/Input";
 import { Markdown } from "../../components/Markdown";
 import { Textarea } from "../../components/Textarea";
+import { InteractivePreview } from "../viewer/InteractivePreview";
 import { CloseIcon } from "../../app/Icons";
 import { studioApi } from "../../ipc/studio";
+import { visualsApi } from "../../ipc/notes";
 import { aiApi } from "../../ipc/ai";
 import { pickSaveDir } from "../../ipc/fileModifier";
 import { inTauri, IpcError } from "../../ipc/client";
@@ -570,6 +572,7 @@ export function Studio({
             <MessageRow
               key={m.id}
               message={m}
+              projectId={projectId}
               onCitation={onCitation}
               onAllow={() => resolveTool.mutate(true)}
               onDeny={() => resolveTool.mutate(false)}
@@ -787,8 +790,31 @@ export function Studio({
   );
 }
 
+/** A stored figure referenced by a tool result (`{"ok":true,"visualId"}`).
+ * Rendered right after the turn it belongs to (plan §4.2); the raw JSON
+ * stays in the collapsed tool block. Unparseable or missing figures render
+ * nothing — old turns stay readable without them. */
+function ToolVisual({ projectId, content }: { projectId: string; content: string }) {
+  const visualId = useMemo(() => {
+    try {
+      const v = JSON.parse(content) as { ok?: unknown; visualId?: unknown };
+      return v && v.ok === true && typeof v.visualId === "string" ? v.visualId : null;
+    } catch {
+      return null;
+    }
+  }, [content]);
+  const q = useQuery({
+    queryKey: ["visual", projectId, visualId],
+    enabled: !!visualId,
+    queryFn: () => visualsApi.get(projectId, visualId!),
+  });
+  if (!visualId || q.isError || !q.data) return null;
+  return <InteractivePreview visual={q.data} />;
+}
+
 function MessageRow({
   message,
+  projectId,
   onCitation,
   onAllow,
   onDeny,
@@ -797,6 +823,7 @@ function MessageRow({
   busy,
 }: {
   message: ChatMessage;
+  projectId: string;
   onCitation: (c: Citation) => void;
   onAllow: () => void;
   onDeny: () => void;
@@ -815,6 +842,7 @@ function MessageRow({
     const lines = message.content.split("\n").length;
     return (
       <article className={styles.message} data-role="tool">
+        <ToolVisual projectId={projectId} content={message.content} />
         <details className={styles.toolBlock}>
           <summary className={styles.toolSummary}>
             <span className={styles.role}>{t("studio.toolResult")}</span>

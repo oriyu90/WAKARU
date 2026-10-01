@@ -227,7 +227,23 @@
     "STUDIO_TRANSLATE_ARG": "翻译请求不正确。",
     "STUDIO_TRANSLATE_TOO_LARGE": "资料过大，请拆分后重试。",
     "STUDIO_TRANSLATE_RENDER": "PDF 生成失败。",
-    "STUDIO_TRANSLATE_TRUNCATED": "翻译中途被截断，请拆分后重试。"
+    "STUDIO_TRANSLATE_TRUNCATED": "翻译中途被截断，请拆分后重试。",
+    "SOURCE_NO_SPACE": "磁盘空间不足。",
+    "SOURCE_NOT_DOWNLOADED": "该文件尚未下载。",
+    "SOURCE_PERMISSION": "无法读取文件（权限不足）。",
+    "NOTE_INVALID_ANCHOR": "便签位置无效。",
+    "NOTE_TOO_LONG": "便签过长。",
+    "NOTE_INVALID_COLOR": "未知的便签颜色。",
+    "NOTE_CONFLICT": "便签已在别处编辑。",
+    "NOTE_DELETED": "便签已删除。",
+    "NOTE_NOT_FOUND": "找不到便签。",
+    "VISUAL_TOO_LARGE": "图解超出大小上限。",
+    "VISUAL_FORBIDDEN": "图解包含离线不允许的元素。",
+    "VISUAL_INVALID": "图解请求无效。",
+    "VISUAL_INVALID_REF": "图解引用了未知资料。",
+    "VISUAL_NOT_FOUND": "找不到图解。",
+    "IMPORT_BAD_DB": "存档数据库验证失败。",
+    "EXPORT_TOO_LARGE": "文件超出导出上限。"
   },
   "viewer": {
     "readonly": "只读",
@@ -274,7 +290,14 @@
     "websiteReload": "重新加载",
     "websiteOpenExternal": "在浏览器中打开",
     "websitePreview": "网站预览",
-    "websiteEntry": "入口页面"
+    "websiteEntry": "入口页面",
+    "windowPosition": "共 {{total}} 字节,当前 {{offset}} 字节起·自第 {{startLine}} 行",
+    "windowFirst": "开头",
+    "windowPrev": "上一段",
+    "windowNext": "下一段",
+    "windowedNotice": "文件较大,分页显示。原件保持不变。",
+    "sheetPosition": "第 {{first}}–{{last}} 行",
+    "largeOfficeNotice": "文件较大,按节显示提取文本。复杂排版、嵌入媒体、宏和修订记录不会还原。"
   },
   "ai": {
     "connections": "连接",
@@ -349,7 +372,8 @@
     "rewriteAs": "以其他详细程度重写",
     "toStudio": "转交到 Studio",
     "handoffSuccess": "已将实时讲解转交到 Studio",
-    "handoffFailed": "无法转交到 Studio"
+    "handoffFailed": "无法转交到 Studio",
+    "makeVisual": "生成图解"
   },
   "studio": {
     "title": "Studio",
@@ -503,5 +527,37 @@
     "use": "使用",
     "download": "下载",
     "diskShort": "磁盘空间不足——约需 {{needed}}，可用 {{free}}。"
+  },
+  "notes": {
+    "markerLabel": "{{color}}便签",
+    "editLabel": "编辑便签",
+    "emptyHint": "空便签 — 点击填写",
+    "chars": "{{count}} / {{max}}",
+    "conflict": "已在别处编辑 — 已重新加载。请复制文本后重试。",
+    "retry": "重试",
+    "delete": "删除",
+    "deleteLabel": "删除便签",
+    "deleted": "已删除便签",
+    "undo": "撤销",
+    "saving": "保存中…",
+    "hideLane": "隐藏便签",
+    "showLane": "便签 ({{count}})",
+    "addHere": "在此添加便签",
+    "needsCheck": "需确认位置",
+    "otherPage": "第 {{page}} 页有 {{count}} 条",
+    "color_yellow": "黄色",
+    "color_pink": "粉色",
+    "color_blue": "蓝色",
+    "color_green": "绿色"
+  },
+  "visual": {
+    "loading": "图解加载中…",
+    "failed": "无法显示图解。",
+    "retry": "重试",
+    "copy": "复制",
+    "copied": "已复制图解源码",
+    "reset": "重置",
+    "expand": "放大",
+    "shrink": "缩小"
   }
 }

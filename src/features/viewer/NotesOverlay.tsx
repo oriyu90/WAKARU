@@ -1,0 +1,432 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { notesApi } from "../../ipc/notes";
+import { viewerApi } from "../../ipc/viewer";
+import { IpcError } from "../../ipc/client";
+import type { Note, ViewerTab } from "../../ipc/types.gen";
+import { useToast } from "../../components/useToast";
+import { rememberTabLocator } from "./Preview";
+import styles from "./NotesOverlay.module.css";
+
+/** Client-side note body ceiling mirrors the backend (plan §5.1). */
+const BODY_MAX = 4000;
+const SAVE_DEBOUNCE_MS = 600;
+
+type Anchor = { page?: number; x?: number; y?: number; [k: string]: unknown };
+
+function asAnchor(note: Note): Anchor {
+  const v = note.anchorJson;
+  return v && typeof v === "object" ? (v as Anchor) : {};
+}
+
+function currentPageOf(locator: unknown): number | null {
+  if (locator && typeof locator === "object") {
+    const p = (locator as { page?: unknown }).page;
+    if (typeof p === "number" && Number.isFinite(p)) return p;
+  }
+  return null;
+}
+
+function sameLocator(a: unknown, b: unknown) {
+  return JSON.stringify(a ?? {}) === JSON.stringify(b ?? {});
+}
+
+/** Sticky notes bound to the source (plan §5). Markers float at stored
+ * surface fractions so zoom, DPR and window resizes re-project
+ * automatically; cards stair-step in a collapsible lane. Memos stay local —
+ * they are never sent to AI search or prompts. */
+export function NotesOverlay({
+  projectId,
+  tab,
+}: {
+  projectId: string;
+  tab: ViewerTab;
+}) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const layerRef = useRef<HTMLDivElement>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [baseUpdatedAt, setBaseUpdatedAt] = useState<string | null>(null);
+  const [conflictId, setConflictId] = useState<string | null>(null);
+  const [laneOpen, setLaneOpen] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [saveErrorId, setSaveErrorId] = useState<string | null>(null);
+  const [pendingBody, setPendingBody] = useState<{ id: string; body: string } | null>(null);
+  const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Latest draft for the unmount/switch flush below (closures would go stale
+  // mid-typing and drop keystrokes).
+  const latest = useRef<{ id: string | null; body: string }>({ id: null, body: "" });
+  useEffect(() => {
+    latest.current = { id: editingId, body: pendingBody?.id === editingId ? pendingBody.body : draft };
+  }, [editingId, draft, pendingBody]);
+  // A new source never inherits the previous note's editor state (the
+  // switch flush above saves first via effect cleanup order).
+  useEffect(() => {
+    setEditingId(null);
+    setDraft("");
+    setBaseUpdatedAt(null);
+    setConflictId(null);
+    setSaveErrorId(null);
+    setPendingBody(null);
+  }, [projectId, tab.sourceId]);
+
+  const notesQuery = useQuery({
+    queryKey: ["notes", projectId, tab.sourceId],
+    queryFn: () => notesApi.list(projectId, tab.sourceId),
+  });
+  const notes = useMemo(() => notesQuery.data ?? [], [notesQuery.data]);
+  const page = currentPageOf(tab.locator);
+
+  const invalidate = useCallback(() => {
+    void qc.invalidateQueries({ queryKey: ["notes", projectId, tab.sourceId] });
+  }, [qc, projectId, tab.sourceId]);
+
+  const createMut = useMutation({
+    mutationFn: (input: { x: number; y: number }) =>
+      notesApi.create({
+        projectId,
+        sourceId: tab.sourceId,
+        locator: (tab.locator ?? {}) as unknown as null,
+        anchorKind: "page",
+        anchorJson: { page: page ?? 1, x: input.x, y: input.y } as unknown as null,
+        body: "",
+        color: "yellow",
+      }),
+    onSuccess: (note) => {
+      invalidate();
+      setEditingId(note.id);
+      setDraft("");
+      setBaseUpdatedAt(note.updatedAt);
+    },
+    onError: (e) => {
+      toast.push({
+        tone: "error",
+        message: e instanceof IpcError ? t([`errors.${e.code}`, "errors.internal"]) : t("errors.internal"),
+      });
+    },
+  });
+
+  const updateMut = useMutation({
+    mutationFn: (input: { id: string; body: string; expected: string | null }) =>
+      notesApi.update({
+        projectId,
+        noteId: input.id,
+        locator: null,
+        anchorJson: null,
+        body: input.body,
+        color: null,
+        stackOrder: null,
+        expectedUpdatedAt: input.expected,
+      }),
+    onMutate: (input) => setSavingId(input.id),
+    onSuccess: (note) => {
+      setSavingId(null);
+      setSaveErrorId(null);
+      setBaseUpdatedAt(note.updatedAt);
+      if (pendingBody?.id !== note.id) invalidate();
+    },
+    onError: (e, input) => {
+      setSavingId(null);
+      if (e instanceof IpcError && e.code === "NOTE_CONFLICT") {
+        setConflictId(input.id);
+      } else {
+        setSaveErrorId(input.id);
+      }
+    },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => notesApi.remove(projectId, id),
+    onSuccess: (_note, id) => {
+      if (editingId === id) {
+        setEditingId(null);
+        setDraft("");
+      }
+      invalidate();
+      toast.push({
+        tone: "info",
+        message: t("notes.deleted"),
+        action: {
+          label: t("notes.undo"),
+          onClick: () => {
+            void notesApi
+              .restore(projectId, id)
+              .then(() => invalidate())
+              .catch(() =>
+                toast.push({ tone: "error", message: t("errors.internal") }),
+              );
+          },
+        },
+      });
+    },
+    onError: () => toast.push({ tone: "error", message: t("errors.internal") }),
+  });
+
+  // Debounced autosave; flushed on blur, source switch and unmount.
+  const flush = useCallback(() => {
+    clearTimeout(debounce.current);
+    if (editingId == null) {
+      setPendingBody(null);
+      return;
+    }
+    const body = (pendingBody?.id === editingId ? pendingBody.body : draft).slice(0, BODY_MAX);
+    setPendingBody(null);
+    updateMut.mutate({ id: editingId, body, expected: baseUpdatedAt });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingId, draft, pendingBody, baseUpdatedAt]);
+
+  useEffect(() => {
+    if (editingId == null) return;
+    clearTimeout(debounce.current);
+    debounce.current = setTimeout(flush, SAVE_DEBOUNCE_MS);
+    return () => clearTimeout(debounce.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft]);
+
+  // Switching sources or leaving the project flushes the draft first.
+  useEffect(() => {
+    return () => {
+      clearTimeout(debounce.current);
+      const { id, body } = latest.current;
+      if (id) {
+        void notesApi
+          .update({
+            projectId,
+            noteId: id,
+            locator: null,
+            anchorJson: null,
+            body: body.slice(0, BODY_MAX),
+            color: null,
+            stackOrder: null,
+            expectedUpdatedAt: null,
+          })
+          .then(() => qc.invalidateQueries({ queryKey: ["notes", projectId] }))
+          .catch(() => {});
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, tab.sourceId]);
+
+  function beginEdit(note: Note) {
+    flush();
+    setEditingId(note.id);
+    setDraft(note.body);
+    setBaseUpdatedAt(note.updatedAt);
+    setConflictId(null);
+    setSaveErrorId(null);
+  }
+
+  function createAt(clientX: number, clientY: number) {
+    const box = layerRef.current?.getBoundingClientRect();
+    if (!box || box.width <= 0 || box.height <= 0) return;
+    const x = Math.min(0.98, Math.max(0.02, (clientX - box.left) / box.width));
+    const y = Math.min(0.98, Math.max(0.02, (clientY - box.top) / box.height));
+    createMut.mutate({ x, y });
+  }
+
+  function onContextMenu(e: React.MouseEvent) {
+    // Create only on the material itself: never on toolbars, page buttons,
+    // links, form controls, or while the reader has text selected (the
+    // native selection menu keeps priority there).
+    const target = e.target as HTMLElement;
+    if (
+      target.closest("button, input, textarea, select, a, [role='toolbar'], [role='menu'], [role='dialog']")
+    ) {
+      return;
+    }
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && layerRef.current && !layerRef.current.contains(sel.anchorNode)) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    createAt(e.clientX, e.clientY);
+  }
+
+  // Shift+F10 / Menu key on focused material → note at the current position.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const wantsNote =
+        (e.shiftKey && e.key === "F10") || e.key === "ContextMenu";
+      if (!wantsNote) return;
+      const layer = layerRef.current;
+      if (!layer || !layer.contains(document.activeElement)) return;
+      e.preventDefault();
+      const box = layer.getBoundingClientRect();
+      createMut.mutate({ x: 0.5, y: 0.5 });
+      void box;
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, tab.sourceId, page]);
+
+  function jumpToPage(target: number) {
+    const locator = { t: "page", page: target };
+    rememberTabLocator(qc, projectId, tab.id, locator);
+    void viewerApi
+      .updateLocator(projectId, tab.id, locator)
+      .then(() => qc.invalidateQueries({ queryKey: ["viewer-tabs", projectId] }))
+      .catch(() => toast.push({ tone: "error", message: t("errors.internal") }));
+  }
+
+  const visible = notes.filter((n) => {
+    const a = asAnchor(n);
+    if (typeof a.page !== "number") return true;
+    if (page == null) return true;
+    return a.page === page;
+  });
+  const hiddenByPage = notes.filter((n) => !visible.includes(n));
+  const hiddenCounts = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const n of hiddenByPage) {
+      const p = asAnchor(n).page;
+      if (typeof p === "number") map.set(p, (map.get(p) ?? 0) + 1);
+    }
+    return [...map.entries()].sort((a, b) => a[0] - b[0]);
+  }, [hiddenByPage]);
+
+  return (
+    <div ref={layerRef} className={styles.layer} onContextMenu={onContextMenu}>
+      {visible.map((n) => {
+        const a = asAnchor(n);
+        const x = typeof a.x === "number" ? a.x * 100 : 50;
+        const y = typeof a.y === "number" ? a.y * 100 : 8;
+        return (
+          <button
+            key={n.id}
+            type="button"
+            className={styles.marker}
+            data-color={n.color}
+            data-editing={editingId === n.id || undefined}
+            style={{ left: `${x}%`, top: `${y}%` }}
+            aria-label={t("notes.markerLabel", { color: t(`notes.color_${n.color}`) })}
+            onClick={() => beginEdit(n)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              deleteMut.mutate(n.id);
+            }}
+          />
+        );
+      })}
+
+      <div className={styles.lane} data-open={laneOpen || undefined}>
+        <div className={styles.laneHead}>
+          <button
+            type="button"
+            className={styles.laneToggle}
+            aria-expanded={laneOpen}
+            onClick={() => setLaneOpen((v) => !v)}
+          >
+            {laneOpen ? t("notes.hideLane") : t("notes.showLane", { count: visible.length })}
+          </button>
+          <button
+            type="button"
+            className={styles.laneToggle}
+            onClick={() => createMut.mutate({ x: 0.5, y: 0.08 })}
+          >
+            {t("notes.addHere")}
+          </button>
+          {savingId ? <span className={styles.status}>{t("notes.saving")}</span> : null}
+        </div>
+        {laneOpen ? (
+          <ol className={styles.cards}>
+            {visible.map((n, i) => {
+              const needsCheck =
+                n.anchorKind === "text" && !sameLocator(n.locator, tab.locator);
+              const editing = editingId === n.id;
+              return (
+                <li
+                  key={n.id}
+                  className={styles.card}
+                  data-color={n.color}
+                  style={{ marginLeft: `${Math.min(i, 8) * 28}px`, marginTop: i === 0 ? 0 : 10 }}
+                >
+                  <button
+                    type="button"
+                    className={styles.cardOpen}
+                    aria-label={t("notes.editLabel")}
+                    onClick={() => beginEdit(n)}
+                  >
+                    {needsCheck ? (
+                      <span className={styles.needsCheck}>{t("notes.needsCheck")}</span>
+                    ) : null}
+                    {editing ? (
+                      <textarea
+                        autoFocus
+                        className={styles.editor}
+                        value={draft}
+                        maxLength={BODY_MAX}
+                        rows={3}
+                        aria-label={t("notes.editLabel")}
+                        onChange={(e) => {
+                          setDraft(e.target.value);
+                          setPendingBody({ id: n.id, body: e.target.value });
+                        }}
+                        onBlur={flush}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            e.stopPropagation();
+                            flush();
+                            setEditingId(null);
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span className={styles.body}>{n.body || t("notes.emptyHint")}</span>
+                    )}
+                  </button>
+                  <span className={styles.cardFoot}>
+                    <span className={styles.count}>
+                      {t("notes.chars", { count: (editing ? draft : n.body).length, max: BODY_MAX })}
+                    </span>
+                    {conflictId === n.id ? (
+                      <span className={styles.conflict} role="alert">
+                        {t("notes.conflict")}
+                      </span>
+                    ) : null}
+                    {saveErrorId === n.id ? (
+                      <button
+                        type="button"
+                        className={styles.retry}
+                        onClick={() =>
+                          updateMut.mutate({ id: n.id, body: draft.slice(0, BODY_MAX), expected: null })
+                        }
+                      >
+                        {t("notes.retry")}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className={styles.delete}
+                      aria-label={t("notes.deleteLabel")}
+                      onClick={() => deleteMut.mutate(n.id)}
+                    >
+                      {t("notes.delete")}
+                    </button>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        ) : null}
+        {hiddenCounts.length ? (
+          <ul className={styles.otherPages}>
+            {hiddenCounts.map(([p, c]) => (
+              <li key={p}>
+                <button type="button" className={styles.jump} onClick={() => jumpToPage(p)}>
+                  {t("notes.otherPage", { count: c, page: p })}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+    </div>
+  );
+}

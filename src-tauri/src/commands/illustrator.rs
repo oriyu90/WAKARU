@@ -56,3 +56,12 @@ pub fn illustrator_import_to_studio(
     let db = projects::open_db(&state.projects_dir, &input.project_id)?;
     illustrator::import_to_studio(&db, &input)
 }
+
+#[tauri::command]
+pub fn illustrator_generate_visual(
+    state: State<'_, AppState>,
+    input: GenerateVisualInput,
+) -> AppResult<crate::domain::visual::VisualPreview> {
+    let project_id = input.project_id.clone();
+    illustrator::generate_visual(&state.projects_dir, &project_id, &input)
+}

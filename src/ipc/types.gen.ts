@@ -101,6 +101,14 @@ streamId: string | null,
 cached: Illustration | null, };
 
 /**
+ * Explicit "make a figure" request from Live (plan §4.2). When `html` is
+ * empty the backend renders a deterministic SVG summary from the current
+ * source range so the path works offline; AI-supplied code is validated and
+ * stored through the same gate. Normal explanation streams never mix HTML.
+ */
+export type GenerateVisualInput = { projectId: string, sourceId: string, locator: unknown, instruction: string, title: string, html: string, css: string, js: string, };
+
+/**
  * The saved page explanation (docs/03 §4 `illustrations`).
  */
 export type Illustration = { content: string, citations: Citation[], level: DetailLevel, model: string, createdAt: string, 
@@ -205,6 +213,20 @@ export type McpUpsertInput = { id: string | null, name: string, transport: strin
  * keychain at connect time; anything else is stored as-is.
  */
 env: Record<string, string>, };
+
+/**
+ * A sticky note bound to a source + locator (plan §5). Viewer-private memo;
+ * never fed to AI search/prompts automatically.
+ */
+export type Note = { id: string, sourceId: string, locator: unknown, anchorKind: string, anchorJson: unknown, body: string, color: string, stackOrder: number, createdAt: string, updatedAt: string, deletedAt: string | null, };
+
+export type NoteCreate = { projectId: string, sourceId: string, locator: unknown | null, anchorKind: string, anchorJson: unknown | null, body: string, color: string, };
+
+export type NoteUpdate = { projectId: string, noteId: string, locator: unknown | null, anchorJson: unknown | null, body: string | null, color: string | null, stackOrder: number | null, 
+/**
+ * Last-known `updated_at` for conflict detection; mismatch → NOTE_CONFLICT.
+ */
+expectedUpdatedAt: string | null, };
 
 export type OcrLine = { text: string, bbox: [number, number, number, number], words: Array<OcrWord>, };
 
@@ -392,6 +414,17 @@ export type TestResult = { ok: boolean, models: Array<string>, latencyMs: number
 
 export type TextToMarkdownInput = { text: string, };
 
+/**
+ * Windowed text read for huge sources (plan §3.2). UTF-8 safe; never returns
+ * more than the requested limit.
+ */
+export type TextWindow = { sourceId: string, offset: bigint, totalBytes: bigint, text: string, nextOffset: bigint | null, isTruncated: boolean, 
+/**
+ * 1-based line number of the window's first byte (CSV keeps absolute
+ * row numbers; counted by a bounded streaming scan, never loaded).
+ */
+startLine: bigint, };
+
 export type Thread = { id: string, scope: string, sourceId: string | null, locatorKey: string | null, title: string, messages: Array<ChatMessage>, };
 
 export type TokenUsage = { promptTokens: number, completionTokens: number, };
@@ -417,6 +450,15 @@ export type UpdateProjectInput = { id: string, name: string | null, description:
 export type VersionVerdict = "accept" | "migrate" | "warnOpen" | "reject";
 
 export type ViewerTab = { id: string, sourceId: string, kind: SourceKind, name: string, locator: unknown, pinned: boolean, ordinal: number, };
+
+export type VisualCreate = { projectId: string, title: string, html: string, css: string, js: string, dataJson: unknown | null, aspectRatio: string, sourceRefs: unknown | null, initialState: unknown | null, model: string, messageId: string | null, };
+
+/**
+ * Typed interactive-visual artifact shared by Studio and Live (plan §4.1).
+ * Small self-contained HTML/CSS/JS; no remote URLs, CDN, fonts, import(),
+ * network fetch or form submission in v1.6.0.
+ */
+export type VisualPreview = { id: string, schemaVersion: number, title: string, html: string, css: string, js: string, dataJson: unknown, aspectRatio: string, sourceRefs: unknown, initialState: unknown, model: string, createdAt: string, };
 
 export type WebsiteFile = { 
 /**

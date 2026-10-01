@@ -57,7 +57,14 @@ so on first launch right-click WAKARU → **Open**.
   Follow-up searches respect the selected source and only cite retrieved chunks.
   Sent text appears immediately with persistence reconciliation, invalid tool calls
   stop after a repeat with guidance, and a whole source can be translated into a
-  verified PDF via `translate_source_document`.
+  verified PDF via `translate_source_document`. `create_visual_preview` builds small
+  interactive figures shown inline in the conversation.
+- **Sticky notes** — right-click the material to pin a private memo. Cards stack in
+  reading order, survive zoom, window resizes, restarts and ZIP round-trips, and are
+  never sent to AI search or prompts.
+- **Large sources** — multi-hundred-megabyte text, sheets and PDFs open in bounded
+  windows/pages (byte ranges, absolute line/row numbers) instead of loading the
+  whole file into the view; over-limit indexes report partial coverage honestly.
 - **MCP** — local stdio servers (a bare `npx` / `uvx` / `node` command is found
   in the usual install locations; a SearXNG web-search preset is built in) and
   policy-checked Streamable HTTP servers. Connected SearXNG/Tavily search tools are

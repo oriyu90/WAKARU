@@ -128,3 +128,27 @@ pub struct StreamCitations {
     #[ts(type = "Citation[]")]
     pub citations: serde_json::Value,
 }
+
+/// Explicit "make a figure" request from Live (plan §4.2). When `html` is
+/// empty the backend renders a deterministic SVG summary from the current
+/// source range so the path works offline; AI-supplied code is validated and
+/// stored through the same gate. Normal explanation streams never mix HTML.
+#[derive(Debug, Clone, Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "types.gen.ts")]
+#[serde(rename_all = "camelCase")]
+pub struct GenerateVisualInput {
+    pub project_id: String,
+    pub source_id: String,
+    #[ts(type = "unknown")]
+    pub locator: serde_json::Value,
+    #[serde(default)]
+    pub instruction: String,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub html: String,
+    #[serde(default)]
+    pub css: String,
+    #[serde(default)]
+    pub js: String,
+}

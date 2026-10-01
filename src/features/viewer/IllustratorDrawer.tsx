@@ -7,14 +7,17 @@ import { IconButton } from "../../components/IconButton";
 import { Textarea } from "../../components/Textarea";
 import { AlertIcon, InfoIcon } from "../../app/Icons";
 import { illustratorApi } from "../../ipc/illustrator";
+import { visualsApi } from "../../ipc/notes";
 import { inTauri, IpcError } from "../../ipc/client";
 import { useAppSettings } from "../settings/useAppSettings";
 import { useToast } from "../../components/useToast";
+import { InteractivePreview } from "./InteractivePreview";
 import type {
   DetailLevel,
   Scope,
   GenerateStarted,
   Citation,
+  VisualPreview,
 } from "../../ipc/types.gen";
 import { useStream } from "./useStream";
 import styles from "./IllustratorDrawer.module.css";
@@ -158,6 +161,11 @@ export function IllustratorDrawer({
   const [text, setText] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [started, setStarted] = useState(autoRun);
+  // Interactive figure for the current range (plan §4). Stored in the
+  // project DB; the id is cached locally so a restart restores it.
+  const [visual, setVisual] = useState<VisualPreview | null>(null);
+  const [visualErr, setVisualErr] = useState<string | null>(null);
+  const [visualBusy, setVisualBusy] = useState(false);
   // Session boundary for "past vs live": the newest message known when
   // this source was opened. Anything newer arrived during this Live
   // session and stays expanded; anything older is past.
@@ -204,6 +212,8 @@ export function IllustratorDrawer({
     setLevelOverride(null);
     setAnchor(null);
     setHistoryOpen(false);
+    setVisual(null);
+    setVisualErr(null);
   }, [sourceId, projectId]);
 
   useEffect(() => {
@@ -250,20 +260,80 @@ export function IllustratorDrawer({
   async function send() {
     if (!text.trim() || !thread.data || !askStream.ready) return;
     setAskErr(null);
+    // "図で説明して" style questions also produce a figure for the current
+    // range; anything else stays a Markdown answer.
+    const wantsFigure = /図|ダイアグラム|チャート|diagram|chart|figure|timeline/i.test(text);
+    const question = text.trim();
     try {
       const sid = await illustratorApi.ask({
         projectId,
         threadId: thread.data.id,
-        text: text.trim(),
+        text: question,
         scope,
         locator,
       });
       setText("");
       setAskStreamId(sid);
+      if (wantsFigure) void makeVisual(question);
     } catch (e) {
       setAskErr(errorText(e));
     }
   }
+
+  function visualStorageKey() {
+    return `wakaru.visual.${projectId}.${sourceId}`;
+  }
+
+  async function makeVisual(instruction: string) {
+    if (!sourceId || visualBusy) return;
+    setVisualBusy(true);
+    setVisualErr(null);
+    try {
+      const created = await illustratorApi.generateVisual({
+        projectId,
+        sourceId,
+        locator: locator ?? { t: "whole" },
+        instruction,
+        title: "",
+        html: "",
+        css: "",
+        js: "",
+      });
+      setVisual(created);
+      try {
+        localStorage.setItem(visualStorageKey(), created.id);
+      } catch {
+        // Private mode etc. — the figure still shows for this session.
+      }
+    } catch (e) {
+      setVisualErr(errorText(e));
+    } finally {
+      setVisualBusy(false);
+    }
+  }
+
+  // Restore the saved figure across restarts from its DB id (plan §6).
+  useEffect(() => {
+    if (!sourceId || visual) return;
+    let id: string | null = null;
+    try {
+      id = localStorage.getItem(visualStorageKey());
+    } catch {
+      id = null;
+    }
+    if (!id) return;
+    void visualsApi
+      .get(projectId, id)
+      .then((v) => setVisual(v))
+      .catch(() => {
+        try {
+          localStorage.removeItem(visualStorageKey());
+        } catch {
+          // Ignore persistence failures.
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, sourceId]);
 
   function stop() {
     if (gen?.streamId) void illustratorApi.cancel(gen.streamId);
@@ -416,6 +486,26 @@ export function IllustratorDrawer({
               </Button>
             ))}
           </div>
+        ) : null}
+
+        <div className={styles.levelSwap}>
+          <Button
+            size="sm"
+            variant="quiet"
+            loading={visualBusy}
+            disabled={!started || streaming || visualBusy}
+            onClick={() => void makeVisual("")}
+          >
+            {t("illustrator.makeVisual")}
+          </Button>
+        </div>
+        {visualErr ? (
+          <p className={styles.error}>
+            <AlertIcon size={14} /> {visualErr}
+          </p>
+        ) : null}
+        {visual ? (
+          <InteractivePreview visual={visual} onRetry={() => void makeVisual("")} />
         ) : null}
 
         {liveMessages.length > 0 ? (

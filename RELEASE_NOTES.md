@@ -1,3 +1,41 @@
+# WAKARU v1.6.0
+
+WAKARU v1.6.0 stages large sources, draws interactive AI figures, and pins
+sticky notes to the material.
+
+## What changed
+
+- Large files open in windows, not all at once: 64–256 KiB text/sheet pages
+  with absolute line/row numbers, single-Range asset delivery (HEAD/206/416),
+  and PDF pages streamed in 256 KiB ranges with a bounded fallback. The 96 MiB
+  interactive ceiling and 16M-pixel canvas ceiling stay; large Office files
+  say what their staged text view does not reproduce. Over-limit indexes
+  report `ready_partial`, never "fully indexed".
+- Interactive figures are typed artifacts shared by Studio
+  (`create_visual_preview`) and Live (`illustrator_generate_visual`, plus a
+  "Make a figure" action). One sandboxed renderer shows them in both places:
+  opaque origin, no network/frames/forms, no IPC bridge, validated sizes and
+  token-checked state notes. Restart restores figures from their DB ids.
+- Sticky notes belong to the source: right-click to place, stair-stepped
+  cards, plain-text editing with autosave/conflict/undo, Shift+F10 support,
+  and full keyboard + screen-reader labels. Positions survive zoom, resize,
+  restart and ZIP round-trips; notes never enter AI search or prompts.
+- Project archives stream entries, snapshot the DB consistently, write
+  atomically, and verify on import (expansion, symlinks, compression ratio,
+  integrity, note references). The manifest records note/visual counts.
+- Japanese, English and Simplified Chinese UI remain in parity (485 keys).
+
+## Compatibility
+
+`PROJECT_SCHEMA_VERSION` is `1.1.0` (`004_notes_visuals.sql`, forward-only).
+Older projects migrate on open; older ZIPs import with zero notes/visuals.
+No IPC breakage: all new commands are additive.
+
+## Distribution
+
+Apple Silicon Mac, macOS 12 or later. Ad-hoc signed, not Apple-notarised.
+Repository remains private; first launch needs Privacy & Security approval.
+
 # WAKARU v1.5.0
 
 WAKARU v1.5.0 makes Studio sends reliable and completes full-document translation PDFs.

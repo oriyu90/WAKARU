@@ -256,6 +256,36 @@ pub fn gc_orphans(app_db: &Connection, root: &Path) -> AppResult<u32> {
             tracing::info!(dir = %name, "gc: removed orphan project folder");
         }
     }
+    // v1.6.0 temp artifacts: failed copies (.incoming), torn exports
+    // (.export-*.snapshot.db) and interrupted imports never survive a restart.
+    for entry in std::fs::read_dir(root)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        for sub in ["sources", "derived", "workspace", "exports"] {
+            let base = entry.path().join(sub);
+            let Ok(rd) = std::fs::read_dir(&base) else {
+                continue;
+            };
+            for f in rd.filter_map(|e| e.ok()) {
+                let n = f.file_name().to_string_lossy().to_string();
+                if n.starts_with(".incoming")
+                    || n.starts_with(".export-")
+                    || n.ends_with(".part")
+                    || n.ends_with(".tmp")
+                {
+                    let p = f.path();
+                    if p.is_dir() {
+                        let _ = std::fs::remove_dir_all(&p);
+                    } else {
+                        let _ = std::fs::remove_file(&p);
+                    }
+                    removed += 1;
+                }
+            }
+        }
+    }
     Ok(removed)
 }
 

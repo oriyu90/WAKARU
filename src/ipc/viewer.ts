@@ -3,6 +3,7 @@ import type {
   ViewerTab,
   DocumentPayload,
   SourceDetail,
+  TextWindow,
   WebsiteManifest,
 } from "./types.gen";
 
@@ -32,4 +33,28 @@ export const documentApi = {
     call<string>("source_asset_url", { projectId, sourceId, relPath }),
   websiteManifest: (projectId: string, sourceId: string) =>
     call<WebsiteManifest>("website_manifest", { projectId, sourceId }),
+  /** Bounded UTF-8 window for huge text (plan §3.2). Offsets may exceed
+   * 2^53 only for absurd files; the backend u64 arrives as bigint. */
+  readWindow: async (
+    projectId: string,
+    sourceId: string,
+    offset: number,
+    limit: number,
+  ): Promise<{ sourceId: string; offset: number; totalBytes: number; text: string; nextOffset: number | null; isTruncated: boolean; startLine: number }> => {
+    const w = await call<TextWindow>("source_read_window", {
+      projectId,
+      sourceId,
+      offset,
+      limit,
+    });
+    return {
+      sourceId: w.sourceId,
+      offset: Number(w.offset),
+      totalBytes: Number(w.totalBytes),
+      text: w.text,
+      nextOffset: w.nextOffset == null ? null : Number(w.nextOffset),
+      isTruncated: w.isTruncated,
+      startLine: Number(w.startLine),
+    };
+  },
 };

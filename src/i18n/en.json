@@ -229,7 +229,23 @@
     "STUDIO_TRANSLATE_ARG": "Invalid translation request.",
     "STUDIO_TRANSLATE_TOO_LARGE": "Source is too large. Split it and retry.",
     "STUDIO_TRANSLATE_RENDER": "PDF rendering failed.",
-    "STUDIO_TRANSLATE_TRUNCATED": "Translation was cut off. Split and retry."
+    "STUDIO_TRANSLATE_TRUNCATED": "Translation was cut off. Split and retry.",
+    "SOURCE_NO_SPACE": "Not enough disk space for this file.",
+    "SOURCE_NOT_DOWNLOADED": "This file is not downloaded yet.",
+    "SOURCE_PERMISSION": "Cannot read the file (permission denied).",
+    "NOTE_INVALID_ANCHOR": "The note position is invalid.",
+    "NOTE_TOO_LONG": "The note is too long.",
+    "NOTE_INVALID_COLOR": "Unknown note colour.",
+    "NOTE_CONFLICT": "The note was edited elsewhere.",
+    "NOTE_DELETED": "The note is deleted.",
+    "NOTE_NOT_FOUND": "The note could not be found.",
+    "VISUAL_TOO_LARGE": "The figure exceeds the size limit.",
+    "VISUAL_FORBIDDEN": "The figure uses features not allowed offline.",
+    "VISUAL_INVALID": "The figure request is invalid.",
+    "VISUAL_INVALID_REF": "The figure cites an unknown source.",
+    "VISUAL_NOT_FOUND": "The figure could not be found.",
+    "IMPORT_BAD_DB": "The archive database failed verification.",
+    "EXPORT_TOO_LARGE": "A file exceeds the export limit."
   },
   "viewer": {
     "readonly": "Read-only",
@@ -276,7 +292,14 @@
     "websiteReload": "Reload",
     "websiteOpenExternal": "Open in browser",
     "websitePreview": "Website preview",
-    "websiteEntry": "Entry page"
+    "websiteEntry": "Entry page",
+    "windowPosition": "Bytes {{offset}} / {{total}} · from line {{startLine}}",
+    "windowFirst": "First",
+    "windowPrev": "Previous",
+    "windowNext": "Next",
+    "windowedNotice": "Large file: showing one window at a time. The original is intact.",
+    "sheetPosition": "Rows {{first}}–{{last}}",
+    "largeOfficeNotice": "Large file: showing extracted text by section. Complex layout, embedded media, macros and change history are not reproduced."
   },
   "ai": {
     "connections": "Connections",
@@ -351,7 +374,8 @@
     "rewriteAs": "Rewrite at another level",
     "toStudio": "Hand off to Studio",
     "handoffSuccess": "Live explanation handed off to Studio",
-    "handoffFailed": "Could not hand off to Studio"
+    "handoffFailed": "Could not hand off to Studio",
+    "makeVisual": "Make a figure"
   },
   "studio": {
     "title": "Studio",
@@ -508,5 +532,37 @@
     "use": "Use",
     "download": "Download",
     "diskShort": "Not enough disk space — needs about {{needed}}, {{free}} free."
+  },
+  "notes": {
+    "markerLabel": "{{color}} sticky note",
+    "editLabel": "Edit note",
+    "emptyHint": "Empty note — click to write",
+    "chars": "{{count}} / {{max}}",
+    "conflict": "Edited elsewhere — reloaded. Copy your text and retry.",
+    "retry": "Retry",
+    "delete": "Delete",
+    "deleteLabel": "Delete note",
+    "deleted": "Note deleted",
+    "undo": "Undo",
+    "saving": "Saving…",
+    "hideLane": "Hide notes",
+    "showLane": "Notes ({{count}})",
+    "addHere": "Note here",
+    "needsCheck": "Check position",
+    "otherPage": "{{count}} note(s) on page {{page}}",
+    "color_yellow": "yellow",
+    "color_pink": "pink",
+    "color_blue": "blue",
+    "color_green": "green"
+  },
+  "visual": {
+    "loading": "Loading figure…",
+    "failed": "The figure could not be shown.",
+    "retry": "Retry",
+    "copy": "Copy",
+    "copied": "Figure source copied",
+    "reset": "Reset",
+    "expand": "Expand",
+    "shrink": "Shrink"
   }
 }

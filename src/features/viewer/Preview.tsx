@@ -57,18 +57,41 @@ function Toolbar({ children }: { children?: React.ReactNode }) {
 
 /* ───────────────────────── text / code ───────────────────────── */
 
+/** Above this size the whole file is never handed to the WebView (plan §3.2):
+ * the UI pages bounded UTF-8 windows instead. */
+const TEXT_WINDOW_THRESHOLD = 256 * 1024;
+const TEXT_WINDOW_LIMIT = 128 * 1024;
+
 function TextPreview({
   projectId,
   tab,
   markdown,
+  sizeBytes,
 }: {
   projectId: string;
   tab: ViewerTab;
   markdown: boolean;
+  sizeBytes: number;
 }) {
   const { t } = useTranslation();
   const rel = `sources/${tab.sourceId}/${tab.name}`;
-  const q = useAssetText(projectId, tab.sourceId, rel);
+  const windowed = sizeBytes > TEXT_WINDOW_THRESHOLD;
+  const [offset, setOffset] = useState(0);
+  // A new source always starts at its head, even when the preview instance
+  // is reused across tab switches.
+  useEffect(() => {
+    setOffset(0);
+  }, [projectId, tab.sourceId]);
+  const win = useQuery({
+    queryKey: ["text-window", projectId, tab.sourceId, offset],
+    enabled: windowed,
+    queryFn: () => documentApi.readWindow(projectId, tab.sourceId, offset, TEXT_WINDOW_LIMIT),
+  });
+  const q = useAssetText(projectId, tab.sourceId, windowed ? null : rel);
+  const text = windowed ? (win.data?.text ?? "") : (q.data ?? "");
+  const isLoading = windowed ? win.isLoading : q.isLoading;
+  const isError = windowed ? win.isError : q.isError;
+  const refetch = windowed ? win.refetch : q.refetch;
   const [wrap, setWrap] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [rendered, setRendered] = useState(markdown);
@@ -77,7 +100,7 @@ function TextPreview({
   const [activeHit, setActiveHit] = useState(0);
   const bodyRef = useRef<HTMLDivElement>(null);
 
-  const lines = useMemo(() => (q.data ?? "").split("\n"), [q.data]);
+  const lines = useMemo(() => text.split("\n"), [text]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -96,8 +119,8 @@ function TextPreview({
   const hits = useMemo(() => {
     if (!find) return 0;
     const re = new RegExp(escapeRe(find), "gi");
-    return (q.data ?? "").match(re)?.length ?? 0;
-  }, [find, q.data]);
+    return text.match(re)?.length ?? 0;
+  }, [find, text]);
 
   useEffect(() => {
     setActiveHit(0);
@@ -109,8 +132,46 @@ function TextPreview({
     el?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [activeHit, find, lines]);
 
-  if (q.isLoading) return <LoadingRows />;
-  if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
+  if (isLoading) return <LoadingRows />;
+  if (isError) return <ErrorState error={(windowed ? win.error : q.error) as Error} onRetry={() => { void refetch(); }} />;
+
+  const pager = windowed && win.data ? (
+    <span className={styles.pageLabel} role="status">
+      {t("viewer.windowPosition", {
+        offset: win.data.offset,
+        total: win.data.totalBytes,
+        startLine: win.data.startLine,
+      })}
+    </span>
+  ) : null;
+  const windowNav = windowed && win.data ? (
+    <>
+      <Button
+        size="sm"
+        variant="quiet"
+        disabled={offset <= 0 || win.isFetching}
+        onClick={() => setOffset(0)}
+      >
+        {t("viewer.windowFirst")}
+      </Button>
+      <Button
+        size="sm"
+        variant="quiet"
+        disabled={offset <= 0 || win.isFetching}
+        onClick={() => setOffset((o) => Math.max(0, o - TEXT_WINDOW_LIMIT))}
+      >
+        {t("viewer.windowPrev")}
+      </Button>
+      <Button
+        size="sm"
+        variant="quiet"
+        disabled={win.data.nextOffset == null || win.isFetching}
+        onClick={() => win.data?.nextOffset != null && setOffset(win.data.nextOffset)}
+      >
+        {t("viewer.windowNext")}
+      </Button>
+    </>
+  ) : null;
 
   if (markdown && rendered) {
     return (
@@ -119,11 +180,14 @@ function TextPreview({
           <Button size="sm" variant="quiet" onClick={() => setRendered(false)}>
             {t("viewer.showSource")}
           </Button>
+          {windowNav}
+          {pager}
           <ZoomControls zoom={zoom} onZoom={setZoom} />
         </Toolbar>
+        {windowed ? <p className={styles.note}>{t("viewer.windowedNotice")}</p> : null}
         <div className={styles.body} ref={bodyRef}>
           <div className={styles.reading} style={{ zoom }}>
-            <Markdown>{q.data ?? ""}</Markdown>
+            <Markdown>{text}</Markdown>
           </div>
         </div>
       </div>
@@ -142,8 +206,11 @@ function TextPreview({
             {t("viewer.showRendered")}
           </Button>
         ) : null}
+        {windowNav}
+        {pager}
         <ZoomControls zoom={zoom} onZoom={setZoom} />
       </Toolbar>
+      {windowed ? <p className={styles.note}>{t("viewer.windowedNotice")}</p> : null}
       <div className={styles.body} ref={bodyRef}>
         {findOpen ? (
           <div className={styles.findBar} role="search">
@@ -167,7 +234,7 @@ function TextPreview({
         <div className={styles.code} data-wrap={wrap} style={{ zoom }}>
           <div className={styles.gutter} aria-hidden="true">
             {lines.map((_, i) => (
-              <span key={i}>{i + 1}</span>
+              <span key={i}>{(windowed ? (win.data?.startLine ?? 1) - 1 : 0) + i + 1}</span>
             ))}
           </div>
           <div className={styles.lines}>
@@ -297,39 +364,122 @@ function ImagePreview({ url }: { url: string }) {
 
 /* ───────────────────────── sheet (csv/tsv) ───────────────────────── */
 
-function SheetPreview({ projectId, tab }: { projectId: string; tab: ViewerTab }) {
+function SheetPreview({ projectId, tab, sizeBytes }: { projectId: string; tab: ViewerTab; sizeBytes: number }) {
+  const { t } = useTranslation();
   const rel = `sources/${tab.sourceId}/${tab.name}`;
-  const q = useAssetText(projectId, tab.sourceId, rel);
+  const windowed = sizeBytes > TEXT_WINDOW_THRESHOLD;
+  const [offset, setOffset] = useState(0);
+  useEffect(() => {
+    setOffset(0);
+  }, [projectId, tab.sourceId]);
+  const full = useAssetText(projectId, tab.sourceId, windowed ? null : rel);
+  const win = useQuery({
+    queryKey: ["text-window", projectId, tab.sourceId, offset],
+    enabled: windowed,
+    queryFn: () => documentApi.readWindow(projectId, tab.sourceId, offset, TEXT_WINDOW_LIMIT),
+  });
+  const headerQ = useQuery({
+    queryKey: ["text-window", projectId, tab.sourceId, "header"],
+    enabled: windowed,
+    queryFn: () => documentApi.readWindow(projectId, tab.sourceId, 0, 8192),
+  });
   const delim = tab.name.toLowerCase().endsWith(".tsv") ? "\t" : ",";
-  const rows = useMemo(() => parseDelimited(q.data ?? "", delim), [q.data, delim]);
 
-  if (q.isLoading) return <LoadingRows />;
-  if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
+  if (!windowed) {
+    const rows = parseDelimited(full.data ?? "", delim);
+    if (full.isLoading) return <LoadingRows />;
+    if (full.isError) return <ErrorState error={full.error} onRetry={() => full.refetch()} />;
+    return (
+      <div className={styles.wrap}>
+        <Toolbar />
+        <div className={styles.body}>
+          <SheetTable head={rows[0] ?? []} rows={rows.slice(1, 2000)} startRow={2} />
+        </div>
+      </div>
+    );
+  }
+
+  const headerRows = parseDelimited((headerQ.data?.text ?? "").split("\n")[0] ?? "", delim);
+  const head = headerRows[0] ?? [];
+  // Drop a possibly-partial first line when paging mid-file (the backend
+  // extends windows to line ends, so only offset 0 starts cleanly).
+  const bodyText = offset === 0
+    ? (win.data?.text ?? "").split("\n").slice(1).join("\n")
+    : (win.data?.text ?? "");
+  const rows = parseDelimited(bodyText, delim);
+  // Absolute row numbers: header is row 1, body starts at startLine (+1 when
+  // the header line was stripped from a continuation window).
+  const startRow = (win.data?.startLine ?? 1) + 1;
+
+  if (win.isLoading) return <LoadingRows />;
+  if (win.isError) return <ErrorState error={win.error} onRetry={() => win.refetch()} />;
 
   return (
     <div className={styles.wrap}>
-      <Toolbar />
+      <Toolbar>
+        <Button
+          size="sm"
+          variant="quiet"
+          disabled={offset <= 0 || win.isFetching}
+          onClick={() => setOffset(0)}
+        >
+          {t("viewer.windowFirst")}
+        </Button>
+        <Button
+          size="sm"
+          variant="quiet"
+          disabled={offset <= 0 || win.isFetching}
+          onClick={() => setOffset((o) => Math.max(0, o - TEXT_WINDOW_LIMIT))}
+        >
+          {t("viewer.windowPrev")}
+        </Button>
+        <Button
+          size="sm"
+          variant="quiet"
+          disabled={win.data?.nextOffset == null || win.isFetching}
+          onClick={() => win.data?.nextOffset != null && setOffset(win.data.nextOffset)}
+        >
+          {t("viewer.windowNext")}
+        </Button>
+        {win.data ? (
+          <span className={styles.pageLabel} role="status">
+            {t("viewer.sheetPosition", {
+              first: startRow,
+              last: startRow + Math.max(rows.length - 1, 0),
+            })}
+          </span>
+        ) : null}
+      </Toolbar>
+      <p className={styles.note}>{t("viewer.windowedNotice")}</p>
       <div className={styles.body}>
-        <table className={styles.sheet}>
-          <thead>
-            <tr>
-              {(rows[0] ?? []).map((c, i) => (
-                <th key={i}>{c}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.slice(1, 2000).map((r, ri) => (
-              <tr key={ri}>
-                {r.map((c, ci) => (
-                  <td key={ci}>{c}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <SheetTable head={head} rows={rows.slice(0, 500)} startRow={startRow} />
       </div>
     </div>
+  );
+}
+
+function SheetTable({ head, rows, startRow }: { head: string[]; rows: string[][]; startRow: number }) {
+  return (
+    <table className={styles.sheet}>
+      <thead>
+        <tr>
+          <th aria-label="#">#</th>
+          {head.map((c, i) => (
+            <th key={i}>{c}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, ri) => (
+          <tr key={ri}>
+            <td className="u-mono-nums">{startRow + ri}</td>
+            {r.map((c, ci) => (
+              <td key={ci}>{c}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -508,14 +658,14 @@ export function Preview({
     }} fallback={fallback} />;
   }
   if (d.kind === "markdown") {
-    return <TextPreview projectId={projectId} tab={tab} markdown />;
+    return <TextPreview projectId={projectId} tab={tab} markdown sizeBytes={Number(d.bytes)} />;
   }
   if (TEXTY.includes(d.kind)) {
-    return <TextPreview projectId={projectId} tab={tab} markdown={false} />;
+    return <TextPreview projectId={projectId} tab={tab} markdown={false} sizeBytes={Number(d.bytes)} />;
   }
   if (d.kind === "sheet") {
     return d.name.toLowerCase().match(/\.(csv|tsv)$/)
-      ? <SheetPreview projectId={projectId} tab={tab} />
+      ? <SheetPreview projectId={projectId} tab={tab} sizeBytes={Number(d.bytes)} />
       : <WorkbookPreview projectId={projectId} detail={d} />;
   }
   if ((d.kind === "audio" || d.kind === "video") && d.primaryAssetUrl) {

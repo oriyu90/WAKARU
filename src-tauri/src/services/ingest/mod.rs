@@ -8,7 +8,7 @@ mod image;
 mod office;
 mod pdf;
 mod sheet;
-mod text;
+pub(crate) mod text;
 pub(crate) mod web;
 
 use crate::domain::source::SourceKind;
@@ -43,6 +43,13 @@ pub struct IngestCtx<'a> {
     pub source_name: &'a str,
     pub project_dir: &'a Path,
 }
+
+/// Index ceilings (plan §3.1). Files are always copied verbatim; the
+/// searchable index is windowed and anything beyond is reported as
+/// `ready_partial` with the unparsed range — never "fully indexed".
+pub const MAX_INDEX_UNITS: usize = 20_000;
+pub const MAX_INDEX_CHARS: usize = 2_000_000;
+pub const MAX_UNIT_CHARS: usize = 200_000;
 
 pub struct Outcome {
     pub documents: u32,
@@ -93,11 +100,11 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput) -> AppResult<
 
     let parsed = parse(ctx, kind, input, &dd)?;
     let Parsed {
-        units,
+        mut units,
         page_count,
         first_image_rel,
         title_override,
-        partial,
+        mut partial,
         scanned_pdf_pages,
     } = parsed;
 
@@ -109,22 +116,86 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput) -> AppResult<
         ));
     }
 
-    // derived/<sid>/document.md — the human+AI readable canonical form (docs/04 §0 ⑤)
-    let mut doc_md = String::new();
-    for u in &units {
-        if let Some(t) = &u.title {
-            doc_md.push_str(&format!("\n\n## {t}\n\n"));
-        } else {
-            doc_md.push_str("\n\n");
+    // Head-window notice: the text family indexes a bounded head window; the
+    // original stays verbatim and the UI pages the rest via source_read_window.
+    if matches!(
+        kind,
+        SourceKind::Text
+            | SourceKind::Markdown
+            | SourceKind::Code
+            | SourceKind::Json
+            | SourceKind::Jsonl
+            | SourceKind::Sheet
+    ) {
+        if let IngestInput::File(p) = input {
+            if crate::services::ingest::text::is_truncated_for_index(p) {
+                partial = true;
+            }
         }
-        doc_md.push_str(&u.text);
     }
-    std::fs::write(dd.join("document.md"), doc_md.trim_start())?;
+
+    // Per-unit ceiling: truncate oversized units instead of ballooning the DB.
+    for u in units.iter_mut() {
+        if u.text.chars().count() > MAX_UNIT_CHARS {
+            let cut: String = u.text.chars().take(MAX_UNIT_CHARS).collect();
+            u.text = format!("{cut}\n\n[…] truncated to {MAX_UNIT_CHARS} chars; the original is intact — page it in the viewer.");
+            partial = true;
+        }
+    }
+    // Total ceilings: keep the head, report the remainder as unparsed.
+    let mut kept_chars = 0usize;
+    let mut kept = 0usize;
+    let total_units = units.len();
+    for (i, u) in units.iter().enumerate() {
+        let n = u.text.chars().count();
+        if i >= MAX_INDEX_UNITS || kept_chars + n > MAX_INDEX_CHARS {
+            break;
+        }
+        kept_chars += n;
+        kept = i + 1;
+    }
+    let dropped_units = total_units.saturating_sub(kept);
+    if dropped_units > 0 {
+        units.truncate(kept);
+        partial = true;
+    }
+
+    // derived/<sid>/document.md — the human+AI readable canonical form
+    // (docs/04 §0 ⑤). Streamed via BufWriter: no giant String is held.
+    {
+        use std::io::Write;
+        let f = std::fs::File::create(dd.join("document.md"))?;
+        let mut w = std::io::BufWriter::with_capacity(64 * 1024, f);
+        for (i, u) in units.iter().enumerate() {
+            if let Some(t) = &u.title {
+                if i == 0 {
+                    write!(w, "## {t}\n\n")?;
+                } else {
+                    write!(w, "\n\n## {t}\n\n")?;
+                }
+            } else if i > 0 {
+                write!(w, "\n\n")?;
+            }
+            w.write_all(u.text.as_bytes())?;
+        }
+        if partial {
+            write!(
+                w,
+                "\n\n[…] partial index: {dropped} of {total} sections are beyond the in-app index. The original file is intact; page the remainder in the viewer.",
+                dropped = dropped_units,
+                total = total_units
+            )?;
+        }
+        w.flush()?;
+    }
 
     let lang = detect_lang(&units);
     let now = now_iso8601();
     let mut total_chunks = 0u32;
 
+    // One transaction: a cancelled re-ingest never leaves half an index while
+    // the old search rows are already gone (the wipe above runs first).
+    let tx = ctx.project_db.unchecked_transaction()?;
     for (di, u) in units.iter().enumerate() {
         let doc_id = Uuid::now_v7().to_string();
         let image_rel = if di == 0 {
@@ -132,7 +203,7 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput) -> AppResult<
         } else {
             None
         };
-        ctx.project_db.execute(
+        tx.execute(
             "INSERT INTO documents (id, source_id, ordinal, kind, title, text, image_rel, locator)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
@@ -153,7 +224,7 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput) -> AppResult<
             let chunk_id = Uuid::now_v7().to_string();
             let locator =
                 serde_json::json!({ "t": "line", "start": piece.start, "end": piece.end });
-            ctx.project_db.execute(
+            tx.execute(
                 "INSERT INTO chunks
                    (id, source_id, document_id, ordinal, text, text_bigram, tokens, locator, created_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
@@ -172,6 +243,7 @@ pub fn run(ctx: &IngestCtx, kind: SourceKind, input: &IngestInput) -> AppResult<
             total_chunks += 1;
         }
     }
+    tx.commit()?;
 
     // Cross-project mirror (FR-N3): one row per source (title) + one per document.
     ctx.app_db.execute(

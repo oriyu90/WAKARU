@@ -9,7 +9,7 @@ use std::path::Path;
 pub mod migrate;
 
 pub const APP_SCHEMA_VERSION: &str = "1.1.0";
-pub const PROJECT_SCHEMA_VERSION: &str = "1.0.0";
+pub const PROJECT_SCHEMA_VERSION: &str = "1.1.0";
 
 /// App-wide migrations, applied in array order. Names are `NNN_desc`; no gaps.
 pub const APP_MIGRATIONS: &[(&str, &str)] = &[
@@ -36,6 +36,10 @@ pub const PROJECT_MIGRATIONS: &[(&str, &str)] = &[
     (
         "003_ocr",
         include_str!("../../migrations/project/003_ocr.sql"),
+    ),
+    (
+        "004_notes_visuals",
+        include_str!("../../migrations/project/004_notes_visuals.sql"),
     ),
 ];
 
@@ -211,6 +215,18 @@ fn adopt_legacy_project_schema(conn: &Connection) -> AppResult<()> {
     if column_exists(conn, "sources", "ocr_status")? && !migration_applied(conn, "003_ocr")? {
         mark_migration_applied(conn, "003_ocr")?;
     }
+    if table_exists(conn, "notes")? && table_exists(conn, "visual_previews")? {
+        if !migration_applied(conn, "004_notes_visuals")? {
+            mark_migration_applied(conn, "004_notes_visuals")?;
+        }
+        // `ALTER TABLE illustrations ADD COLUMN visual_id` may already exist.
+        if !column_exists(conn, "illustrations", "visual_id")? {
+            conn.execute(
+                "ALTER TABLE illustrations ADD COLUMN visual_id TEXT REFERENCES visual_previews(id) ON DELETE SET NULL",
+                [],
+            )?;
+        }
+    }
     Ok(())
 }
 
@@ -354,6 +370,48 @@ mod legacy_tests {
         assert!(migration_applied(&legacy, "003_ocr").unwrap());
         migrate::run(&legacy, PROJECT_MIGRATIONS, PROJECT_SCHEMA_VERSION).unwrap();
         // no-op, no error
+    }
+
+    #[test]
+    fn project_004_adds_notes_and_visuals_and_old_archives_stay_readable() {
+        // Pre-1.6.0 project.db: migrations 001–003 only, no notes tables.
+        let legacy = open_in_memory().unwrap();
+        let old: &[(&str, &str)] = &PROJECT_MIGRATIONS[..3];
+        migrate::run(&legacy, old, "1.0.0").unwrap();
+        legacy
+            .execute(
+                "INSERT INTO sources (id, kind, original_name, rel_path, status, added_at)
+                 VALUES ('s1', 'pdf', 'a.pdf', 'sources/s1/a.pdf', 'ready', '2026-01-01')",
+                [],
+            )
+            .unwrap();
+        // Forward migration adds the v1.6.0 tables without touching old rows.
+        migrate::run(&legacy, PROJECT_MIGRATIONS, PROJECT_SCHEMA_VERSION).unwrap();
+        assert!(column_exists(&legacy, "illustrations", "visual_id").unwrap());
+        legacy
+            .execute(
+                "INSERT INTO notes (id, source_id, locator, anchor_kind, anchor_json, body, color, stack_order, created_at, updated_at, deleted_at)
+                 VALUES ('n1', 's1', '{}', 'page', '{}', 'hi', 'yellow', 0, '2026-01-01', '2026-01-01', NULL)",
+                [],
+            )
+            .unwrap();
+        // Old ZIP shape (no counts/digest) still imports: only name/version
+        // are read, notes/visuals count as zero.
+        let manifest = serde_json::json!({
+            "schemaVersion": "1.0.0",
+            "project": { "name": "Old", "description": "" },
+        });
+        assert_eq!(
+            migrate::version_verdict(
+                manifest
+                    .get("schemaVersion")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("1.0.0"),
+                PROJECT_SCHEMA_VERSION
+            ),
+            crate::domain::export::VersionVerdict::Migrate
+        );
+        assert!(migration_applied(&legacy, "004_notes_visuals").unwrap());
     }
 
     #[test]
