@@ -278,25 +278,42 @@ export function PdfFilePreview({
       // chunks instead of one arrayBuffer copy. The custom protocol may not
       // forward Range on every WebView, so any failure falls back to the
       // bounded buffer path below — and beyond 96 MiB to extracted text.
+      // Past 96 MiB a blind URL handoff could pull the whole file when the
+      // server answers 200 instead of 206, so preflight one byte first.
       const url = detail.primaryAssetUrl ?? undefined;
       if (url && detail.bytes > 8 * 1024 * 1024) {
-        try {
-          task = pdfjs.getDocument({
-            url,
-            rangeChunkSize: 256 * 1024,
-            disableStream: true,
-            disableAutoFetch: true,
-          });
-          const loaded = await task.promise;
-          if (!cancelled) {
-            setPdf(loaded);
-            setPage((current) => Math.min(current, loaded.numPages));
+        let ranged = detail.bytes <= MAX_INTERACTIVE_BYTES;
+        if (!ranged) {
+          try {
+            const probe = await fetch(url, { headers: { Range: "bytes=0-0" } });
+            ranged = probe.status === 206;
+            await probe.arrayBuffer().catch(() => undefined);
+          } catch {
+            ranged = false;
           }
-          return;
-        } catch {
-          task = undefined;
           if (cancelled) return;
-          // Fall through to the bounded buffer path.
+        }
+        if (ranged) {
+          try {
+            task = pdfjs.getDocument({
+              url,
+              rangeChunkSize: 256 * 1024,
+              disableStream: true,
+              disableAutoFetch: true,
+            });
+            const loaded = await task.promise;
+            if (!cancelled) {
+              setPdf(loaded);
+              setPage((current) => Math.min(current, loaded.numPages));
+            }
+            return;
+          } catch {
+            task = undefined;
+            if (cancelled) return;
+            // Fall through to the bounded buffer path.
+          }
+        } else if (detail.bytes > MAX_INTERACTIVE_BYTES) {
+          throw new Error("pdf-range-unsupported");
         }
       }
       if (!asset.data) return;

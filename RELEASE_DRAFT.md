@@ -1,3 +1,49 @@
+# v1.6.1 release record
+
+Prepared 2026-10-01. Scope: v1.6.0 audit fixes for notes and figures.
+See `RELEASE_NOTES.md`, `docs/DECISIONS.md` D-48 and `QUALITY_REPORT.md`.
+
+## Verified artifact
+
+- App: `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, macOS 12+,
+  version 1.6.1, ad-hoc signed with runtime option)
+- DMG: `WAKARU_1.6.1_aarch64.dmg` (23,344,079 bytes)
+- Checksum: `WAKARU_1.6.1_aarch64.dmg.sha256`
+- SHA-256: `fcece04b1f051b0fa032764e66ac5a6b5b081a81d6935acc62fecee187c11307`
+- `codesign --verify --deep --strict` passed on the built app and mounted DMG
+  app. `hdiutil verify` was VALID. The mounted app reached
+  `WAKARU backend ready version="1.6.1"`.
+- No credentials are embedded in tracked source, new documentation or DMG.
+
+## Verification summary
+
+- Frontend: typecheck, lint/design/hardcoded checks, 45 tests, contrast,
+  i18n parity (486 keys × 3 languages), production build and production npm
+  audit (0 vulnerabilities) passed.
+- Rust: fmt, clippy with denied warnings, 236 library tests passed (1 ignored),
+  phase integration suites and cargo-deny passed. No database migration.
+- Audit coverage: stack-level creation listener with overlay-chrome guard,
+  lane pointer discipline, editor separation, conflict-clear on save, figure
+  stop/timeout/retry, aspect fallback (both sides), PDF Range preflight,
+  windowed paging continuity and external page-jump follow.
+
+## Publication sequence
+
+1. Commit and tag `v1.6.1` on `main`.
+2. Publish the GitHub release with the verified DMG and checksum; re-download
+   the assets and compare hash and size.
+3. Publish four localized Studio RIZI pages and release/news metadata after
+   the site tests.
+4. Record the release in the private common-rules maintenance document.
+
+## Limits
+
+- No Developer ID signature or Apple notarisation credentials were supplied.
+- Windows and Linux are not built or verified.
+- The GitHub repository remains private.
+
+---
+
 # v1.6.0 release record
 
 Prepared 2026-10-01. Scope: large-source staging, interactive figures, sticky

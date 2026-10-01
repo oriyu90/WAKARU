@@ -1,3 +1,36 @@
+# WAKARU v1.6.1
+
+WAKARU v1.6.1 fixes the v1.6.0 sticky-note creation path and hardens the
+interactive figure renderer. No data migration is required.
+
+## What changed
+
+- Right-click note creation now reaches the material: the overlay listens on
+  the wrapping stack instead of its own pointer-transparent layer, and overlay
+  chrome is tagged so marker right-clicks stay delete-only. Shift+F10 / Menu
+  key creation follows the focused material for the same reason.
+- The notes lane no longer blocks clicks to page controls beneath it, markers
+  stay clickable above the lane, long lanes scroll within a bounded height,
+  and the editor is no longer nested inside a button.
+- Figures gain a stop control and a load timeout, so a hung figure script
+  lands in the failure panel with retry instead of wedging the tab. Malformed
+  aspect ratios fall back to 16:9 on both backend and renderer.
+- Large PDFs verify single-Range support with a one-byte preflight before
+  handing the URL to the renderer; without it they fall back to extracted
+  text instead of risking a full-file fetch. Text/sheet windows keep the
+  previous page visible while paging, and PDF/PPTX follow external page jumps
+  (citations, note lists).
+- Japanese, English and Simplified Chinese UI remain in parity (486 keys).
+
+## Compatibility
+
+No database migration. All v1.6.0 projects, notes and figures open as-is.
+
+## Distribution
+
+Apple Silicon Mac, macOS 12 or later. Ad-hoc signed, not Apple-notarised.
+Repository remains private; first launch needs Privacy & Security approval.
+
 # WAKARU v1.6.0
 
 WAKARU v1.6.0 stages large sources, draws interactive AI figures, and pins

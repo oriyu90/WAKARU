@@ -16,6 +16,11 @@ vi.mock("../../components/useToast", () => ({
   useToast: () => ({ push: vi.fn(), dismiss: vi.fn() }),
 }));
 
+vi.mock("../../ipc/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../ipc/client")>();
+  return { ...actual, inTauri: true };
+});
+
 vi.mock("../../ipc/viewer", () => ({
   viewerApi: { updateLocator: vi.fn(async () => {}) },
   documentApi: {},
@@ -58,10 +63,23 @@ describe("NotesOverlay", () => {
 
   function setup(list: ReturnType<typeof note>[]) {
     vi.spyOn(notesApi, "list").mockResolvedValue(list as never);
+    // jsdom reports zero rects: give the overlay a measurable box.
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 800,
+      bottom: 600,
+      width: 800,
+      height: 600,
+      toJSON: () => "",
+    });
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={qc}>
-        <div style={{ position: "relative" }}>
+        <div data-testid="stack" style={{ position: "relative" }}>
+          <div data-testid="material">material</div>
           <NotesOverlay projectId="p1" tab={tab} />
         </div>
       </QueryClientProvider>,
@@ -79,14 +97,26 @@ describe("NotesOverlay", () => {
     expect(screen.queryByText("elsewhere")).toBeNull();
   });
 
-  it("right-click on a marker deletes without creating a new note", async () => {
-    const remove = vi.spyOn(notesApi, "remove").mockResolvedValue(note("n1", 3, "hello") as never);
+  it("right-click on the material creates a note; on a marker it does not", async () => {
     const create = vi.spyOn(notesApi, "create").mockResolvedValue(note("n9", 3, "") as never);
     setup([note("n1", 3, "hello")]);
     await waitFor(() => expect(screen.getByText("hello")).toBeInTheDocument());
-    const marker = screen.getByLabelText(/markerLabel/);
-    fireEvent.contextMenu(marker);
+    // Material right-click (bubbles to the stack listener) creates.
+    fireEvent.contextMenu(screen.getByTestId("material"));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    // Marker right-click is overlay chrome: no creation, only delete.
+    const remove = vi.spyOn(notesApi, "remove").mockResolvedValue(note("n1", 3, "hello") as never);
+    fireEvent.contextMenu(screen.getByLabelText(/markerLabel/));
     await waitFor(() => expect(remove).toHaveBeenCalled());
-    expect(create).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("overlay chrome is tagged so material right-clicks never hit it", async () => {
+    setup([note("n1", 3, "hello")]);
+    await waitFor(() => expect(screen.getByText("hello")).toBeInTheDocument());
+    // Markers and the lane carry the guard attribute the stack-level
+    // contextmenu listener checks before creating a note.
+    expect(document.querySelector("[data-note-ui='lane']")).not.toBeNull();
+    expect(document.querySelector("[data-note-ui='marker']")).not.toBeNull();
   });
 });

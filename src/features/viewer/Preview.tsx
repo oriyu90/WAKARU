@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import { Markdown } from "../../components/Markdown";
 import { Skeleton } from "../../components/Skeleton";
@@ -85,6 +85,7 @@ function TextPreview({
   const win = useQuery({
     queryKey: ["text-window", projectId, tab.sourceId, offset],
     enabled: windowed,
+    placeholderData: keepPreviousData,
     queryFn: () => documentApi.readWindow(projectId, tab.sourceId, offset, TEXT_WINDOW_LIMIT),
   });
   const q = useAssetText(projectId, tab.sourceId, windowed ? null : rel);
@@ -376,11 +377,13 @@ function SheetPreview({ projectId, tab, sizeBytes }: { projectId: string; tab: V
   const win = useQuery({
     queryKey: ["text-window", projectId, tab.sourceId, offset],
     enabled: windowed,
+    placeholderData: keepPreviousData,
     queryFn: () => documentApi.readWindow(projectId, tab.sourceId, offset, TEXT_WINDOW_LIMIT),
   });
   const headerQ = useQuery({
     queryKey: ["text-window", projectId, tab.sourceId, "header"],
     enabled: windowed,
+    placeholderData: keepPreviousData,
     queryFn: () => documentApi.readWindow(projectId, tab.sourceId, 0, 8192),
   });
   const delim = tab.name.toLowerCase().endsWith(".tsv") ? "\t" : ",";

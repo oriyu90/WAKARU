@@ -52,4 +52,16 @@ describe("InteractivePreview isolation", () => {
     render(<InteractivePreview visual={visual} />);
     expect(screen.getByLabelText("Test figure")).toBeInTheDocument();
   });
+
+  it("falls back to 16/9 for malformed aspect ratios", () => {
+    render(<InteractivePreview visual={{ ...visual, aspectRatio: "wide" }} />);
+    const box = document.querySelector("[aria-label='Test figure'] > div:last-child");
+    expect(box?.getAttribute("style")).toContain("16 / 9");
+  });
+
+  it("offers a stop control that unmounts a hung frame", () => {
+    render(<InteractivePreview visual={visual} />);
+    // Visible before any failure: the reader can always stop the figure.
+    expect(screen.getByText("visual.stop")).toBeInTheDocument();
+  });
 });

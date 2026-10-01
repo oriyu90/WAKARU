@@ -2,6 +2,29 @@
 
 Cumulative; newest release first.
 
+## v1.6.1 verification — 2026-10-01
+
+Scope: v1.6.0 audit fixes (note creation reachability, lane pointer discipline,
+editor separation, figure stop/timeout, aspect fallback, PDF Range preflight,
+windowed paging continuity, external page-jump follow). No DB migration.
+
+| Gate | Current result |
+|---|---|
+| Frontend typecheck, lint, design/hardcoded checks, i18n, build | pass; 486 keys × 3 languages |
+| Frontend tests and contrast | pass; 45 tests, light/dark contrast |
+| Rust fmt, clippy, library and integration tests | pass; 236 library tests passed, 1 ignored; phase suites passed |
+| Rust advisories and npm production audit | pass; 0 npm vulnerabilities |
+| Release app/DMG signature and mounted startup | pass; arm64 v1.6.1, macOS 12+, strict signature passes for build and mounted app; DMG checksum VALID (`fcece04b…11307`, 23,344,079 bytes); mounted app logged `backend ready version="1.6.1"` |
+
+### Release artifact
+
+| Item | Value |
+|---|---|
+| App | arm64 `WAKARU.app`, version `1.6.1`, minimum macOS 12; ad-hoc signed with runtime option |
+| Signature | `codesign --verify --deep --strict` passes for build output and mounted-image app |
+| DMG | `WAKARU_1.6.1_aarch64.dmg`, 23,344,079 bytes; `hdiutil verify` VALID |
+| SHA-256 | `fcece04b1f051b0fa032764e66ac5a6b5b081a81d6935acc62fecee187c11307` |
+
 ## v1.6.0 verification — 2026-10-01
 
 Scope: large-source staging (Range/HEAD, text windows, index ceilings, ZIP

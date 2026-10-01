@@ -505,7 +505,7 @@ export function IllustratorDrawer({
           </p>
         ) : null}
         {visual ? (
-          <InteractivePreview visual={visual} onRetry={() => void makeVisual("")} />
+          <InteractivePreview visual={visual} />
         ) : null}
 
         {liveMessages.length > 0 ? (

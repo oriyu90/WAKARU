@@ -563,6 +563,7 @@
     "copied": "Figure source copied",
     "reset": "Reset",
     "expand": "Expand",
-    "shrink": "Shrink"
+    "shrink": "Shrink",
+    "stop": "Stop"
   }
 }

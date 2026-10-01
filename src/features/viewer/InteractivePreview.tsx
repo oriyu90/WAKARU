@@ -7,6 +7,9 @@ import styles from "./InteractivePreview.module.css";
 
 /** Max persisted operation state per figure (plan §6 — safe JSON only). */
 const STATE_MAX = 16 * 1024;
+/** A figure that never fires `load` is treated as hung (e.g. an accidental
+ * infinite loop): the parent offers stop/retry instead of wedging the tab. */
+const LOAD_TIMEOUT_MS = 10_000;
 
 function stateKey(id: string) {
   return `wakaru.visual-state.${id}`;
@@ -29,15 +32,23 @@ function buildSrcDoc(visual: VisualPreview, token: string, savedState: string) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none';"><style>html,body{margin:0;padding:0}body{font:0.875rem/1.5 system-ui,sans-serif;padding:0.75rem;box-sizing:border-box}svg{max-width:100%;height:auto}canvas{max-width:100%}</style><style>${visual.css}</style></head><body>${visual.html}<script>window.__WAKARU_TOKEN__=${JSON.stringify(token)};window.__WAKARU_STATE__=${safeState};window.__WAKARU_DATA__=${visual.dataJson == null ? "{}" : JSON.stringify(visual.dataJson).slice(0, 16384)};(function(){var t=window.__WAKARU_TOKEN__;window.__wakaruNotify=function(s){try{var raw=JSON.stringify(s);if(raw.length>${STATE_MAX})return;parent.postMessage({token:t,state:JSON.parse(raw)},"*");}catch(e){}};})();<\/script><script>${visual.js}</script></body></html>`;
 }
 
+/** CSS `aspect-ratio` needs a plain `w / h` pair; anything else falls back
+ * instead of collapsing the frame to zero height. */
+function aspectStyle(raw: string) {
+  const parts = raw.split(":").map((p) => Number(p.trim()));
+  if (parts.length === 2 && parts.every((v) => Number.isFinite(v) && v > 0)) {
+    return `${parts[0]} / ${parts[1]}`;
+  }
+  return "16 / 9";
+}
+
 /** Shared figure renderer for Studio and Live (plan §4.3). Same artifact,
- * same chrome: loading, failure + retry, copy, expand, reset. Narrow
+ * same chrome: loading, failure + retry, copy, expand, reset, stop. Narrow
  * containers (drawer) get a compact layout via ResizeObserver. */
 export function InteractivePreview({
   visual,
-  onRetry,
 }: {
   visual: VisualPreview;
-  onRetry?: () => void;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -45,6 +56,7 @@ export function InteractivePreview({
   const boxRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [stopped, setStopped] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [compact, setCompact] = useState(false);
   const [nonce, setNonce] = useState(0);
@@ -62,7 +74,17 @@ export function InteractivePreview({
   useEffect(() => {
     setLoading(true);
     setFailed(false);
+    setStopped(false);
   }, [visual.id, nonce]);
+
+  // A figure that never loads (typically an accidental infinite loop in its
+  // own script) must not wedge the tab: time out into the failure panel,
+  // where stop/retry unmount the frame.
+  useEffect(() => {
+    if (!loading || stopped) return;
+    const timer = setTimeout(() => setFailed(true), LOAD_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [loading, stopped, visual.id, nonce]);
 
   // Compact layout for narrow drawers; wide Studio panes keep full chrome.
   useEffect(() => {
@@ -115,18 +137,39 @@ export function InteractivePreview({
       // Ignore persistence failures; the in-memory state still resets.
     }
     setSavedState("{}");
+    setStopped(false);
     setNonce((n) => n + 1);
   }
 
-  if (failed) {
+  function stop() {
+    // Unmount the frame outright: a hung figure script stops with it, and
+    // the tab stays usable. Retry remounts from the saved initial state.
+    setStopped(true);
+    setLoading(false);
+  }
+
+  if (failed || stopped) {
     return (
       <section className={styles.figure} aria-label={visual.title}>
         <p className={styles.error}>{t("visual.failed")}</p>
-        {onRetry ? (
-          <Button variant="secondary" size="sm" onClick={onRetry}>
+        <span className={styles.actions}>
+          {!stopped ? (
+            <button type="button" className={styles.tool} onClick={stop}>
+              {t("visual.stop")}
+            </button>
+          ) : null}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setStopped(false);
+              setFailed(false);
+              setNonce((n) => n + 1);
+            }}
+          >
             {t("visual.retry")}
           </Button>
-        ) : null}
+        </span>
       </section>
     );
   }
@@ -148,6 +191,9 @@ export function InteractivePreview({
           <button type="button" className={styles.tool} onClick={reset}>
             {t("visual.reset")}
           </button>
+          <button type="button" className={styles.tool} onClick={stop}>
+            {t("visual.stop")}
+          </button>
           <button
             type="button"
             className={styles.tool}
@@ -158,7 +204,7 @@ export function InteractivePreview({
           </button>
         </span>
       </div>
-      <div className={styles.frameBox} style={{ aspectRatio: visual.aspectRatio.replace(":", " / ") }}>
+      <div className={styles.frameBox} style={{ aspectRatio: aspectStyle(visual.aspectRatio) }}>
         {loading ? <p className={styles.loading}>{t("visual.loading")}</p> : null}
         <iframe
           ref={frameRef}

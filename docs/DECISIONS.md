@@ -517,3 +517,11 @@
 - **理由**: 巨大ファイルを UI プロセスへ複製しない設計を優先し、生成コードは親 React DOM・IPC・他資料から隔離する。付箋は閲覧者の私的メモとして保存・ZIP 往復・再起動の復元を保証する。
 - **影響**: `PROJECT_SCHEMA_VERSION` を `1.1.0` とする forward migration（`004_notes_visuals.sql`）。旧 project は起動時移行、旧 ZIP は 0 件として import。IPC は追加のみ。日英中 UI 同時対応（485 キー）。
 - **残る制約**: コピー+ハッシュの background job 化・進捗/取消 UI は未実装（空き容量検査・上限・部分成功で代替）。3D と任意 npm 実行は対象外。外部 Web の iframe 内座標への付箋は対象外。
+
+## D-48 · 付箋生成の到達性と図解の停止性を監査で直す
+
+- **日付**: 2026-10-01（v1.6.1）
+- **論点**: 付箋層は `pointer-events: none` のため層自身の右クリックは資料から届かず、生成系が全滅していた。lane 全面が pointer を取るため下のページ操作を塞ぎ、編集欄が button 内包で a11y を損なう。図解は無限 loop 時に tab を道連れにし、不正 aspect は枠を潰す。大 PDF は Range 非対応でも URL を渡すと全量取得に落ち得る。
+- **採用**: 生成は包含 stack の native listener へ移し、付箋 chrome は `data-note-ui` で除外する（marker 右削除は React 側が後段で処理）。lane は chrome/カードのみ pointer を取り、マーカーを前面、lane 高さを上限化、編集欄を button 外へ出す。図解は停止釦 + 読込 timeout + 失敗時再試行、aspect は前後で 16:9 へ縮退する。大 PDF は 1 byte preflight で 206 を確認してから URL を渡す。窓表示は `keepPreviousData`、PDF/PPTX は外部 page jump へ追従する。
+- **理由**: 生成不能は中核機能の全損であり、隔離と両立する最小経路で回復させる。停止性は WebKit プロセス共有の前提で UI 側に逃げ道を残す。
+- **影響**: DB 移行・IPC 変更なし。日英中 UI 同時対応（486 キー、`visual.stop` 追加）。

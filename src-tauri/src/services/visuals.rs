@@ -164,6 +164,24 @@ pub fn create(
 
 /// Direct insert on an already-open project connection (Studio tool loop).
 #[allow(clippy::too_many_arguments)]
+/// The renderer maps the aspect straight into CSS `aspect-ratio`; anything
+/// that is not a plain positive `w:h` pair falls back instead of breaking
+/// layout.
+fn normalise_aspect(raw: &str) -> String {
+    let parts = raw.trim().split(':').collect::<Vec<_>>();
+    let ok = parts.len() == 2
+        && parts
+            .iter()
+            .all(|p| p.parse::<f64>().map(|v| v > 0.0).unwrap_or(false));
+    if ok {
+        raw.trim().to_string()
+    } else {
+        "16:9".to_string()
+    }
+}
+
+/// Direct insert on an already-open project connection (Studio tool loop).
+#[allow(clippy::too_many_arguments)]
 pub fn create_on_db(
     db: &rusqlite::Connection,
     title: &str,
@@ -211,11 +229,7 @@ pub fn create_on_db(
             }
         }
     }
-    let aspect = if aspect_ratio.trim().is_empty() {
-        "16:9".to_string()
-    } else {
-        aspect_ratio.to_string()
-    };
+    let aspect = normalise_aspect(aspect_ratio);
     let id = Uuid::now_v7().to_string();
     let now = now_iso8601();
     db.execute(
@@ -297,5 +311,17 @@ mod tests {
         );
         let big_state = serde_json::json!({ "blob": "x".repeat(VISUAL_STATE_MAX + 1) });
         assert!(validate_parts("t", "<p>a</p>", "", "", &ok, &big_state).is_err());
+    }
+
+    #[test]
+    fn aspect_falls_back_unless_plain_width_by_height() {
+        assert_eq!(normalise_aspect("16:9"), "16:9");
+        assert_eq!(normalise_aspect(" 4:3 "), "4:3");
+        assert_eq!(normalise_aspect(""), "16:9");
+        assert_eq!(normalise_aspect("wide"), "16:9");
+        assert_eq!(normalise_aspect("16:9:4"), "16:9");
+        assert_eq!(normalise_aspect("0:9"), "16:9");
+        assert_eq!(normalise_aspect("16:0"), "16:9");
+        assert_eq!(normalise_aspect("16/9"), "16:9");
     }
 }

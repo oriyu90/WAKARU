@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notesApi } from "../../ipc/notes";
 import { viewerApi } from "../../ipc/viewer";
-import { IpcError } from "../../ipc/client";
+import { IpcError, inTauri } from "../../ipc/client";
 import type { Note, ViewerTab } from "../../ipc/types.gen";
 import { useToast } from "../../components/useToast";
 import { rememberTabLocator } from "./Preview";
@@ -75,6 +75,7 @@ export function NotesOverlay({
 
   const notesQuery = useQuery({
     queryKey: ["notes", projectId, tab.sourceId],
+    enabled: inTauri,
     queryFn: () => notesApi.list(projectId, tab.sourceId),
   });
   const notes = useMemo(() => notesQuery.data ?? [], [notesQuery.data]);
@@ -125,6 +126,7 @@ export function NotesOverlay({
     onSuccess: (note) => {
       setSavingId(null);
       setSaveErrorId(null);
+      if (conflictId === note.id) setConflictId(null);
       setBaseUpdatedAt(note.updatedAt);
       if (pendingBody?.id !== note.id) invalidate();
     },
@@ -219,32 +221,42 @@ export function NotesOverlay({
     setSaveErrorId(null);
   }
 
-  function createAt(clientX: number, clientY: number) {
-    const box = layerRef.current?.getBoundingClientRect();
-    if (!box || box.width <= 0 || box.height <= 0) return;
-    const x = Math.min(0.98, Math.max(0.02, (clientX - box.left) / box.width));
-    const y = Math.min(0.98, Math.max(0.02, (clientY - box.top) / box.height));
-    createMut.mutate({ x, y });
-  }
-
-  function onContextMenu(e: React.MouseEvent) {
-    // Create only on the material itself: never on toolbars, page buttons,
-    // links, form controls, or while the reader has text selected (the
-    // native selection menu keeps priority there).
-    const target = e.target as HTMLElement;
-    if (
-      target.closest("button, input, textarea, select, a, [role='toolbar'], [role='menu'], [role='dialog']")
-    ) {
-      return;
+  // The overlay layer itself is pointer-transparent, so creation listens on
+  // the wrapping stack (the layer's parent: an ancestor of both the material
+  // and the overlay). Overlay-owned targets carry `data-note-ui` and never
+  // create: marker right-clicks stay delete-only even though the native
+  // parent listener runs before React's own contextmenu handlers.
+  useEffect(() => {
+    const parent = layerRef.current?.parentElement;
+    if (!parent) return;
+    function onMenu(e: MouseEvent) {
+      // Create only on the material itself: never on toolbars, page buttons,
+      // links, form controls, note chrome, or while the reader has text
+      // selected (the native selection menu keeps priority there).
+      const target = e.target as HTMLElement;
+      if (
+        target.closest(
+          "[data-note-ui], button, input, textarea, select, a, [role='toolbar'], [role='menu'], [role='dialog']",
+        )
+      ) {
+        return;
+      }
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      const box = layerRef.current?.getBoundingClientRect();
+      if (!box || box.width <= 0 || box.height <= 0) return;
+      const x = Math.min(0.98, Math.max(0.02, (e.clientX - box.left) / box.width));
+      const y = Math.min(0.98, Math.max(0.02, (e.clientY - box.top) / box.height));
+      createMut.mutate({ x, y });
     }
-    const sel = window.getSelection();
-    if (sel && !sel.isCollapsed && layerRef.current && !layerRef.current.contains(sel.anchorNode)) {
-      return;
-    }
-    e.preventDefault();
-    e.stopPropagation();
-    createAt(e.clientX, e.clientY);
-  }
+    parent.addEventListener("contextmenu", onMenu);
+    return () => parent.removeEventListener("contextmenu", onMenu);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, tab.sourceId, page]);
 
   // Shift+F10 / Menu key on focused material → note at the current position.
   useEffect(() => {
@@ -252,12 +264,12 @@ export function NotesOverlay({
       const wantsNote =
         (e.shiftKey && e.key === "F10") || e.key === "ContextMenu";
       if (!wantsNote) return;
-      const layer = layerRef.current;
-      if (!layer || !layer.contains(document.activeElement)) return;
+      const scope = layerRef.current?.parentElement;
+      if (!scope || !scope.contains(document.activeElement)) return;
+      const target = document.activeElement as HTMLElement | null;
+      if (target && target.closest("input, textarea, select, [role='dialog']")) return;
       e.preventDefault();
-      const box = layer.getBoundingClientRect();
       createMut.mutate({ x: 0.5, y: 0.5 });
-      void box;
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -290,7 +302,7 @@ export function NotesOverlay({
   }, [hiddenByPage]);
 
   return (
-    <div ref={layerRef} className={styles.layer} onContextMenu={onContextMenu}>
+    <div ref={layerRef} className={styles.layer}>
       {visible.map((n) => {
         const a = asAnchor(n);
         const x = typeof a.x === "number" ? a.x * 100 : 50;
@@ -300,6 +312,7 @@ export function NotesOverlay({
             key={n.id}
             type="button"
             className={styles.marker}
+            data-note-ui="marker"
             data-color={n.color}
             data-editing={editingId === n.id || undefined}
             style={{ left: `${x}%`, top: `${y}%` }}
@@ -314,7 +327,7 @@ export function NotesOverlay({
         );
       })}
 
-      <div className={styles.lane} data-open={laneOpen || undefined}>
+      <div className={styles.lane} data-note-ui="lane" data-open={laneOpen || undefined}>
         <div className={styles.laneHead}>
           <button
             type="button"
@@ -327,7 +340,7 @@ export function NotesOverlay({
           <button
             type="button"
             className={styles.laneToggle}
-            onClick={() => createMut.mutate({ x: 0.5, y: 0.08 })}
+            onClick={() => createMut.mutate({ x: 0.5, y: 0.4 })}
           >
             {t("notes.addHere")}
           </button>
@@ -346,41 +359,40 @@ export function NotesOverlay({
                   data-color={n.color}
                   style={{ marginLeft: `${Math.min(i, 8) * 28}px`, marginTop: i === 0 ? 0 : 10 }}
                 >
-                  <button
-                    type="button"
-                    className={styles.cardOpen}
-                    aria-label={t("notes.editLabel")}
-                    onClick={() => beginEdit(n)}
-                  >
-                    {needsCheck ? (
-                      <span className={styles.needsCheck}>{t("notes.needsCheck")}</span>
-                    ) : null}
-                    {editing ? (
-                      <textarea
-                        autoFocus
-                        className={styles.editor}
-                        value={draft}
-                        maxLength={BODY_MAX}
-                        rows={3}
-                        aria-label={t("notes.editLabel")}
-                        onChange={(e) => {
-                          setDraft(e.target.value);
-                          setPendingBody({ id: n.id, body: e.target.value });
-                        }}
-                        onBlur={flush}
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape") {
-                            e.stopPropagation();
-                            flush();
-                            setEditingId(null);
-                          }
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    ) : (
+                  {needsCheck ? (
+                    <span className={styles.needsCheck}>{t("notes.needsCheck")}</span>
+                  ) : null}
+                  {editing ? (
+                    <textarea
+                      autoFocus
+                      className={styles.editor}
+                      value={draft}
+                      maxLength={BODY_MAX}
+                      rows={3}
+                      aria-label={t("notes.editLabel")}
+                      onChange={(e) => {
+                        setDraft(e.target.value);
+                        setPendingBody({ id: n.id, body: e.target.value });
+                      }}
+                      onBlur={flush}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          e.stopPropagation();
+                          flush();
+                          setEditingId(null);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.cardOpen}
+                      aria-label={t("notes.editLabel")}
+                      onClick={() => beginEdit(n)}
+                    >
                       <span className={styles.body}>{n.body || t("notes.emptyHint")}</span>
-                    )}
-                  </button>
+                    </button>
+                  )}
                   <span className={styles.cardFoot}>
                     <span className={styles.count}>
                       {t("notes.chars", { count: (editing ? draft : n.body).length, max: BODY_MAX })}
