@@ -547,8 +547,6 @@
     "deleted": "Note deleted",
     "undo": "Undo",
     "saving": "Saving…",
-    "hideLane": "Hide notes",
-    "showLane": "Notes ({{count}})",
     "needsCheck": "Check position",
     "otherPage": "{{count}} note(s) on page {{page}}",
     "color_yellow": "yellow",

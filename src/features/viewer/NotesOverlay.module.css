@@ -14,9 +14,15 @@
   border: var(--rule-control) solid var(--color-ink);
   background: var(--color-warning);
   pointer-events: auto;
-  cursor: pointer;
+  cursor: grab;
+  /* A press on the dot starts a move, not a material scroll. */
+  touch-action: none;
   padding: 0;
   z-index: 2;
+}
+
+.marker[data-dragging] {
+  cursor: grabbing;
 }
 
 .marker[data-color="pink"] {

@@ -542,8 +542,6 @@
     "deleted": "付箋を削除しました",
     "undo": "元に戻す",
     "saving": "保存中…",
-    "hideLane": "付箋を隠す",
-    "showLane": "付箋 ({{count}}件)",
     "needsCheck": "位置を確認",
     "otherPage": "ページ {{page}} に{{count}}件",
     "color_yellow": "黄",

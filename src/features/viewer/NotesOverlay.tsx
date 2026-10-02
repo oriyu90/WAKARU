@@ -227,6 +227,8 @@ export function NotesOverlay({
     },
     onSuccess: (note) => {
       invalidate();
+      setLaneOpen(true);
+      setSelectedId(note.id);
       setEditingId(note.id);
       setDraft("");
       setBaseUpdatedAt(note.updatedAt);
@@ -351,13 +353,14 @@ export function NotesOverlay({
     setSaveErrorId(null);
   }
 
-  /** End the edit and release the single-note focus (draft already saved). */
+  /** End the edit, release the single-note focus and close the lane. */
   function closeNote() {
     flush();
     setEditingId(null);
     setSelectedId(null);
     setDraft("");
     setPendingBody(null);
+    setLaneOpen(false);
   }
 
   /** Open one note from the list or its dot: reveal the lane, hide the
@@ -389,11 +392,9 @@ export function NotesOverlay({
     };
   }
 
-  /** Project stored document fractions into layer-box percentages.
+  /** Project document fractions into layer-box percentages.
    * Returns null while scrolled out of view (reappears on scroll-back). */
-  function toViewport(a: Anchor): { left: number; top: number } | null {
-    const x = typeof a.x === "number" && Number.isFinite(a.x) ? clamp01(a.x) : 0.5;
-    const y = typeof a.y === "number" && Number.isFinite(a.y) ? clamp01(a.y) : 0.08;
+  function projectXY(x: number, y: number): { left: number; top: number } | null {
     if (
       !metrics ||
       metrics.sw <= 0 ||
@@ -410,6 +411,52 @@ export function NotesOverlay({
     if (left < -5 || left > 105 || top < -5 || top > 105) return null;
     return { left, top };
   }
+
+  function toViewport(a: Anchor): { left: number; top: number } | null {
+    const x = typeof a.x === "number" && Number.isFinite(a.x) ? clamp01(a.x) : 0.5;
+    const y = typeof a.y === "number" && Number.isFinite(a.y) ? clamp01(a.y) : 0.08;
+    return projectXY(x, y);
+  }
+
+  // Marker drag: press and move repositions the note; a press without
+  // movement stays a tap (opens the note). The drop persists the anchor.
+  const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(null);
+  const dragMoved = useRef(false);
+  const suppressClick = useRef(false);
+  const dragCleanup = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    return () => dragCleanup.current?.();
+  }, []);
+
+  const moveMut = useMutation({
+    mutationFn: (input: { id: string; x: number; y: number; expected: string | null }) => {
+      const current = notes.find((m) => m.id === input.id);
+      const anchor = {
+        ...(current ? asAnchor(current) : {}),
+        page: page ?? 1,
+        x: input.x,
+        y: input.y,
+      };
+      return notesApi.update({
+        projectId,
+        noteId: input.id,
+        locator: null,
+        anchorJson: anchor as unknown as null,
+        body: null,
+        color: null,
+        stackOrder: null,
+        expectedUpdatedAt: input.expected,
+      });
+    },
+    onSuccess: () => {
+      setSaveErrorId(null);
+      invalidate();
+    },
+    onError: () => {
+      invalidate();
+      toast.push({ tone: "error", message: t("errors.internal") });
+    },
+  });
 
   // The overlay layer itself is pointer-transparent, so creation listens on
   // the wrapping stack (the layer's parent: an ancestor of both the material
@@ -526,7 +573,8 @@ export function NotesOverlay({
   return (
     <div ref={layerRef} className={styles.layer} data-size={sizeBucket}>
       {visible.map((n) => {
-        const pos = toViewport(asAnchor(n));
+        const live = drag?.id === n.id ? projectXY(drag.x, drag.y) : null;
+        const pos = live ?? toViewport(asAnchor(n));
         if (!pos) return null;
         return (
           <button
@@ -536,9 +584,50 @@ export function NotesOverlay({
             data-note-ui="marker"
             data-color={n.color}
             data-editing={editingId === n.id || undefined}
+            data-dragging={drag?.id === n.id || undefined}
             style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
             aria-label={t("notes.markerLabel", { color: t(`notes.color_${n.color}`) })}
-            onClick={() => openNote(n)}
+            onClick={() => {
+              if (suppressClick.current) {
+                suppressClick.current = false;
+                return;
+              }
+              openNote(n);
+            }}
+            onPointerDown={(e) => {
+              // Left-button drag moves the note; touch and pen always drag.
+              if (e.pointerType === "mouse" && e.button !== 0) return;
+              const id = n.id;
+              const startX = e.clientX;
+              const startY = e.clientY;
+              dragMoved.current = false;
+              const expected = n.updatedAt;
+              function onMove(ev: PointerEvent) {
+                if (!dragMoved.current) {
+                  if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 5) return;
+                  dragMoved.current = true;
+                }
+                const p = toDoc(ev.clientX, ev.clientY);
+                setDrag({ id, x: p.x, y: p.y });
+              }
+              function onUp(ev: PointerEvent) {
+                window.removeEventListener("pointermove", onMove);
+                window.removeEventListener("pointerup", onUp);
+                dragCleanup.current = null;
+                if (!dragMoved.current) return;
+                dragMoved.current = false;
+                suppressClick.current = true;
+                const p = toDoc(ev.clientX, ev.clientY);
+                setDrag(null);
+                moveMut.mutate({ id, x: p.x, y: p.y, expected });
+              }
+              window.addEventListener("pointermove", onMove);
+              window.addEventListener("pointerup", onUp);
+              dragCleanup.current = () => {
+                window.removeEventListener("pointermove", onMove);
+                window.removeEventListener("pointerup", onUp);
+              };
+            }}
             onContextMenu={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -548,20 +637,9 @@ export function NotesOverlay({
         );
       })}
 
-      {notes.length > 0 ? (
-      <div className={styles.lane} data-note-ui="lane" data-open={laneOpen || undefined}>
+      {notes.length > 0 && laneOpen ? (
+      <div className={styles.lane} data-note-ui="lane">
         <div className={styles.laneHead}>
-          <button
-            type="button"
-            className={styles.laneToggle}
-            aria-expanded={laneOpen}
-            onClick={() => {
-              if (laneOpen) closeNote();
-              setLaneOpen((v) => !v);
-            }}
-          >
-            {laneOpen ? t("notes.hideLane") : t("notes.showLane", { count: visible.length })}
-          </button>
           {selectedId ? (
             <button
               type="button"
@@ -573,7 +651,6 @@ export function NotesOverlay({
           ) : null}
           {savingId ? <span className={styles.status}>{t("notes.saving")}</span> : null}
         </div>
-        {laneOpen ? (
           <ol className={styles.cards}>
             {listed.map((n, i) => {
               const needsCheck = needsPositionCheck(n, tab.locator);
@@ -644,7 +721,6 @@ export function NotesOverlay({
               );
             })}
           </ol>
-        ) : null}
         {hiddenCounts.length ? (
           <ul className={styles.otherPages}>
             {hiddenCounts.map(([p, c]) => (

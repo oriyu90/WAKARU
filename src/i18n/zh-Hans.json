@@ -542,8 +542,6 @@
     "deleted": "已删除便签",
     "undo": "撤销",
     "saving": "保存中…",
-    "hideLane": "隐藏便签",
-    "showLane": "便签 ({{count}})",
     "needsCheck": "需确认位置",
     "otherPage": "第 {{page}} 页有 {{count}} 条",
     "color_yellow": "黄色",

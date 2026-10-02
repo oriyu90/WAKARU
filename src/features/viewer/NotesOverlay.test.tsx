@@ -157,9 +157,12 @@ describe("NotesOverlay", () => {
   it("tapping a dot opens its note even when the lane is closed", async () => {
     setup([note("n1", 3, "hello"), note("n2", 3, "other")]);
     await waitFor(() => expect(screen.getByText("hello")).toBeInTheDocument());
-    // Close the lane, then tap the dot: the lane reopens on that note.
-    fireEvent.click(screen.getByText(/hideLane/));
-    await waitFor(() => expect(screen.queryByText("hello")).toBeNull());
+    // Open a note, then click outside: the note and the lane both close.
+    fireEvent.click(screen.getByText("hello"));
+    await waitFor(() => expect(document.querySelector("textarea")).not.toBeNull());
+    fireEvent.click(document.body);
+    await waitFor(() => expect(document.querySelector("[data-note-ui='lane']")).toBeNull());
+    // Tap the dot: the lane reopens on that note.
     const marker = screen.getAllByLabelText(/markerLabel/)[0];
     if (!marker) throw new Error("no marker");
     fireEvent.click(marker);
@@ -206,19 +209,49 @@ describe("NotesOverlay", () => {
   it("hides the lane entirely when there are no notes", async () => {
     setup([]);
     await waitFor(() => expect(notesListed()).toBe(true));
-    expect(screen.queryByText(/hideLane|showLane/)).toBeNull();
+    expect(screen.queryByText(/showAll/)).toBeNull();
   });
 
-  it("clicking outside an open note closes it, scrolling does not", async () => {
+  it("clicking outside an open note closes it and the lane", async () => {
     setup([note("n1", 3, "first"), note("n2", 3, "second")]);
     await waitFor(() => expect(screen.getByText("first")).toBeInTheDocument());
     fireEvent.click(screen.getByText("first"));
     await waitFor(() => expect(document.querySelector("textarea")).not.toBeNull());
     expect(screen.queryByText("second")).toBeNull();
-    // A click anywhere outside the card ends the edit and restores the list.
+    // A click anywhere outside the card ends the edit and closes the lane.
+    // Scrolling fires no click, so it keeps the note open.
     fireEvent.click(document.body);
     await waitFor(() => expect(document.querySelector("textarea")).toBeNull());
-    await waitFor(() => expect(screen.getByText("second")).toBeInTheDocument());
+    await waitFor(() => expect(document.querySelector("[data-note-ui='lane']")).toBeNull());
+  });
+
+  it("dragging a dot moves the note without opening it", async () => {
+    const update = vi.spyOn(notesApi, "update").mockResolvedValue(note("n1", 3, "hello") as never);
+    setup([note("n1", 3, "hello")]);
+    await waitFor(() => expect(screen.getByText("hello")).toBeInTheDocument());
+    const marker = screen.getByLabelText(/markerLabel/);
+    // jsdom has no PointerEvent: drive the pointer handlers with real
+    // MouseEvents of the same type names (production browsers supply the
+    // real PointerEvents). Press, move past the drag threshold, release.
+    const down = new MouseEvent("pointerdown", { button: 0, clientX: 100, clientY: 100, bubbles: true });
+    marker.dispatchEvent(down);
+    document.body.dispatchEvent(
+      new MouseEvent("pointermove", { clientX: 200, clientY: 300, bubbles: true }),
+    );
+    document.body.dispatchEvent(
+      new MouseEvent("pointerup", { clientX: 200, clientY: 300, bubbles: true }),
+    );
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    const anchor = (update.mock.calls[0]?.[0] as { anchorJson?: unknown } | undefined)?.anchorJson as {
+      x?: number;
+      y?: number;
+    };
+    // Scroller is 800x2000 at scroll 400: (200, 300) lands at (0.25, 0.35).
+    expect(anchor?.x).toBeCloseTo(0.25);
+    expect(anchor?.y).toBeCloseTo(0.35);
+    // The suppressed tap opens nothing.
+    fireEvent.click(marker);
+    expect(document.querySelector("textarea")).toBeNull();
   });
 
   function notesListed() {
