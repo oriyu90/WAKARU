@@ -39,7 +39,7 @@ function currentPageOf(locator: unknown): number | null {
 }
 
 /** Scroll metrics of the material scroller (`data-note-scroll`). Markers
- * live in document fractions and are projected into the viewport, so they
+ * live in document fractions and are projected into the layer box, so they
  * scroll together with the document. */
 type ScrollMetrics = {
   sl: number;
@@ -48,6 +48,13 @@ type ScrollMetrics = {
   sh: number;
   cw: number;
   ch: number;
+  /** Scroller origin inside the layer box, plus the layer size: markers are
+   * positioned as percentages of the LAYER, so the toolbar/lane strips above
+   * and below the scroller must be accounted for. */
+  ox: number;
+  oy: number;
+  lw: number;
+  lh: number;
 };
 
 function clamp01(v: number) {
@@ -123,27 +130,51 @@ export function NotesOverlay({
       return;
     }
     let raf = 0;
-    const update = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        setMetrics({
-          sl: scroller.scrollLeft,
-          st: scroller.scrollTop,
-          sw: scroller.scrollWidth,
-          sh: scroller.scrollHeight,
-          cw: scroller.clientWidth,
-          ch: scroller.clientHeight,
-        });
+    const read = () => {
+      const lr = stack.getBoundingClientRect();
+      const r = scroller.getBoundingClientRect();
+      setMetrics({
+        sl: scroller.scrollLeft,
+        st: scroller.scrollTop,
+        sw: scroller.scrollWidth,
+        sh: scroller.scrollHeight,
+        cw: scroller.clientWidth,
+        ch: scroller.clientHeight,
+        ox: r.left - lr.left,
+        oy: r.top - lr.top,
+        lw: lr.width,
+        lh: lr.height,
       });
     };
-    update();
+    // Initial measure is synchronous (no rAF): the first paint already
+    // projects markers correctly instead of flashing fallback positions.
+    read();
+    const update = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(read);
+    };
     scroller.addEventListener("scroll", update, { passive: true });
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
     ro?.observe(scroller);
+    ro?.observe(stack);
+    // Content changes (zoom, window paging, re-render) resize the scroll
+    // area without resizing the scroller box itself: without this, metrics
+    // go stale after every +/- zoom and markers drift.
+    const mo =
+      typeof MutationObserver !== "undefined"
+        ? new MutationObserver(update)
+        : null;
+    mo?.observe(scroller, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style", "width", "height"],
+    });
     return () => {
       cancelAnimationFrame(raf);
       scroller.removeEventListener("scroll", update);
       ro?.disconnect();
+      mo?.disconnect();
     };
   }, [projectId, tab.sourceId, tab.locator]);
 
@@ -348,16 +379,24 @@ export function NotesOverlay({
     };
   }
 
-  /** Project stored document fractions back into viewport percentages.
+  /** Project stored document fractions into layer-box percentages.
    * Returns null while scrolled out of view (reappears on scroll-back). */
   function toViewport(a: Anchor): { left: number; top: number } | null {
     const x = typeof a.x === "number" && Number.isFinite(a.x) ? clamp01(a.x) : 0.5;
     const y = typeof a.y === "number" && Number.isFinite(a.y) ? clamp01(a.y) : 0.08;
-    if (!metrics || metrics.sw <= 0 || metrics.sh <= 0 || metrics.cw <= 0 || metrics.ch <= 0) {
+    if (
+      !metrics ||
+      metrics.sw <= 0 ||
+      metrics.sh <= 0 ||
+      metrics.cw <= 0 ||
+      metrics.ch <= 0 ||
+      metrics.lw <= 0 ||
+      metrics.lh <= 0
+    ) {
       return { left: x * 100, top: y * 100 };
     }
-    const left = ((x * metrics.sw - metrics.sl) / metrics.cw) * 100;
-    const top = ((y * metrics.sh - metrics.st) / metrics.ch) * 100;
+    const left = ((metrics.ox + x * metrics.sw - metrics.sl) / metrics.lw) * 100;
+    const top = ((metrics.oy + y * metrics.sh - metrics.st) / metrics.lh) * 100;
     if (left < -5 || left > 105 || top < -5 || top > 105) return null;
     return { left, top };
   }

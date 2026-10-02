@@ -167,6 +167,31 @@ describe("NotesOverlay", () => {
     expect(screen.queryByText("other")).toBeNull();
   });
 
+  it("projects document fractions into the layer box, not the scroller box", async () => {
+    setup([note("n1", 3, "hello", 0.5, 0.5)]);
+    // Scroller sits 100px below the stack top (toolbar strip): a document
+    // midpoint must land mid-layer, not mid-scroller.
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const box = {
+        x: 0, y: 0, left: 0, top: 0, right: 800, bottom: 600,
+        width: 800, height: 600, toJSON: () => "",
+      };
+      if (this.dataset.testid === "stack") return { ...box, bottom: 800, height: 800 };
+      if (this.dataset.testid === "material") return { ...box, top: 100, height: 600 };
+      return box;
+    });
+    await waitFor(() => expect(screen.getByText("hello")).toBeInTheDocument());
+    const marker = screen.getByLabelText(/markerLabel/);
+    // Document (0.5, 0.5) of an 800x2000 scroller scrolled to 400 → layer
+    // point (400, 100 + 1000 - 400 = 700) → left 50%, top 87.5%.
+    await waitFor(() => expect(marker.style.left).toBe("50%"));
+    // A scroll refreshes the metrics (resize/content observers in browsers).
+    fireEvent.scroll(screen.getByTestId("material"));
+    await waitFor(() => expect(marker.style.top).toBe("87.5%"));
+  });
+
   it("hides the lane entirely when there are no notes", async () => {
     setup([]);
     await waitFor(() => expect(notesListed()).toBe(true));

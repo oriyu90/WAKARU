@@ -20,7 +20,7 @@ vi.mock("pdfjs-dist", () => ({
           width: 100 * scale,
           height: 140 * scale,
         }),
-        render: () => ({ promise: Promise.resolve() }),
+        render: () => ({ promise: Promise.resolve(), cancel: vi.fn() }),
         getTextContent: async () => ({ items: [] }),
       }),
     }),
@@ -44,6 +44,11 @@ const pdfDetail: SourceDetail = {
 };
 
 function pdfSetup() {
+  // jsdom has no 2d canvas: stub the context so the render effect completes.
+  Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+    value: vi.fn(() => ({})),
+    configurable: true,
+  });
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => new Response(new Uint8Array([1, 2, 3, 4]))),
@@ -73,6 +78,22 @@ describe("PdfFilePreview zoom modes", () => {
     expect(fit.getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(fill);
     expect(fill.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("grows the rendered page when zooming in with +", async () => {
+    pdfSetup();
+    let canvas: HTMLCanvasElement | null = null;
+    await waitFor(() => {
+      canvas = document.querySelector("canvas");
+      expect(canvas).not.toBeNull();
+      expect(canvas!.style.width).not.toBe("");
+    });
+    if (!canvas) throw new Error("no canvas");
+    const el = canvas as HTMLCanvasElement;
+    const before = el.style.width;
+    fireEvent.click(screen.getByRole("button", { name: /^(拡大|Zoom in|放大)$/ }));
+    await waitFor(() => expect(el.style.width).not.toBe(before));
+    expect(parseFloat(el.style.width)).toBeGreaterThan(parseFloat(before));
   });
 });
 
