@@ -192,6 +192,17 @@ describe("NotesOverlay", () => {
     await waitFor(() => expect(marker.style.top).toBe("87.5%"));
   });
 
+  it("flags pre-1.6.4 notes whose stored coordinates used the old meaning", async () => {
+    setup([
+      { ...note("n1", 3, "legacy"), createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" },
+      { ...note("n2", 3, "fresh"), createdAt: "2026-10-02T01:00:00Z", updatedAt: "2026-10-02T01:00:00Z" },
+    ]);
+    await waitFor(() => expect(screen.getByText("legacy")).toBeInTheDocument());
+    // Exactly one position-check badge: the legacy note. The fresh note,
+    // stored as document fractions, renders without one.
+    await waitFor(() => expect(screen.getAllByText(/needsCheck/).length).toBe(1));
+  });
+
   it("hides the lane entirely when there are no notes", async () => {
     setup([]);
     await waitFor(() => expect(notesListed()).toBe(true));

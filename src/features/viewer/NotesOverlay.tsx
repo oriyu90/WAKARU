@@ -65,6 +65,16 @@ function sameLocator(a: unknown, b: unknown) {
   return JSON.stringify(a ?? {}) === JSON.stringify(b ?? {});
 }
 
+/** Notes stored before the v1.6.4 coordinate rollout used layer fractions;
+ * the current meaning is document fractions, so their dots cannot be trusted
+ * and carry the position-check badge instead of being silently wrong. */
+const LEGACY_ANCHOR_CUTOFF = "2026-10-01T23:47:00Z";
+
+function needsPositionCheck(n: Note, locator: unknown): boolean {
+  if (n.createdAt < LEGACY_ANCHOR_CUTOFF) return true;
+  return n.anchorKind === "text" && !sameLocator(n.locator, locator);
+}
+
 /** Sticky notes bound to the source (plan §5). Markers float at stored
  * surface fractions so zoom, DPR and window resizes re-project
  * automatically; cards stair-step in a collapsible lane. Memos stay local —
@@ -566,8 +576,7 @@ export function NotesOverlay({
         {laneOpen ? (
           <ol className={styles.cards}>
             {listed.map((n, i) => {
-              const needsCheck =
-                n.anchorKind === "text" && !sameLocator(n.locator, tab.locator);
+              const needsCheck = needsPositionCheck(n, tab.locator);
               const editing = editingId === n.id;
               return (
                 <li
