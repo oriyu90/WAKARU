@@ -131,59 +131,110 @@ export function NotesOverlay({
   // Material scroll tracking: markers are stored in document fractions and
   // re-projected on every scroll/resize, so they travel with the document.
   // Without a tagged scroller (e.g. website iframe) viewport fractions apply.
+  // The preview body renders ASYNC (asset/PDF loading), long after this
+  // overlay mounts — so the scroller is re-resolved on every stack mutation
+  // instead of once at mount. A mount-time-only lookup would stick at null
+  // forever: markers would ignore scrolling and mismatch clicks.
   const [metrics, setMetrics] = useState<ScrollMetrics | null>(null);
   useEffect(() => {
     const stack = layerRef.current?.parentElement;
-    const scroller = stack?.querySelector("[data-note-scroll]") as HTMLElement | null;
-    if (!stack || !scroller) {
-      setMetrics(null);
-      return;
-    }
+    if (!stack) return;
+    let scroller: HTMLElement | null = null;
     let raf = 0;
+    let ro: ResizeObserver | null = null;
+    let contentMo: MutationObserver | null = null;
     const read = () => {
+      const el = scroller;
+      if (!el || !el.isConnected) {
+        setMetrics(null);
+        return;
+      }
       const lr = stack.getBoundingClientRect();
-      const r = scroller.getBoundingClientRect();
-      setMetrics({
-        sl: scroller.scrollLeft,
-        st: scroller.scrollTop,
-        sw: scroller.scrollWidth,
-        sh: scroller.scrollHeight,
-        cw: scroller.clientWidth,
-        ch: scroller.clientHeight,
+      const r = el.getBoundingClientRect();
+      const next: ScrollMetrics = {
+        sl: el.scrollLeft,
+        st: el.scrollTop,
+        sw: el.scrollWidth,
+        sh: el.scrollHeight,
+        cw: el.clientWidth,
+        ch: el.clientHeight,
         ox: r.left - lr.left,
         oy: r.top - lr.top,
         lw: lr.width,
         lh: lr.height,
-      });
+      };
+      // Compare before updating: our own lane/marker renders also mutate the
+      // stack, and must never loop.
+      setMetrics((prev) =>
+        prev &&
+        prev.sl === next.sl &&
+        prev.st === next.st &&
+        prev.sw === next.sw &&
+        prev.sh === next.sh &&
+        prev.cw === next.cw &&
+        prev.ch === next.ch &&
+        prev.ox === next.ox &&
+        prev.oy === next.oy &&
+        prev.lw === next.lw &&
+        prev.lh === next.lh
+          ? prev
+          : next,
+      );
     };
     // Initial measure is synchronous (no rAF): the first paint already
     // projects markers correctly instead of flashing fallback positions.
-    read();
     const update = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(read);
     };
-    scroller.addEventListener("scroll", update, { passive: true });
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
-    ro?.observe(scroller);
-    ro?.observe(stack);
-    // Content changes (zoom, window paging, re-render) resize the scroll
-    // area without resizing the scroller box itself: without this, metrics
-    // go stale after every +/- zoom and markers drift.
+    const attach = (el: HTMLElement | null) => {
+      if (el === scroller) {
+        update();
+        return;
+      }
+      if (scroller) {
+        scroller.removeEventListener("scroll", update);
+        contentMo?.disconnect();
+        contentMo = null;
+      }
+      scroller = el;
+      if (el) {
+        el.addEventListener("scroll", update, { passive: true });
+        ro?.observe(el);
+        if (typeof MutationObserver !== "undefined") {
+          // Content changes (zoom, window paging, re-render) resize the
+          // scroll area without resizing the scroller box itself.
+          contentMo = new MutationObserver(update);
+          contentMo.observe(el, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["style", "width", "height"],
+          });
+        }
+      } else {
+        setMetrics(null);
+      }
+      update();
+    };
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(update);
+      ro.observe(stack);
+    }
+    // Stack-level observer: catches the async preview (un)mount, so the
+    // scroller is picked up whenever it appears, not just at overlay mount.
+    const resolve = () => {
+      attach(stack.querySelector("[data-note-scroll]") as HTMLElement | null);
+    };
     const mo =
-      typeof MutationObserver !== "undefined"
-        ? new MutationObserver(update)
-        : null;
-    mo?.observe(scroller, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["style", "width", "height"],
-    });
+      typeof MutationObserver !== "undefined" ? new MutationObserver(resolve) : null;
+    mo?.observe(stack, { childList: true, subtree: true });
+    resolve();
     return () => {
       cancelAnimationFrame(raf);
-      scroller.removeEventListener("scroll", update);
+      scroller?.removeEventListener("scroll", update);
       ro?.disconnect();
+      contentMo?.disconnect();
       mo?.disconnect();
     };
   }, [projectId, tab.sourceId, tab.locator]);
@@ -640,15 +691,6 @@ export function NotesOverlay({
       {notes.length > 0 && laneOpen ? (
       <div className={styles.lane} data-note-ui="lane">
         <div className={styles.laneHead}>
-          {selectedId ? (
-            <button
-              type="button"
-              className={styles.laneToggle}
-              onClick={() => setSelectedId(null)}
-            >
-              {t("notes.showAll")}
-            </button>
-          ) : null}
           {savingId ? <span className={styles.status}>{t("notes.saving")}</span> : null}
         </div>
           <ol className={styles.cards}>

@@ -555,8 +555,7 @@
     "color_green": "green",
     "color_orange": "orange",
     "color_purple": "purple",
-    "color_teal": "teal",
-    "showAll": "Show all"
+    "color_teal": "teal"
   },
   "visual": {
     "loading": "Loading figure…",

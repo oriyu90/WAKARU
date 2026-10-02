@@ -550,8 +550,7 @@
     "color_green": "绿色",
     "color_orange": "橙色",
     "color_purple": "紫色",
-    "color_teal": "青色",
-    "showAll": "显示全部"
+    "color_teal": "青色"
   },
   "visual": {
     "loading": "图解加载中…",

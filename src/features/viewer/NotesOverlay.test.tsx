@@ -138,7 +138,7 @@ describe("NotesOverlay", () => {
     expect(screen.queryByRole("button", { name: /delete/i })).toBeNull();
   });
 
-  it("tapping a card hides the rest and edits it; the list button restores all", async () => {
+  it("tapping a card hides the rest and edits it; outside click closes all", async () => {
     const update = vi.spyOn(notesApi, "update").mockResolvedValue(note("n1", 3, "hello") as never);
     setup([note("n1", 3, "first"), note("n2", 3, "second")]);
     await waitFor(() => expect(screen.getByText("first")).toBeInTheDocument());
@@ -147,9 +147,9 @@ describe("NotesOverlay", () => {
     fireEvent.click(screen.getByText("first"));
     await waitFor(() => expect(screen.queryByText("second")).toBeNull());
     expect(document.querySelector("textarea")).not.toBeNull();
-    // The list button brings every card back.
-    fireEvent.click(screen.getByText(/showAll/));
-    await waitFor(() => expect(screen.getByText("second")).toBeInTheDocument());
+    // Clicking outside closes the note and the lane together.
+    fireEvent.click(document.body);
+    await waitFor(() => expect(document.querySelector("[data-note-ui='lane']")).toBeNull());
     // Opening a card schedules its (unchanged) autosave flush.
     await waitFor(() => expect(update).toHaveBeenCalled());
   });
@@ -168,6 +168,44 @@ describe("NotesOverlay", () => {
     fireEvent.click(marker);
     await waitFor(() => expect(screen.getByText("hello")).toBeInTheDocument());
     expect(screen.queryByText("other")).toBeNull();
+  });
+
+  it("picks up a scroller that mounts after the overlay (async preview load)", async () => {
+    vi.spyOn(notesApi, "list").mockResolvedValue([note("n1", 3, "hello", 0.5, 0.5)] as never);
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 800, bottom: 600,
+      width: 800, height: 600, toJSON: () => "",
+    });
+    const scrollSizes: Record<string, number> = {
+      scrollWidth: 800, scrollHeight: 2000, clientWidth: 800, clientHeight: 600,
+      scrollLeft: 0, scrollTop: 400,
+    };
+    for (const [prop, value] of Object.entries(scrollSizes)) {
+      vi.spyOn(HTMLElement.prototype, prop as "scrollWidth", "get").mockReturnValue(value);
+    }
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = (withScroller: boolean) => (
+      <QueryClientProvider client={qc}>
+        <div data-testid="stack" style={{ position: "relative" }}>
+          {withScroller ? (
+            <div data-testid="material" data-note-scroll>
+              <p data-testid="content">material</p>
+            </div>
+          ) : null}
+          <NotesOverlay projectId="p1" tab={tab} />
+        </div>
+      </QueryClientProvider>
+    );
+    // Overlay mounts first (preview still loading): fallback position.
+    const view = render(tree(false));
+    await waitFor(() => expect(screen.getByText("hello")).toBeInTheDocument());
+    expect(screen.getByLabelText(/markerLabel/).style.top).toBe("50%");
+    // The preview body arrives late: metrics attach and the dot re-projects
+    // to document coordinates (800x2000 at scroll 400 → 100% here).
+    view.rerender(tree(true));
+    await waitFor(() =>
+      expect(screen.getByLabelText(/markerLabel/).style.top).toBe("100%"),
+    );
   });
 
   it("projects document fractions into the layer box, not the scroller box", async () => {
