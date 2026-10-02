@@ -230,8 +230,7 @@
   font-size: 0.75rem;
 }
 
-.retry,
-.jump {
+.retry {
   border: var(--rule-1) solid var(--color-rule-strong);
   border-radius: var(--radius-sm);
   background: transparent;
@@ -242,19 +241,9 @@
   cursor: pointer;
 }
 
-.retry:focus-visible,
-.jump:focus-visible {
+.retry:focus-visible {
   outline: var(--focus-ring) solid var(--color-focus);
   outline-offset: var(--focus-offset);
-}
-
-.otherPages {
-  list-style: none;
-  margin: var(--space-2xs) 0 0;
-  padding: 0;
-  display: flex;
-  gap: var(--gap-tight);
-  flex-wrap: wrap;
 }
 
 /* Responsive buckets from the stack width (set as data-size on the layer):
@@ -278,8 +267,7 @@
 }
 
 .layer[data-size="sm"] .laneToggle,
-.layer[data-size="sm"] .retry,
-.layer[data-size="sm"] .jump {
+.layer[data-size="sm"] .retry {
   min-height: 2.5rem;
   font-size: 0.8125rem;
 }

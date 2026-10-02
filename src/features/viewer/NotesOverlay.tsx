@@ -2,11 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notesApi } from "../../ipc/notes";
-import { viewerApi } from "../../ipc/viewer";
 import { IpcError, inTauri } from "../../ipc/client";
 import type { Note, ViewerTab } from "../../ipc/types.gen";
 import { useToast } from "../../components/useToast";
-import { rememberTabLocator } from "./Preview";
 import styles from "./NotesOverlay.module.css";
 
 /** Client-side note body ceiling mirrors the backend (plan §5.1). */
@@ -586,21 +584,14 @@ export function NotesOverlay({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, tab.sourceId, page]);
 
-  function jumpToPage(target: number) {
-    const locator = { t: "page", page: target };
-    rememberTabLocator(qc, projectId, tab.id, locator);
-    void viewerApi
-      .updateLocator(projectId, tab.id, locator)
-      .then(() => qc.invalidateQueries({ queryKey: ["viewer-tabs", projectId] }))
-      .catch(() => toast.push({ tone: "error", message: t("errors.internal") }));
-  }
-
   const visible = notes.filter((n) => {
     const a = asAnchor(n);
     if (typeof a.page !== "number") return true;
     if (page == null) return true;
     return a.page === page;
   });
+  // Notes on other pages stay hidden without any jump buttons: the current
+  // page shows only its own markers and cards.
   // Single-note focus: tapping one card (or its dot) hides the rest and
   // opens it for editing; the list button returns to the side-by-side view.
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -611,15 +602,6 @@ export function NotesOverlay({
     setSelectedId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, tab.sourceId, tab.locator]);
-  const hiddenByPage = notes.filter((n) => !visible.includes(n));
-  const hiddenCounts = useMemo(() => {
-    const map = new Map<number, number>();
-    for (const n of hiddenByPage) {
-      const p = asAnchor(n).page;
-      if (typeof p === "number") map.set(p, (map.get(p) ?? 0) + 1);
-    }
-    return [...map.entries()].sort((a, b) => a[0] - b[0]);
-  }, [hiddenByPage]);
 
   return (
     <div ref={layerRef} className={styles.layer} data-size={sizeBucket}>
@@ -763,17 +745,6 @@ export function NotesOverlay({
               );
             })}
           </ol>
-        {hiddenCounts.length ? (
-          <ul className={styles.otherPages}>
-            {hiddenCounts.map(([p, c]) => (
-              <li key={p}>
-                <button type="button" className={styles.jump} onClick={() => jumpToPage(p)}>
-                  {t("notes.otherPage", { count: c, page: p })}
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
       </div>
       ) : null}
     </div>

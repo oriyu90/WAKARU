@@ -543,7 +543,6 @@
     "undo": "撤销",
     "saving": "保存中…",
     "needsCheck": "需确认位置",
-    "otherPage": "第 {{page}} 页有 {{count}} 条",
     "color_yellow": "黄色",
     "color_pink": "粉色",
     "color_blue": "蓝色",

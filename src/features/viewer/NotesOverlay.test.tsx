@@ -101,14 +101,15 @@ describe("NotesOverlay", () => {
     return qc;
   }
 
-  it("shows current-page markers and cards, other pages as jump counts", async () => {
+  it("shows current-page markers and cards, and no other-page buttons", async () => {
     setup([note("n1", 3, "hello"), note("n2", 5, "elsewhere")]);
     await waitFor(() => expect(screen.getByText("hello")).toBeInTheDocument());
     // Current-page marker present with a colour label, not colour alone.
     expect(screen.getByLabelText(/markerLabel/)).toBeInTheDocument();
-    // Other page collapses to a count + jump entry.
-    expect(screen.getByText(/otherPage/)).toBeInTheDocument();
+    // Other pages stay hidden with no jump buttons at all.
     expect(screen.queryByText("elsewhere")).toBeNull();
+    expect(screen.queryByText(/otherPage/)).toBeNull();
+    expect(document.querySelector("[data-note-ui='lane'] ul")).toBeNull();
   });
 
   it("right-click on content creates a note; on bare viewport or marker it does not", async () => {
