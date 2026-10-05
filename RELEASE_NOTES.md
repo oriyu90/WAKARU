@@ -1,3 +1,33 @@
+# WAKARU v1.6.9
+
+WAKARU v1.6.9 stabilises the v1.6.0 sticky notes on document coordinates and
+adds fit/fill document zoom. No data migration is required.
+
+## What changed
+
+- Note markers live in document fractions and re-project on scroll, resize,
+  zoom and late-mounted previews; markers out of view hide and return on
+  scroll-back. Pre-v1.6.4 notes carry a position-check badge instead of a
+  silent offset.
+- The lane is a bottom bar that opens on create/marker tap and closes on
+  outside click or Escape; markers drag to move (tap still opens, right-click
+  still deletes with undo). Text selection stays inverted for legibility and
+  creation is limited to real material content.
+- PDF/image views gain fit (whole) and fill (cover) modes with pinch and
+  Shift+wheel zoom; seven band colours identify notes.
+- Audit fixes: panic-free anchor validation, pointer-cancelled drags,
+  zero lint warnings. Japanese, English and Simplified Chinese UI remain in
+  parity (487 keys).
+
+## Compatibility
+
+No database migration. All v1.6.0–v1.6.1 projects, notes and figures open as-is.
+
+## Distribution
+
+Apple Silicon Mac, macOS 12 or later. Ad-hoc signed, not Apple-notarised.
+Repository remains private; first launch needs Privacy & Security approval.
+
 # WAKARU v1.6.1
 
 WAKARU v1.6.1 fixes the v1.6.0 sticky-note creation path and hardens the
