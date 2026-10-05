@@ -1,3 +1,41 @@
+# v1.6.9 release record
+
+Prepared 2026-10-05. Scope: sticky-note stabilisation on document coordinates
+(D-49–D-57) plus audit fixes (D-58). See `RELEASE_NOTES.md`,
+`docs/DECISIONS.md` D-49–D-58 and `QUALITY_REPORT.md`.
+
+## Verified artifact
+
+- App: `src-tauri/target/release/bundle/macos/WAKARU.app` (arm64, macOS 12+,
+  version 1.6.9, ad-hoc signed with runtime option, identifier
+  `com.yukiorita.wakaru`; strict verify passes after manual re-sign due to the
+  known linker-signed bundler skip)
+- DMG: `WAKARU_1.6.9_aarch64.dmg` (21,958,941 bytes)
+- Checksum: `WAKARU_1.6.9_aarch64.dmg.sha256`
+- SHA-256: `9701db2cb2aa10308c33b2efa458f871393ef351eef208d04b78d33d430a2daf`
+- `hdiutil verify` was VALID. The built app reached
+  `WAKARU backend ready version="1.6.9"`.
+- No credentials are embedded in tracked source, new documentation or DMG.
+
+## Verification summary
+
+- Frontend: typecheck, lint (0 warnings), design-rules, hardcoded-strings,
+  57 tests, contrast, i18n 487 keys × 3, production build.
+- Rust: fmt, clippy all-targets/all-features `-D warnings`, 236 lib passed +
+  1 ignored, all integration phases, `cargo deny check` (advisories/bans/
+  licenses/sources).
+- No DB migration, no IPC change (additive-only since v1.6.0). v1.6.0–v1.6.1
+  projects, notes and figures open as-is; pre-v1.6.4 note coordinates show the
+  position-check badge.
+
+## Steps
+
+1. Commit and tag `v1.6.9` on `main`.
+2. Create the GitHub Release `v1.6.9` with the DMG + `.sha256`.
+3. Update the Studio RIZI site (4 locales) and the private `WAKARU.md` memo.
+
+---
+
 # v1.6.1 release record
 
 Prepared 2026-10-01. Scope: v1.6.0 audit fixes for notes and figures.
