@@ -93,6 +93,7 @@ export function NotesOverlay({
   const [baseUpdatedAt, setBaseUpdatedAt] = useState<string | null>(null);
   const [conflictId, setConflictId] = useState<string | null>(null);
   const [laneOpen, setLaneOpen] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [saveErrorId, setSaveErrorId] = useState<string | null>(null);
   const [pendingBody, setPendingBody] = useState<{ id: string; body: string } | null>(null);
@@ -593,14 +594,12 @@ export function NotesOverlay({
   // Notes on other pages stay hidden without any jump buttons: the current
   // page shows only its own markers and cards.
   // Single-note focus: tapping one card (or its dot) hides the rest and
-  // opens it for editing; the list button returns to the side-by-side view.
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // opens it for editing.
   const listed = selectedId ? visible.filter((n) => n.id === selectedId) : visible;
   // Moving to another page/locator releases the focus; a pending autosave
   // still flushes through the shared draft timer.
   useEffect(() => {
     setSelectedId(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, tab.sourceId, tab.locator]);
 
   return (
@@ -646,6 +645,7 @@ export function NotesOverlay({
               function onUp(ev: PointerEvent) {
                 window.removeEventListener("pointermove", onMove);
                 window.removeEventListener("pointerup", onUp);
+                window.removeEventListener("pointercancel", onCancel);
                 dragCleanup.current = null;
                 if (!dragMoved.current) return;
                 dragMoved.current = false;
@@ -654,11 +654,21 @@ export function NotesOverlay({
                 setDrag(null);
                 moveMut.mutate({ id, x: p.x, y: p.y, expected });
               }
+              function onCancel() {
+                window.removeEventListener("pointermove", onMove);
+                window.removeEventListener("pointerup", onUp);
+                window.removeEventListener("pointercancel", onCancel);
+                dragCleanup.current = null;
+                dragMoved.current = false;
+                setDrag(null);
+              }
               window.addEventListener("pointermove", onMove);
               window.addEventListener("pointerup", onUp);
+              window.addEventListener("pointercancel", onCancel);
               dragCleanup.current = () => {
                 window.removeEventListener("pointermove", onMove);
                 window.removeEventListener("pointerup", onUp);
+                window.removeEventListener("pointercancel", onCancel);
               };
             }}
             onContextMenu={(e) => {

@@ -364,7 +364,6 @@ export function PdfFilePreview({
       cancelled = true;
       void task?.destroy();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asset.data, detail.primaryAssetUrl, detail.bytes]);
 
   useEffect(() => {

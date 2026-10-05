@@ -67,7 +67,13 @@ fn validate_anchor(kind: &str, anchor: &serde_json::Value) -> AppResult<()> {
         ));
     }
     if kind == "page" && anchor.is_object() {
-        let obj = anchor.as_object().unwrap();
+        let Some(obj) = anchor.as_object() else {
+            return Err(AppError::new(
+                "NOTE_INVALID_ANCHOR",
+                "error.note.invalidAnchor",
+                "anchor must be a JSON object",
+            ));
+        };
         for key in ["x", "y"] {
             if let Some(v) = obj.get(key) {
                 let n = v.as_f64().ok_or_else(|| {
