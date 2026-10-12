@@ -605,3 +605,45 @@
 - **採用**: 資料座標への統一・下部バー・開閉一本化・ドラッグ移動・遅延描画追従を v1.6.9 として確定する。監査修正として `validate_anchor` の `unwrap` を `if let` 化し、未使用の eslint-disable 2件を除去し、丸ぽちドラッグへ `pointercancel` を追加し、`selectedId` の宣言順を整理する。
 - **理由**: 座標の帰属・開閉・移動を資料上の直接操作へ畳む方針（D-52/D-56/D-57）を保ちつつ、クラッシュ安全性と警告ゼロを回復させる。
 - **影響**: DB 移行・IPC 変更なし。日英中 UI 同時対応（487キー）。既存 v1.6.0〜v1.6.1 の付箋はそのまま開き、v1.6.4 より前の座標は位置確認バッジのまま。
+
+## D-59 · Windows 10/11 x64 対応（Tauri構成のまま移植）
+
+- **日付**: 2026-10-12（v1.7.0）
+- **論点**: macOS専用（arm64 DMG）だったWAKARUをWindowsへ出す。WinUI3への書き換えはしない。
+- **採用**: `whisper-rs` の `metal` をmacOS限定・WindowsはCPU既定へ。`tauri.conf.json` へ `bundle.windows`
+  （publisher・言語・bootstrapper）を追加し、NSISを第一配布物にする。sandbox/MCPのPATH・実行解決・
+  プロセスkill・空き容量確認へ `cfg(windows)` 分岐を追加し、unix側は不変にする。OneDriveの
+  オンデマンドstubをiCloud stubと同等（`SOURCE_NOT_DOWNLOADED`）に扱う。Overlay/insetはmacOSのみにし、
+  Windowsは通常枠にする。i18nは値追記のみ（487キー維持）でWindows Firewall文を追加する。
+  `deny.toml` へ `x86_64-pc-windows-msvc` を追加する。新規 `unsafe` はFFIの最小1箇所のみ（SAFETY注記）。
+- **理由**: 同一Tauri構成のままOS固有層だけを分岐させ、互換性・上限・原子性・監査（deny）を保つ。
+  配布はNSISを正本、MSIXは任意の第二経路にする。
+- **影響**: DB移行・IPC変更なし。日英中UI同時対応（487キー維持）。`identifier` は不変
+ （設定・projectの移行不要）。macOSの動作・見た目は不変。
+
+## D-60 · WindowsのSxSマニフェストは単一化する
+
+- **日付**: 2026-10-12（v1.7.0）
+- **論点**: rfd/common-controls-v6 が `TaskDialogIndirect` を静的importするため、
+  v6束縛のないバイナリは起動前に `0xC0000139` で死ぬ。tauri既定の `resource.lib` は
+  binsにしか届かず、テスト用に別経路で足すとbinsで重複（CVT1100）する。
+- **採用**: `new_without_app_manifest` で `resource.lib` からマニフェストを外し、
+  自前のrichマニフェスト（v6＋UTF-8＋DPIv2＋longPath＋asInvoker＋Win7-11互換、
+  版数は `CARGO_PKG_VERSION_*` から自動生成）を無接尾辞link-argで全ターゲットへ
+  単一適用する。依存追加なし、macOS側は不変。
+- **理由**: どのリンク成果物もマニフェストをちょうど1つ持ち、重複も欠落もない。
+  製品のicon・versioninfoは `resource.lib` に残る。
+- **影響**: DB移行・IPC・Rustコード変更なし。`build.rs` のみ。
+
+## D-61 · Windows配布は独自exe＋ポータブルzipの2本立てにする
+
+- **日付**: 2026-10-12（v1.7.0）
+- **論点**: NSISを使わずに配布する。インストーラは外部FWなしで単一exeにしたい。
+- **採用**: `installer/`（stdのみ、約500行）にペイロード（WAKARU.exe＋LICENSE＋
+  初回手引き）を内蔵した単一setup.exeを作る。per-user（管理者権限不要）、
+  Start Menu登録、ARP登録、アンインストーラは自己複製（`uninstall.exe` は起動名で
+  動作・配置判定する）。日英はOSロケールで自動切替。ポータブルzipは同ペイロードの
+  圧縮版。署名なし＋SmartScreen手順明記は共通方針どおり。
+- **理由**: 外部インストーラFWの導入・保守が要らず、動作はround-trip試験で固定する。
+  失敗時は構造化エラーで中止し、黙って続行しない。
+- **影響**: DB移行・IPC変更なし。版上げ時は `installer` の版も連動する。

@@ -367,9 +367,9 @@ export function Studio({
       toast.push({ tone: "error", message: t("studio.importFailed") }),
   });
 
-  // Tauri's native file-drop event carries real filesystem paths on macOS;
-  // HTML drag data in WKWebView does not do so reliably. The listener exists
-  // only while Studio is mounted and a conversation can own the artifacts.
+  // Tauri's native file-drop event carries real filesystem paths on macOS and
+  // Windows; HTML drag data in the webview does not do so reliably. The listener
+  // exists only while Studio is mounted and a conversation can own the artifacts.
   useEffect(() => {
     if (!inTauri || !activeTabId) return;
     let disposed = false;

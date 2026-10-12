@@ -13,17 +13,14 @@ pub fn transcribe_chunk(
     samples: &[f32],
     language: Option<&str>,
 ) -> AppResult<Vec<TranscriptSegment>> {
-    let ctx = WhisperContext::new_with_params(
-        &model_path.to_string_lossy(),
-        WhisperContextParameters::default(),
-    )
-    .map_err(|e| {
-        AppError::new(
-            "WHISPER_LOAD_FAILED",
-            "error.whisper.loadFailed",
-            e.to_string(),
-        )
-    })?;
+    let ctx = WhisperContext::new_with_params(model_path, WhisperContextParameters::default())
+        .map_err(|e| {
+            AppError::new(
+                "WHISPER_LOAD_FAILED",
+                "error.whisper.loadFailed",
+                e.to_string(),
+            )
+        })?;
     let mut state = ctx.create_state().map_err(|e| {
         AppError::new(
             "WHISPER_STATE_FAILED",
@@ -55,18 +52,17 @@ pub fn transcribe_chunk(
         )
     })?;
 
-    let n = state.full_n_segments().map_err(|e| {
-        AppError::new(
-            "WHISPER_RUN_FAILED",
-            "error.whisper.runFailed",
-            e.to_string(),
-        )
-    })?;
+    // whisper-rs 0.16 returns plain values for segment queries (bounds are
+    // enforced by `get_segment`); failures collapse to skip, as before.
+    let n = state.full_n_segments();
     let mut out = Vec::with_capacity(n as usize);
     for i in 0..n {
-        let text = state.full_get_segment_text(i).unwrap_or_default();
-        let t0 = state.full_get_segment_t0(i).unwrap_or(0);
-        let t1 = state.full_get_segment_t1(i).unwrap_or(t0);
+        let Some(seg) = state.get_segment(i) else {
+            continue;
+        };
+        let text = seg.to_str_lossy().unwrap_or_default();
+        let t0 = seg.start_timestamp();
+        let t1 = seg.end_timestamp();
         let text = text.trim().to_string();
         if text.is_empty() {
             continue;

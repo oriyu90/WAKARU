@@ -42,14 +42,15 @@ body {
   overflow: hidden;
 }
 
-/* Inside the Tauri shell the window uses an overlay (hidden-inset) title bar,
- * so the unified toolbar must leave room for the macOS traffic lights. In a
- * plain browser there are none, so the inset stays at the default. */
-:root[data-tauri="true"] {
+/* Inside the Tauri shell on macOS the window uses an overlay (hidden-inset)
+ * title bar, so the unified toolbar must leave room for the traffic lights.
+ * On Windows the native frame is used (`data-titlebar-overlay` is unset),
+ * so no inset is reserved. In a plain browser there are none either. */
+:root[data-tauri="true"][data-titlebar-overlay="mac"] {
   --titlebar-inset-start: 5rem;
 }
 /* Fullscreen: macOS hides the traffic lights, so reclaim the reserved space. */
-:root[data-tauri="true"][data-fullscreen="true"] {
+:root[data-tauri="true"][data-titlebar-overlay="mac"][data-fullscreen="true"] {
   --titlebar-inset-start: var(--space-sm);
 }
 

@@ -26,8 +26,15 @@ import {
 import { FirstRun } from "./FirstRun";
 import styles from "./AppShell.module.css";
 
-const isMac =
-  typeof navigator !== "undefined" && /mac/i.test(navigator.platform || navigator.userAgent);
+function platformString(): string {
+  if (typeof navigator === "undefined") return "";
+  const withData = navigator as Navigator & {
+    userAgentData?: { platform?: string };
+  };
+  return withData.userAgentData?.platform ?? navigator.platform ?? navigator.userAgent ?? "";
+}
+
+const isMac = typeof navigator !== "undefined" && /mac/i.test(platformString());
 
 export function AppShell() {
   const { t } = useTranslation();

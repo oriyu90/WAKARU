@@ -1,8 +1,15 @@
 import { useTranslation } from "react-i18next";
 import styles from "./About.module.css";
 
-const isMac =
-  typeof navigator !== "undefined" && /mac/i.test(navigator.platform || navigator.userAgent);
+function platformString(): string {
+  if (typeof navigator === "undefined") return "";
+  const withData = navigator as Navigator & {
+    userAgentData?: { platform?: string };
+  };
+  return withData.userAgentData?.platform ?? navigator.platform ?? navigator.userAgent ?? "";
+}
+
+const isMac = typeof navigator !== "undefined" && /mac/i.test(platformString());
 const M = isMac ? "⌘" : "Ctrl+";
 
 // docs/06 §3.2 — read-only in v1.0.

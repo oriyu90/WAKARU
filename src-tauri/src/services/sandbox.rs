@@ -23,8 +23,22 @@ pub const MAX_WORKSPACE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 pub const MAX_OUTPUT_BYTES: usize = 1024 * 1024;
 /// Only these are inherited by a sandboxed command (docs/05 §7.2). An API key
 /// can never reach a child process.
+#[cfg(unix)]
 const ENV_ALLOWLIST: &[&str] = &["PATH", "HOME", "TMPDIR", "LANG"];
+/// Windows equivalent: `HOME` -> `USERPROFILE`, `TMPDIR` -> `TEMP`/`TMP`,
+/// plus the minimum Windows runtime variables. Secrets are still excluded.
+#[cfg(windows)]
+const ENV_ALLOWLIST: &[&str] = &[
+    "PATH",
+    "USERPROFILE",
+    "TEMP",
+    "TMP",
+    "SystemRoot",
+    "PATHEXT",
+    "LANG",
+];
 
+#[cfg(unix)]
 fn command_path() -> OsString {
     let mut dirs: Vec<PathBuf> = std::env::var_os("PATH")
         .map(|value| std::env::split_paths(&value).collect())
@@ -53,12 +67,62 @@ fn command_path() -> OsString {
     std::env::join_paths(dirs).unwrap_or_else(|_| OsString::from("/usr/bin:/bin"))
 }
 
+/// Windows search path for sandboxed commands. The inherited `PATH` wins;
+/// well-known install locations are appended (existence-checked, deduped).
+#[cfg(windows)]
+fn command_path() -> OsString {
+    use std::env::var_os;
+    let mut dirs: Vec<PathBuf> = var_os("PATH")
+        .map(|value| std::env::split_paths(&value).collect())
+        .unwrap_or_default();
+    let system_root = var_os("SystemRoot")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+    let program_files = var_os("ProgramFiles")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(r"C:\Program Files"));
+    let program_files_x86 = var_os("ProgramFiles(x86)")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(r"C:\Program Files (x86)"));
+    dirs.extend([
+        system_root.join("System32"),
+        program_files.join("Git").join("cmd"),
+        program_files.join("nodejs"),
+        program_files_x86
+            .join("Microsoft Visual Studio")
+            .join("Shared")
+            .join("Python"),
+    ]);
+    if let Some(profile) = var_os("USERPROFILE").map(PathBuf::from) {
+        dirs.extend([
+            profile.join(".cargo").join("bin"),
+            profile.join("scoop").join("shims"),
+            profile
+                .join("AppData")
+                .join("Local")
+                .join("Programs")
+                .join("Python"),
+        ]);
+    }
+    if let Some(appdata) = var_os("APPDATA").map(PathBuf::from) {
+        dirs.extend([appdata.join("npm"), appdata.join("Python")]);
+    }
+    if let Some(local) = var_os("LOCALAPPDATA").map(PathBuf::from) {
+        dirs.extend([local.join("Microsoft").join("WindowsApps")]);
+    }
+    let mut seen = HashSet::new();
+    dirs.retain(|dir| dir.is_dir() && seen.insert(dir.clone()));
+    std::env::join_paths(dirs).unwrap_or_else(|_| OsString::from(r"C:\Windows\System32"))
+}
+
 /// Short, runtime-accurate command list placed in the weak-model capability
 /// guide. It advertises only tools that can actually be spawned by run_command.
 pub fn command_catalog() -> String {
     let path = command_path();
     let dirs: Vec<PathBuf> = std::env::split_paths(&path).collect();
-    let available: Vec<&str> = [
+    // `textutil` is macOS-only; it must never be advertised on Windows.
+    #[cfg(unix)]
+    const CANDIDATES: &[&str] = &[
         "python3",
         "textutil",
         "pandoc",
@@ -66,10 +130,22 @@ pub fn command_catalog() -> String {
         "ffmpeg",
         "magick",
         "pdftotext",
-    ]
-    .into_iter()
-    .filter(|name| dirs.iter().any(|dir| dir.join(name).is_file()))
-    .collect();
+    ];
+    #[cfg(windows)]
+    const CANDIDATES: &[&str] = &[
+        "python",
+        "python3",
+        "pandoc",
+        "soffice",
+        "ffmpeg",
+        "magick",
+        "pdftotext",
+    ];
+    let available: Vec<&str> = CANDIDATES
+        .iter()
+        .copied()
+        .filter(|name| dirs.iter().any(|dir| dir.join(name).is_file()))
+        .collect();
     if available.is_empty() {
         "(no optional conversion commands detected)".into()
     } else {
@@ -98,12 +174,19 @@ pub fn resolve_in_sandbox(root: &Path, user_path: &str) -> AppResult<PathBuf> {
     if raw.starts_with('~') {
         return Err(denied("home-relative paths are not allowed"));
     }
-    // Reject Windows-isms outright: a backslash is never a legitimate separator
-    // or filename byte here, and on a unix host `..\..\` would otherwise slip
-    // through as one innocent-looking filename (AC-7-5). Drive letters and UNC
-    // prefixes are covered by the `:` and leading-`/` checks.
+    // On unix hosts a backslash is never a legitimate separator or filename
+    // byte here, and `..\..\` would otherwise slip through as one
+    // innocent-looking filename (AC-7-5). Drive letters and UNC prefixes are
+    // covered by the `:` and leading-`/` checks.
+    // On Windows hosts backslashes and drive prefixes are legitimate
+    // separators; absolute paths are still rejected below via components.
+    #[cfg(unix)]
     if raw.starts_with('/') || raw.contains('\\') || raw.contains(':') {
         return Err(denied("absolute or Windows-style paths are not allowed"));
+    }
+    #[cfg(windows)]
+    if raw.starts_with('/') || raw.starts_with('\\') {
+        return Err(denied("absolute paths are not allowed"));
     }
 
     let p = Path::new(raw);
@@ -337,7 +420,21 @@ fn kill_group(pid: Option<u32>) {
     }
 }
 
-#[cfg(not(unix))]
+/// Windows: kill the whole child tree (`taskkill /T /F`). Best-effort only:
+/// a failure must never turn a timeout into a crash (design §2.3).
+#[cfg(windows)]
+fn kill_group(pid: Option<u32>) {
+    if let Some(pid) = pid {
+        let _ = std::process::Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+    }
+}
+
+#[cfg(not(any(unix, windows)))]
 fn kill_group(_pid: Option<u32>) {}
 
 #[cfg(test)]
@@ -376,14 +473,13 @@ mod tests {
         std::fs::write(outside.path().join("secret.txt"), b"top secret").unwrap();
         #[cfg(unix)]
         std::os::unix::fs::symlink(outside.path(), root.join("link")).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(outside.path(), root.join("link")).unwrap();
 
-        #[cfg(unix)]
-        {
-            // A path *through* the symlink resolves outside and is rejected.
-            assert!(resolve_in_sandbox(root, "link/secret.txt").is_err());
-            // And write_file's own regular-file check catches the link itself.
-            assert!(reject_symlink(&root.join("link")).is_err());
-        }
+        // A path *through* the symlink resolves outside and is rejected.
+        assert!(resolve_in_sandbox(root, "link/secret.txt").is_err());
+        // And write_file's own regular-file check catches the link itself.
+        assert!(reject_symlink(&root.join("link")).is_err());
     }
 
     #[test]
@@ -398,17 +494,22 @@ mod tests {
     async fn ac_7_7_and_7_8_shell_free_and_env_scrubbed() {
         let dir = ws();
         std::env::set_var("WAKARU_SECRET_KEY", "sk-must-not-leak");
-        // `env` with a bogus arg containing shell metacharacters — proves the
-        // arg is literal (no command runs) and the environment is clean.
-        let out = run_command(
-            "p1",
-            dir.path(),
-            "/usr/bin/env",
-            &["; rm -rf /".to_string()],
-            Duration::from_secs(5),
-        )
-        .await
-        .unwrap();
+        // Proves the arg is literal (no command runs) and the environment is
+        // clean. Uses `cmd /c set` on Windows, `/usr/bin/env` on unix.
+        #[cfg(unix)]
+        let (program, args): (&str, Vec<String>) = ("/usr/bin/env", vec!["; rm -rf /".to_string()]);
+        #[cfg(windows)]
+        let (program, args): (&str, Vec<String>) = (
+            "cmd",
+            vec![
+                "/c".to_string(),
+                "set".to_string(),
+                "; rm -rf /".to_string(),
+            ],
+        );
+        let out = run_command("p1", dir.path(), program, &args, Duration::from_secs(5))
+            .await
+            .unwrap();
         assert!(
             !out.stdout.contains("WAKARU_SECRET_KEY"),
             "no secrets in child env"
@@ -421,15 +522,20 @@ mod tests {
     async fn ac_7_9_timeout_kills_the_process() {
         let dir = ws();
         let start = std::time::Instant::now();
-        let out = run_command(
-            "p2",
-            dir.path(),
-            "/bin/sleep",
-            &["30".to_string()],
-            Duration::from_millis(400),
-        )
-        .await
-        .unwrap();
+        #[cfg(unix)]
+        let (program, args): (&str, Vec<String>) = ("/bin/sleep", vec!["30".to_string()]);
+        #[cfg(windows)]
+        let (program, args): (&str, Vec<String>) = (
+            "powershell",
+            vec![
+                "-NoProfile".to_string(),
+                "-Command".to_string(),
+                "Start-Sleep -Seconds 30".to_string(),
+            ],
+        );
+        let out = run_command("p2", dir.path(), program, &args, Duration::from_millis(400))
+            .await
+            .unwrap();
         assert!(out.timed_out);
         assert!(
             start.elapsed() < Duration::from_secs(5),
@@ -440,16 +546,21 @@ mod tests {
     #[tokio::test]
     async fn ac_7_10_output_over_1mb_is_truncated() {
         let dir = ws();
-        // ~2 MB of 'y\n' from `yes`, cut off by head-free capping.
-        let out = run_command(
-            "p3",
-            dir.path(),
-            "/usr/bin/yes",
-            &[],
-            Duration::from_millis(600),
-        )
-        .await
-        .unwrap();
+        // ~2 MB of output, cut off by head-free capping.
+        #[cfg(unix)]
+        let (program, args): (&str, Vec<String>) = ("/usr/bin/yes", vec![]);
+        #[cfg(windows)]
+        let (program, args): (&str, Vec<String>) = (
+            "powershell",
+            vec![
+                "-NoProfile".to_string(),
+                "-Command".to_string(),
+                "1..200000 | ForEach-Object { 'y' }".to_string(),
+            ],
+        );
+        let out = run_command("p3", dir.path(), program, &args, Duration::from_millis(600))
+            .await
+            .unwrap();
         assert!(out.stdout.len() <= MAX_OUTPUT_BYTES + 64);
         assert!(out.truncated || out.timed_out);
     }
@@ -457,12 +568,38 @@ mod tests {
     #[tokio::test]
     async fn one_command_per_project() {
         let dir = ws();
-        let sleep_args = ["2".to_string()];
-        let echo_args = ["hi".to_string()];
+        #[cfg(unix)]
+        let (sleep_prog, sleep_args, echo_prog, echo_args): (
+            &str,
+            Vec<String>,
+            &str,
+            Vec<String>,
+        ) = (
+            "/bin/sleep",
+            vec!["2".to_string()],
+            "/bin/echo",
+            vec!["hi".to_string()],
+        );
+        #[cfg(windows)]
+        let (sleep_prog, sleep_args, echo_prog, echo_args): (
+            &str,
+            Vec<String>,
+            &str,
+            Vec<String>,
+        ) = (
+            "powershell",
+            vec![
+                "-NoProfile".to_string(),
+                "-Command".to_string(),
+                "Start-Sleep -Seconds 2".to_string(),
+            ],
+            "cmd",
+            vec!["/c".to_string(), "echo".to_string(), "hi".to_string()],
+        );
         let a = run_command(
             "busy",
             dir.path(),
-            "/bin/sleep",
+            sleep_prog,
             &sleep_args,
             Duration::from_secs(3),
         );
@@ -471,7 +608,7 @@ mod tests {
             run_command(
                 "busy",
                 dir.path(),
-                "/bin/echo",
+                echo_prog,
                 &echo_args,
                 Duration::from_secs(3),
             )

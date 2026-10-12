@@ -285,7 +285,24 @@ pub fn add_one(
         .to_string();
     // Finder/iCloud placeholders are not the real bytes: fail distinctly from
     // a generic read error so the UI can tell the user to download first.
+    // Windows equivalent: OneDrive "Files On-Demand" stubs carry
+    // FILE_ATTRIBUTE_OFFLINE and read as 0 bytes until recalled.
+    let is_cloud_stub = {
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::MetadataExt;
+            const FILE_ATTRIBUTE_OFFLINE: u32 = 0x1000;
+            std::fs::metadata(src_path)
+                .map(|m| (m.file_attributes() & FILE_ATTRIBUTE_OFFLINE) != 0 && m.len() == 0)
+                .unwrap_or(false)
+        }
+        #[cfg(not(windows))]
+        {
+            false
+        }
+    };
     if original_name.ends_with(".icloud")
+        || is_cloud_stub
         || src_path
             .as_os_str()
             .to_string_lossy()
@@ -675,8 +692,54 @@ fn check_space(project_dir: &Path, file_bytes: u64, name: &str) -> AppResult<()>
             }
         }
     }
+    #[cfg(windows)]
+    {
+        if let Some(avail) = win_free_bytes(project_dir) {
+            if avail < need {
+                let missing = need.saturating_sub(avail);
+                return Err(AppError::new(
+                    "SOURCE_NO_SPACE",
+                    "error.source.noSpace",
+                    format!("not enough disk space for {name}"),
+                )
+                .with_details(serde_json::json!({
+                    "neededBytes": need,
+                    "missingBytes": missing,
+                    "fileBytes": file_bytes,
+                })));
+            }
+        }
+    }
     let _ = (need, name);
     Ok(())
+}
+
+/// Windows free-space probe via `GetDiskFreeSpaceExW`. The FFI call itself
+/// requires one minimal `unsafe` block (documented below); no other `unsafe`
+/// is added by the Windows port.
+#[cfg(windows)]
+fn win_free_bytes(path: &Path) -> Option<u64> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
+    let wide: Vec<u16> = path.as_os_str().encode_wide().chain([0]).collect();
+    let mut free: u64 = 0;
+    // SAFETY: `wide` is NUL-terminated and lives through the call; `free` is
+    // a stack-local `u64` used only as an out-pointer; the other two
+    // out-pointers are null as allowed by the API contract. The call has no
+    // aliasing or lifetime effects beyond writing `free`.
+    let ok = unsafe {
+        GetDiskFreeSpaceExW(
+            wide.as_ptr(),
+            &mut free,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        )
+    };
+    if ok != 0 {
+        Some(free)
+    } else {
+        None
+    }
 }
 
 pub fn kind_to_str(k: SourceKind) -> &'static str {

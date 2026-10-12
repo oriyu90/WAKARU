@@ -10,9 +10,21 @@ import { inTauri } from "./ipc/client";
 import { useUiStore, applyUiToDocument } from "./stores/ui";
 
 // Mark the document when running inside the Tauri shell so the toolbar can
-// reserve space for the macOS overlay title bar (traffic lights).
+// reserve space for the macOS overlay title bar (traffic lights). On Windows
+// the native frame is used, so no inset is reserved (see base.css).
 if (inTauri) {
   document.documentElement.dataset.tauri = "true";
+  // `navigator.userAgentData.platform` is preferred; fall back to the legacy
+  // `navigator.platform` / UA sniff so tests and older WebViews keep working.
+  const navPlatform =
+    (navigator as Navigator & { userAgentData?: { platform?: string } })
+      .userAgentData?.platform ??
+    navigator.platform ??
+    navigator.userAgent ??
+    "";
+  if (/mac/i.test(navPlatform)) {
+    document.documentElement.dataset.titlebarOverlay = "mac";
+  }
   // In fullscreen macOS hides the traffic lights, so the reserved left inset
   // is just dead space. Track it and let CSS drop the inset there (P5).
   void (async () => {

@@ -21,7 +21,19 @@ use tokio::sync::Mutex;
 
 const KEYRING_SERVICE: &str = "com.yukiorita.wakaru";
 /// Env vars a stdio MCP server inherits (docs/05 §6.4 — no secrets by default).
+#[cfg(unix)]
 const ENV_ALLOWLIST: &[&str] = &["PATH", "HOME", "TMPDIR", "LANG"];
+/// Windows equivalent (`HOME` -> `USERPROFILE`, `TMPDIR` -> `TEMP`/`TMP`).
+#[cfg(windows)]
+const ENV_ALLOWLIST: &[&str] = &[
+    "PATH",
+    "USERPROFILE",
+    "TEMP",
+    "TMP",
+    "SystemRoot",
+    "PATHEXT",
+    "LANG",
+];
 const STDERR_KEEP_LINES: usize = 200;
 const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(25);
 const LIST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
@@ -224,6 +236,7 @@ pub fn set_policy(app_db: &Connection, server_id: &str, tool: &str, policy: &str
 
 /// Well-known bin directories for language runtimes and tool managers that a
 /// GUI-launched process does not get on `PATH`. Only ones that exist are used.
+#[cfg(unix)]
 fn extra_bin_dirs() -> Vec<PathBuf> {
     let mut dirs: Vec<PathBuf> = [
         "/opt/homebrew/bin",
@@ -273,6 +286,57 @@ fn extra_bin_dirs() -> Vec<PathBuf> {
     dirs
 }
 
+/// Windows equivalent of [`extra_bin_dirs`]: Node.js, Git, npm, Scoop and
+/// nvm-windows install locations that a GUI-launched process does not get on
+/// `PATH`. Only directories that exist are used; the inherited `PATH` keeps
+/// its priority in [`child_path`].
+#[cfg(windows)]
+fn extra_bin_dirs() -> Vec<PathBuf> {
+    use std::env::var_os;
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    if let Some(pf) = var_os("ProgramFiles").map(PathBuf::from) {
+        dirs.push(pf.join("nodejs"));
+        dirs.push(pf.join("Git").join("cmd"));
+    }
+    if let Some(pfx) = var_os("ProgramFiles(x86)").map(PathBuf::from) {
+        dirs.push(pfx.join("nodejs"));
+    }
+    if let Some(root) = var_os("SystemRoot").map(PathBuf::from) {
+        dirs.push(root.join("System32"));
+    }
+    if let Some(profile) = var_os("USERPROFILE").map(PathBuf::from) {
+        dirs.push(profile.join(".cargo").join("bin"));
+        dirs.push(profile.join("scoop").join("shims"));
+        dirs.push(profile.join(".bun").join("bin"));
+        dirs.push(profile.join(".deno").join("bin"));
+        // nvm-windows keeps versioned `node.exe` directly under per-version
+        // dirs (no `bin` level, unlike nvm-sh).
+        let nvm = var_os("NVM_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| profile.join("AppData").join("Roaming").join("nvm"));
+        for base in [nvm, profile.join("AppData").join("Roaming").join("fnm")] {
+            if let Ok(rd) = std::fs::read_dir(&base) {
+                let mut found: Vec<PathBuf> = rd
+                    .flatten()
+                    .map(|e| e.path())
+                    .filter(|p| p.is_dir())
+                    .collect();
+                found.sort();
+                dirs.extend(found);
+            }
+        }
+    }
+    if let Some(appdata) = var_os("APPDATA").map(PathBuf::from) {
+        dirs.push(appdata.join("npm"));
+        dirs.push(appdata.join("Python"));
+    }
+    if let Some(local) = var_os("LOCALAPPDATA").map(PathBuf::from) {
+        dirs.push(local.join("Microsoft").join("WindowsApps"));
+        dirs.push(local.join("Programs").join("Python"));
+    }
+    dirs
+}
+
 /// `PATH` for a stdio MCP child: the inherited `PATH` first (user intent wins),
 /// then [`extra_bin_dirs`], de-duplicated, existing directories only.
 fn child_path() -> OsString {
@@ -294,23 +358,48 @@ fn child_path() -> OsString {
 /// path-qualified command is returned unchanged; if nothing matches, the
 /// original name is returned so `spawn` fails exactly as it did before.
 fn resolve_program(program: &str, search_path: &OsString) -> OsString {
-    if program.contains('/') || Path::new(program).is_absolute() {
+    if program.contains('/') || program.contains('\\') || Path::new(program).is_absolute() {
         return program.into();
     }
-    for dir in std::env::split_paths(search_path) {
-        let candidate = dir.join(program);
-        if !candidate.is_file() {
-            continue;
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            match std::fs::metadata(&candidate) {
-                Ok(md) if md.permissions().mode() & 0o111 != 0 => {}
-                _ => continue,
+    #[cfg(windows)]
+    let candidates: Vec<String> = {
+        let mut out = vec![program.to_string()];
+        if Path::new(program).extension().is_none() {
+            let pathext = std::env::var_os("PATHEXT")
+                .map(|v| {
+                    v.to_string_lossy()
+                        .split(';')
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_else(|| {
+                    vec![".EXE".to_string(), ".CMD".to_string(), ".BAT".to_string()]
+                });
+            for ext in pathext {
+                out.push(format!("{program}{ext}"));
             }
         }
-        return candidate.into_os_string();
+        out
+    };
+    #[cfg(unix)]
+    let candidates: Vec<String> = vec![program.to_string()];
+    for dir in std::env::split_paths(search_path) {
+        for name in &candidates {
+            let candidate = dir.join(name);
+            if !candidate.is_file() {
+                continue;
+            }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                match std::fs::metadata(&candidate) {
+                    Ok(md) if md.permissions().mode() & 0o111 != 0 => {}
+                    _ => continue,
+                }
+            }
+            return candidate.into_os_string();
+        }
     }
     program.into()
 }
@@ -948,22 +1037,35 @@ mod tests {
         let unique: std::collections::HashSet<_> = dirs.iter().collect();
         assert_eq!(unique.len(), dirs.len(), "child_path has duplicate entries");
         // A POSIX system always has /bin or /usr/bin.
+        #[cfg(unix)]
         assert!(dirs
             .iter()
             .any(|d| d == Path::new("/bin") || d == Path::new("/usr/bin")));
+        // A Windows system always has System32 on the child path.
+        #[cfg(windows)]
+        assert!(dirs.iter().any(|d| d
+            .file_name()
+            .is_some_and(|n| n.eq_ignore_ascii_case("System32"))));
     }
 
     #[test]
     fn resolve_program_finds_a_bare_name_on_path() {
         let path = child_path();
-        let resolved = resolve_program("sh", &path);
+        #[cfg(unix)]
+        let (probe, expected_file) = ("sh", "sh");
+        #[cfg(windows)]
+        let (probe, expected_file) = ("cmd", "cmd.exe");
+        let resolved = resolve_program(probe, &path);
         let p = Path::new(&resolved);
         assert!(
             p.is_absolute(),
-            "sh should resolve to an absolute path: {resolved:?}"
+            "{probe} should resolve to an absolute path: {resolved:?}"
         );
         assert!(p.is_file());
-        assert_eq!(p.file_name().unwrap(), "sh");
+        assert_eq!(
+            p.file_name().unwrap().to_string_lossy().to_lowercase(),
+            expected_file
+        );
     }
 
     #[test]

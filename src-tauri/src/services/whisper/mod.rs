@@ -134,7 +134,31 @@ fn free_bytes(path: &Path) -> Option<u64> {
     let s = nix::sys::statvfs::statvfs(path).ok()?;
     Some(s.blocks_available() as u64 * s.fragment_size() as u64)
 }
-#[cfg(not(unix))]
+/// Windows free-space probe via `GetDiskFreeSpaceExW` (one minimal documented
+/// `unsafe` FFI block). `None` = unknown, the check is skipped (fail-open).
+#[cfg(windows)]
+fn free_bytes(path: &Path) -> Option<u64> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
+    let wide: Vec<u16> = path.as_os_str().encode_wide().chain([0]).collect();
+    let mut free: u64 = 0;
+    // SAFETY: `wide` is NUL-terminated and lives through the call; `free` is
+    // a stack-local out-pointer; other out-pointers are null per API contract.
+    let ok = unsafe {
+        GetDiskFreeSpaceExW(
+            wide.as_ptr(),
+            &mut free,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        )
+    };
+    if ok != 0 {
+        Some(free)
+    } else {
+        None
+    }
+}
+#[cfg(not(any(unix, windows)))]
 fn free_bytes(_path: &Path) -> Option<u64> {
     None
 }

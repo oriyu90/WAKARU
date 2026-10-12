@@ -1,0 +1,16 @@
+[package]
+name = "wakaru-setup"
+version = "1.7.0"
+edition = "2021"
+rust-version = "1.85"
+authors = ["Yuki_Orita"]
+license = "MIT"
+description = "WAKARU per-user installer for Windows (x64, no admin rights required)"
+
+[[bin]]
+name = "wakaru-setup"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+strip = true

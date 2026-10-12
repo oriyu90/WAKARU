@@ -1051,7 +1051,11 @@ pub fn import_external_files(
             relative = PathBuf::from("imports").join(format!("{stem}-{suffix}{extension}"));
             suffix += 1;
         }
-        let relative_text = relative.to_string_lossy().to_string();
+        let relative_text = relative.to_string_lossy().replace('\\', "/");
+        // Cross-platform record (export.rs uses the same normalisation):
+        // DB rel paths always use `/` so projects and ZIPs move between
+        // macOS and Windows unchanged. `resolve_in_sandbox` accepts `/`
+        // on Windows, and `PathBuf` joins it back natively below.
         let destination = sandbox::resolve_in_sandbox(workspace, &relative_text)?;
         sandbox::check_write_size(workspace, &destination, metadata.len())?;
         let parent = destination.parent().ok_or_else(|| {

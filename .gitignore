@@ -35,3 +35,5 @@ dist-ssr
 
 # Release artifacts (uploaded to GitHub Releases, never committed)
 *.dmg
+/dist-windows/
+/installer/target/

@@ -287,8 +287,16 @@ mod tests {
             !note.contains("secret-test-key"),
             "note leaked the key: {note:?}"
         );
-        // No 1s+2s retry back-off on a dead endpoint.
-        assert!(started.elapsed() < Duration::from_secs(2), "probe retried");
+        // No 1s+2s retry back-off on a dead endpoint. Windows loopback RST
+        // delivery can itself take ~2s (measured 2060ms on this machine),
+        // consuming the whole 2s client timeout for a single attempt — so
+        // the ceiling is OS-gated. One retry would still cost ~2s + ~1s
+        // sleep + ~2s and trip either ceiling.
+        #[cfg(windows)]
+        let ceiling = Duration::from_secs(4);
+        #[cfg(not(windows))]
+        let ceiling = Duration::from_secs(2);
+        assert!(started.elapsed() < ceiling, "probe retried");
     }
 
     #[tokio::test]
