@@ -1,0 +1,41 @@
+WAKARU for Windows — 初回起動の手引き / First-launch guide
+============================================================
+対象 / Applies to: ポータブル版 (portable zip) とインストーラ版 (setup.exe)
+
+【日本語】
+
+1. ポータブル版はzipを展開して WAKARU.exe を実行してください。
+   インストーラ版は setup.exe を実行すると
+   %LocalAppData%\Programs\WAKARU に配置され、スタートメニューに登録されます。
+2. 初回起動時に SmartScreen ("Windows によって PC が保護されました") が
+   表示される場合があります。本ソフトは無署名配布のためです。
+   配布元 (GitHub Releases) とハッシュ値 (.sha256) を確認のうえ、
+   「詳細情報 → 実行」を選んでください。
+3. 動作には WebView2 Runtime が必要です (Windows 10 1803以降に標準搭載)。
+   不足時はインストーラ版・zip版いずれも起動しません。
+   https://developer.microsoft.com/microsoft-edge/webview2/ から
+   Evergreen Bootstrapper を導入してください。
+4. LAN上のモデル (LM Studio等) に接続できない場合は、Windows Defender
+   ファイアウォールの「プライベート ネットワーク」で WAKARU を許可してください。
+5. 設定・資料は %AppData%\com.yukiorita.wakaru に保存されます。
+   ポータブル版の削除はフォルダごと削除するだけです。
+6. 不具合報告・質問: https://discord.gg/x7KXhNTD8M
+   開発者: Yuki_Orita (https://studio-rizi.pages.dev/)
+
+[English]
+
+1. Portable: extract the zip and run WAKARU.exe.
+   Installer: run setup.exe. Files go to %LocalAppData%\Programs\WAKARU
+   and a Start menu entry is created. No admin rights are required.
+2. On first launch SmartScreen ("Windows protected your PC") may appear:
+   this build is unsigned. Verify the origin (GitHub Releases) and the
+   .sha256 hash, then choose "More info" -> "Run anyway".
+3. WebView2 Runtime is required (preinstalled on Windows 10 1803+).
+   If missing, install the Evergreen Bootstrapper from
+   https://developer.microsoft.com/microsoft-edge/webview2/ .
+4. If a LAN model server (e.g. LM Studio) is unreachable, allow WAKARU
+   on private networks in Windows Defender Firewall.
+5. Settings and documents live in %AppData%\com.yukiorita.wakaru.
+   Portable removal is just deleting the folder.
+6. Bug reports / questions: https://discord.gg/x7KXhNTD8M
+   Developer: Yuki_Orita (https://studio-rizi.pages.dev/)

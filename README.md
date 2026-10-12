@@ -17,11 +17,12 @@ Prebuilt builds are on the
 
 - **macOS (Apple Silicon, macOS 12+)**: `WAKARU_<version>_aarch64.dmg`. The build is
   ad-hoc signed and not Apple-notarized, so on first launch right-click WAKARU → **Open**.
-- **Windows 10/11 (x64)**: `WAKARU_<version>_x64-setup.exe` (NSIS installer, WebView2
-  Evergreen Runtime required — preinstalled on Windows 10 1803+). On first launch,
-  Windows SmartScreen may warn because the installer is not EV-signed; choose
-  **More info → Run anyway** only if you downloaded it from the Releases page above
-  and verified the `.sha256`.
+- **Windows 10/11 (x64)**: `WAKARU_<version>_x64-setup.exe` (own installer, per-user,
+  no admin rights) or `WAKARU_<version>_x64-portable.zip` (extract and run).
+  WebView2 Evergreen Runtime is required (preinstalled on Windows 10 1803+).
+  On first launch, Windows SmartScreen may warn because the binaries are not
+  EV-signed; choose **More info → Run anyway** only if you downloaded them from
+  the Releases page above and verified the `.sha256`.
 
 ## Highlights
 
