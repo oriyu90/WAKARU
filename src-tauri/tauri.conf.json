@@ -31,10 +31,13 @@
   "bundle": {
     "active": true,
     "targets": ["dmg", "app", "nsis", "deb", "appimage"],
+    "publisher": "Yuki Orita",
     "windows": {
-      "publisher": "Yuki Orita",
-      "languages": ["ja-JP", "en-US"],
-      "webviewInstallMode": { "type": "downloadBootstrapper" }
+      "webviewInstallMode": { "type": "downloadBootstrapper" },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["Japanese", "English"]
+      }
     },
     "macOS": {
       "minimumSystemVersion": "12.0"

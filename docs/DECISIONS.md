@@ -620,3 +620,17 @@
   配布はNSISを正本、MSIXは任意の第二経路にする。
 - **影響**: DB移行・IPC変更なし。日英中UI同時対応（487キー維持）。`identifier` は不変
  （設定・projectの移行不要）。macOSの動作・見た目は不変。
+
+## D-60 · WindowsのSxSマニフェストは単一化する
+
+- **日付**: 2026-10-12（v1.7.0）
+- **論点**: rfd/common-controls-v6 が `TaskDialogIndirect` を静的importするため、
+  v6束縛のないバイナリは起動前に `0xC0000139` で死ぬ。tauri既定の `resource.lib` は
+  binsにしか届かず、テスト用に別経路で足すとbinsで重複（CVT1100）する。
+- **採用**: `new_without_app_manifest` で `resource.lib` からマニフェストを外し、
+  自前のrichマニフェスト（v6＋UTF-8＋DPIv2＋longPath＋asInvoker＋Win7-11互換、
+  版数は `CARGO_PKG_VERSION_*` から自動生成）を無接尾辞link-argで全ターゲットへ
+  単一適用する。依存追加なし、macOS側は不変。
+- **理由**: どのリンク成果物もマニフェストをちょうど1つ持ち、重複も欠落もない。
+  製品のicon・versioninfoは `resource.lib` に残る。
+- **影響**: DB移行・IPC・Rustコード変更なし。`build.rs` のみ。
