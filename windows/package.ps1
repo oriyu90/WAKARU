@@ -7,8 +7,8 @@ param([string]$Version = "1.7.0")
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
-$payload = Join-Path $root "target\wix-payload"
 $dist = Join-Path $root "dist-windows"
+$payload = Join-Path $dist "_payload"
 
 function Needs($path, $what) {
     if (-not (Test-Path $path)) { throw "missing ${what}: ${path}" }
