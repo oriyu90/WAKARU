@@ -27,10 +27,11 @@
   --control-h: 2.5rem;
   --row-height: 2.5rem;
   --tab-height: 2.5rem;
-  --toolbar-height: 3.5rem; /* readable app header; still clears traffic lights */
+  --toolbar-height: 3.5rem; /* readable app header; still clears traffic lights on macOS */
   --hit-min: 2.75rem;
   /* Left inset so the toolbar wordmark clears the macOS traffic lights.
-   * Only applied inside the Tauri shell (see base.css [data-tauri]). */
+   * Only applied inside the Tauri shell on macOS
+   * (see base.css [data-titlebar-overlay="mac"]). */
   --titlebar-inset-start: var(--space-xs);
 
   /* ─── Measures ───────────────────────────────────────────────────────── */

@@ -7070,7 +7070,7 @@ dependencies = [
 
 [[package]]
 name = "wakaru"
-version = "1.6.9"
+version = "1.7.0"
 dependencies = [
  "base64 0.22.1",
  "calamine",
@@ -7124,6 +7124,7 @@ dependencies = [
  "uuid",
  "walkdir",
  "whisper-rs",
+ "windows-sys 0.59.0",
  "zip 2.4.2",
 ]
 

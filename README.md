@@ -12,12 +12,16 @@ offline.
 
 ## Download
 
-Prebuilt macOS (Apple Silicon) builds are on the
-[Releases page](https://github.com/oriyu90/WAKARU/releases/latest) (this
-repository is currently private, so release assets are available to
-collaborators). Verify the `.dmg` against its `.sha256`, open it, and drag
-**WAKARU** to Applications. The build is ad-hoc signed and not Apple-notarized,
-so on first launch right-click WAKARU → **Open**.
+Prebuilt builds are on the
+[Releases page](https://github.com/oriyu90/WAKARU/releases/latest).
+
+- **macOS (Apple Silicon, macOS 12+)**: `WAKARU_<version>_aarch64.dmg`. The build is
+  ad-hoc signed and not Apple-notarized, so on first launch right-click WAKARU → **Open**.
+- **Windows 10/11 (x64)**: `WAKARU_<version>_x64-setup.exe` (NSIS installer, WebView2
+  Evergreen Runtime required — preinstalled on Windows 10 1803+). On first launch,
+  Windows SmartScreen may warn because the installer is not EV-signed; choose
+  **More info → Run anyway** only if you downloaded it from the Releases page above
+  and verified the `.sha256`.
 
 ## Highlights
 
@@ -51,8 +55,9 @@ so on first launch right-click WAKARU → **Open**.
   Page-scoped questions include visible-page evidence even when search wording
   differs from the source.
 - **Studio** — an agentic loop over your sources and a sandboxed workspace, with tool
-  approval, iteration limits and artifact export. Drop files from Finder to copy and
-  ingest them into the project; completed tool work stays in expandable activity rows.
+  approval, iteration limits and artifact export. Drop files from Finder (macOS) or
+  Explorer (Windows) to copy and ingest them into the project; completed tool work
+  stays in expandable activity rows.
   Enter sends, Shift+Enter inserts a newline, and an earlier user turn can be edited.
   Follow-up searches respect the selected source and only cite retrieved chunks.
   Sent text appears immediately with persistence reconciliation, invalid tool calls
@@ -84,8 +89,10 @@ npm run tauri build        # package (macOS: add -- --bundles app for an app-onl
 ```
 
 Requirements: Node 20+, a stable Rust toolchain (see `src-tauri/Cargo.toml`
-`rust-version`), CMake (for the bundled `whisper.cpp`), and Xcode command-line
-tools on macOS.
+`rust-version`), CMake (for the bundled `whisper.cpp`), and platform tools:
+Xcode command-line tools on macOS, or MSVC C++ Build Tools ("Desktop development
+with C++" + Windows SDK) on Windows. WebView2 Runtime is required on Windows
+(preinstalled on Windows 10 1803+).
 
 ## Repository layout
 
