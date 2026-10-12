@@ -1,3 +1,30 @@
+# WAKARU v1.7.0
+
+WAKARU v1.7.0 adds Windows 10/11 (x64) support alongside macOS, with its own
+per-user installer and a portable build. No data migration is required.
+
+## What changed
+
+- Windows 10/11 (x64) distribution: `WAKARU_<version>_x64-setup.exe`
+  (own installer, per-user, no admin rights) and
+  `WAKARU_<version>_x64-portable.zip` (extract and run). WebView2 Evergreen
+  Runtime is required (preinstalled on Windows 10 1803+). Both are unsigned,
+  so SmartScreen may warn on first launch.
+- Studio commands and MCP servers resolve Windows tool locations (Node.js,
+  Git, npm, Scoop, nvm-windows) with PATHEXT-aware lookup.
+- OneDrive on-demand stubs are reported like iCloud stubs (download first).
+- Disk-space checks and Studio timeout termination work on Windows.
+- Native window frame on Windows; the macOS overlay inset stays mac-only.
+- Connection hints mention Windows Defender Firewall alongside the macOS
+  local-network permission. Japanese, English and Simplified Chinese UI
+  remain in parity (487 keys).
+- whisper-rs 0.14 to 0.16 with identical transcription behavior.
+
+## Compatibility
+
+No database migration. All v1.6.x projects, settings, notes and figures open
+as-is on both platforms.
+
 # WAKARU v1.6.9
 
 WAKARU v1.6.9 stabilises the v1.6.0 sticky notes on document coordinates and
