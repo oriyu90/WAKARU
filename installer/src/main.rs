@@ -101,6 +101,8 @@ fn msg(lang: Lang, key: &str) -> &str {
         }
         (Lang::Ja, "reg_failed") => "レジストリ登録に失敗しました",
         (Lang::En, "reg_failed") => "Registry registration failed",
+        (Lang::Ja, "vcredist_warn") => "注意: Visual C++ 再頒布可能パッケージ (x64) が見つかりません。起動しない場合は https://aka.ms/vs/17/release/vc_redist.x64.exe から導入してください。",
+        (Lang::En, "vcredist_warn") => "Warning: Visual C++ Redistributable (x64) not found. If the app does not start, install it from https://aka.ms/vs/17/release/vc_redist.x64.exe .",
         (Lang::Ja, "usage") => "使い方",
         (Lang::En, "usage") => "Usage",
         _ => key,
@@ -121,6 +123,13 @@ struct Options {
 }
 
 fn parse_args() -> Result<Options, String> {
+    parse_args_from(std::env::args_os().skip(1))
+}
+
+fn parse_args_from<I>(iter: I) -> Result<Options, String>
+where
+    I: IntoIterator<Item = std::ffi::OsString>,
+{
     let mut opts = Options {
         uninstall: false,
         install: false,
@@ -133,7 +142,7 @@ fn parse_args() -> Result<Options, String> {
         show_help: false,
         show_version: false,
     };
-    let mut args = std::env::args_os().skip(1).peekable();
+    let mut args = iter.into_iter().peekable();
     while let Some(arg) = args.next() {
         let text = arg.to_string_lossy().to_string();
         match text.as_str() {
@@ -252,19 +261,24 @@ fn reg(args: &[&str]) -> Result<(), String> {
 // world-writable caveat behind the clippy lint does not apply to this
 // Windows-only installer).
 #[allow(clippy::permissions_set_readonly_false)]
+fn clear_readonly(path: &Path) {
+    if let Ok(meta) = std::fs::metadata(path) {
+        let mut perms = meta.permissions();
+        if perms.readonly() {
+            perms.set_readonly(false);
+            let _ = std::fs::set_permissions(path, perms);
+        }
+    }
+}
+
+#[allow(clippy::permissions_set_readonly_false)]
 fn write_file(path: &Path, bytes: &[u8], lang: Lang) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     // Clear read-only leftovers from a previous install before overwriting.
     if path.is_file() {
-        let mut perms = std::fs::metadata(path)
-            .map_err(|e| e.to_string())?
-            .permissions();
-        if perms.readonly() {
-            perms.set_readonly(false);
-            std::fs::set_permissions(path, perms).map_err(|e| e.to_string())?;
-        }
+        clear_readonly(path);
     }
     match std::fs::write(path, bytes) {
         Ok(()) => Ok(()),
@@ -346,6 +360,17 @@ fn desktop_lnk() -> Result<PathBuf, String> {
         .join(format!("{APP_NAME}.lnk")))
 }
 
+/// The app links the dynamic CRT (`MSVCP140.dll`), which is not part of a
+/// bare Windows install. Warn (non-fatal) when it is absent so the user
+/// gets an actionable message instead of a cryptic startup failure.
+fn vcredist_present() -> bool {
+    let system32 = std::env::var_os("SystemRoot")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(r"C:\Windows"))
+        .join("System32");
+    system32.join("vcruntime140.dll").is_file() && system32.join("msvcp140.dll").is_file()
+}
+
 fn installed_version(dir: &Path) -> Option<String> {
     std::fs::read_to_string(dir.join(VERSION_FILE))
         .ok()
@@ -375,6 +400,9 @@ fn do_install(opts: &Options, lang: Lang) -> Result<(), String> {
         "{}: {EXE_NAME}, {LICENSE_NAME}, {FIRST_LAUNCH_NAME}",
         msg(lang, "files")
     );
+    if !vcredist_present() {
+        eprintln!("{}", msg(lang, "vcredist_warn"));
+    }
     if !confirm(lang, opts.yes, msg(lang, "confirm"))? {
         println!("{}", msg(lang, "cancelled"));
         return Ok(());
@@ -423,13 +451,7 @@ fn do_install(opts: &Options, lang: Lang) -> Result<(), String> {
 
 fn remove_if_exists(path: &Path) {
     if path.is_symlink() || path.is_file() {
-        let mut perms = std::fs::metadata(path).map(|m| m.permissions()).ok();
-        if let Some(ref mut p) = perms {
-            if p.readonly() {
-                p.set_readonly(false);
-                let _ = std::fs::set_permissions(path, p.clone());
-            }
-        }
+        clear_readonly(path);
         let _ = std::fs::remove_file(path);
     }
 }
@@ -496,10 +518,28 @@ fn do_uninstall(opts: &Options, lang: Lang) -> Result<(), String> {
     }
 
     let mut locked = false;
+    // Pre-flight: a running app locks its exe. Fail before deleting
+    // anything so a retry after quitting completes cleanly.
+    {
+        let exe = dir.join(EXE_NAME);
+        if exe.is_file() {
+            let probe = std::fs::OpenOptions::new().write(true).open(&exe);
+            if let Err(e) = probe {
+                if e.raw_os_error() == Some(32) {
+                    return Err(msg(lang, "close_app").into());
+                }
+            }
+        }
+    }
     for name in [EXE_NAME, LICENSE_NAME, FIRST_LAUNCH_NAME, VERSION_FILE] {
         let path = dir.join(name);
-        if path.is_file() && std::fs::remove_file(&path).is_err() {
-            locked = true;
+        if path.is_file() {
+            // Clear read-only so a deliberate removal never trips on it
+            // (a locked running exe still fails below with error 32).
+            clear_readonly(&path);
+            if std::fs::remove_file(&path).is_err() {
+                locked = true;
+            }
         }
     }
     if locked {
@@ -573,5 +613,72 @@ fn main() {
     if let Err(e) = result {
         eprintln!("error: {e}");
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::OsString;
+
+    fn args(words: &[&str]) -> Vec<OsString> {
+        words.iter().map(OsString::from).collect()
+    }
+
+    #[test]
+    fn defaults_install_without_flags() {
+        let opts = parse_args_from(args(&[])).unwrap();
+        assert!(!opts.uninstall && !opts.yes && !opts.force && opts.dir.is_none());
+    }
+
+    #[test]
+    fn force_implies_yes() {
+        let opts = parse_args_from(args(&["--force"])).unwrap();
+        assert!(opts.force && opts.yes);
+    }
+
+    #[test]
+    fn dir_forms_and_unknown_are_checked() {
+        let opts = parse_args_from(args(&["--dir", r"C:\App"])).unwrap();
+        assert_eq!(opts.dir, Some(PathBuf::from(r"C:\App")));
+        let opts = parse_args_from(args(&["--dir=C:\\App"])).unwrap();
+        assert_eq!(opts.dir, Some(PathBuf::from(r"C:\App")));
+        assert!(parse_args_from(args(&["--dir"])).is_err());
+        assert!(parse_args_from(args(&["--badopt"])).is_err());
+        assert!(parse_args_from(args(&["--no-shortcut", "--desktop"])).is_err());
+        assert!(parse_args_from(args(&["--install", "--uninstall"])).is_err());
+    }
+
+    #[test]
+    fn catalog_covers_both_languages() {
+        for key in [
+            "plan",
+            "files",
+            "confirm",
+            "cancelled",
+            "need_yes",
+            "installed",
+            "how_to_start",
+            "already",
+            "upgrading",
+            "close_app",
+            "write_failed",
+            "uninstall_confirm",
+            "uninstalled",
+            "not_installed",
+            "shortcut_warn",
+            "reg_failed",
+            "usage",
+            "vcredist_warn",
+        ] {
+            assert_ne!(msg(Lang::Ja, key), key, "missing ja {key}");
+            assert_ne!(msg(Lang::En, key), key, "missing en {key}");
+        }
+    }
+
+    #[test]
+    fn powershell_quote_doubles_single_quotes() {
+        assert_eq!(powershell_quote("plain"), "'plain'");
+        assert_eq!(powershell_quote("a'b"), "'a''b'");
     }
 }

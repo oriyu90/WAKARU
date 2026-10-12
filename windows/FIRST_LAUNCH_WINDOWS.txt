@@ -15,6 +15,9 @@ WAKARU for Windows — 初回起動の手引き / First-launch guide
    不足時はインストーラ版・zip版いずれも起動しません。
    https://developer.microsoft.com/microsoft-edge/webview2/ から
    Evergreen Bootstrapper を導入してください。
+   加えて Microsoft Visual C++ 再頒布可能パッケージ (x64) が必要です。
+   多くのPCに導入済みですが、起動しない場合は
+   https://aka.ms/vs/17/release/vc_redist.x64.exe から導入してください。
 4. LAN上のモデル (LM Studio等) に接続できない場合は、Windows Defender
    ファイアウォールの「プライベート ネットワーク」で WAKARU を許可してください。
 5. 設定・資料は %AppData%\com.yukiorita.wakaru に保存されます。
@@ -33,6 +36,9 @@ WAKARU for Windows — 初回起動の手引き / First-launch guide
 3. WebView2 Runtime is required (preinstalled on Windows 10 1803+).
    If missing, install the Evergreen Bootstrapper from
    https://developer.microsoft.com/microsoft-edge/webview2/ .
+   The Microsoft Visual C++ Redistributable (x64) is also required.
+   Most PCs already have it; if the app does not start, install it from
+   https://aka.ms/vs/17/release/vc_redist.x64.exe .
 4. If a LAN model server (e.g. LM Studio) is unreachable, allow WAKARU
    on private networks in Windows Defender Firewall.
 5. Settings and documents live in %AppData%\com.yukiorita.wakaru.
