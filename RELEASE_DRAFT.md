@@ -1,3 +1,39 @@
+# v1.7.1 release record
+
+Prepared 2026-10-14. Scope: Windows distribution repair (v1.7.0 shipped only
+`.sha256`) plus installer/backend/verification-gate hardening (D-62).
+See `RELEASE_NOTES.md`, `docs/DECISIONS.md` D-62 and `QUALITY_REPORT.md`.
+
+## Verified artifact
+
+- App: `WAKARU.exe` (x64, Windows 10/11, version 1.7.1; WebView2 Evergreen
+  required; unsigned with SmartScreen guidance in `windows/FIRST_LAUNCH_WINDOWS.txt`)
+- Setup: `WAKARU_1.7.1_x64-setup.exe` (58,098,176 bytes, SHA-256 `3075ab38b2e0cc5a9dff80e1db9a1e20e56237d74c1fadc25577606dd7fdac48`)
+- Portable: `WAKARU_1.7.1_x64-portable.zip` (20,833,139 bytes, SHA-256 `074ea345c6e5c1620eda41dfcc273472c9d8a4c5b8aa3ee52686d3c3bd9f778c`)
+- Checksums: `WAKARU_1.7.1_x64-setup.exe.sha256`,
+  `WAKARU_1.7.1_x64-portable.zip.sha256`
+- The packaged app reaches `WAKARU backend ready version="1.7.1"`.
+- No credentials are embedded in tracked source or distribution files.
+
+## Verification summary
+
+- Frontend: typecheck, lint (eslint + design-rules + hardcoded, 0 warnings),
+  57 vitest tests, contrast, i18n 487 keys × 3, production build.
+- Rust: fmt, clippy all-targets `-D warnings`, lib tests (236 passed +
+  1 ignored), integration phases 1–8 + 10 (43 passed), installer 7 unit
+  tests, `cargo deny check` (advisories/bans/licenses/sources).
+- No DB migration, no IPC change (additive-only since v1.6.0). v1.6.x–v1.7.0
+  projects, notes and figures open as-is.
+
+## Steps
+
+1. Commit and tag `v1.7.1` on `main`.
+2. Create the GitHub Release `v1.7.1` with the setup exe + portable zip +
+   `.sha256` files.
+3. Update the Studio RIZI site (4 locales) and the private `WAKARU.md` memo.
+
+---
+
 # v1.6.9 release record
 
 Prepared 2026-10-05. Scope: sticky-note stabilisation on document coordinates

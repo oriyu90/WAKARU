@@ -222,7 +222,15 @@ pub fn save_text(input: &SaveTextInput) -> AppResult<WrittenFile> {
                 },
             )?
         }
-        _ => unreachable!(),
+        // Already validated in `want_ext` above; defensive error instead of a
+        // panic so a future format never crashes the command handler.
+        other => {
+            return Err(crate::error::AppError::new(
+                "FM_BAD_FORMAT",
+                "error.fm.badFormat",
+                other,
+            ))
+        }
     };
     atomic_write(destination, &bytes)?;
     Ok(WrittenFile { path })

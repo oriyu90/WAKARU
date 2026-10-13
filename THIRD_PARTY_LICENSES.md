@@ -46,7 +46,7 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | base64 | 0.21.7 | MIT OR Apache-2.0 |
 | base64 | 0.22.1 | MIT OR Apache-2.0 |
 | base64 | 0.23.1 | MIT OR Apache-2.0 |
-| bindgen | 0.71.1 | BSD-3-Clause |
+| bindgen | 0.72.1 | BSD-3-Clause |
 | bit-set | 0.5.3 | MIT/Apache-2.0 |
 | bit-set | 0.8.0 | Apache-2.0 OR MIT |
 | bit-vec | 0.6.3 | MIT/Apache-2.0 |
@@ -694,8 +694,8 @@ enforced by `cargo deny check licenses` against `src-tauri/deny.toml`.
 | webview2-com-sys | 0.38.2 | MIT |
 | weezl | 0.1.12 | MIT OR Apache-2.0 |
 | weezl | 0.2.1 | MIT OR Apache-2.0 |
-| whisper-rs | 0.14.4 | Unlicense |
-| whisper-rs-sys | 0.13.1 | Unlicense |
+| whisper-rs | 0.16.0 | Unlicense |
+| whisper-rs-sys | 0.15.0 | Unlicense |
 | winapi | 0.3.9 | MIT/Apache-2.0 |
 | winapi-i686-pc-windows-gnu | 0.4.0 | MIT/Apache-2.0 |
 | winapi-util | 0.1.11 | Unlicense OR MIT |

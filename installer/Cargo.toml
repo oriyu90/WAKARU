@@ -1,6 +1,6 @@
 [package]
 name = "wakaru-setup"
-version = "1.7.0"
+version = "1.7.1"
 edition = "2021"
 rust-version = "1.85"
 authors = ["Yuki_Orita"]

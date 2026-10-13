@@ -16,7 +16,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// Keep in sync with the app version (see the release checklist in docs).
-const VERSION: &str = "1.7.0";
+/// Sourced from Cargo.toml so `installer/Cargo.toml` is the single source.
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 const APP_NAME: &str = "WAKARU";
 const APP_ID: &str = "WAKARU";
 const EXE_NAME: &str = "WAKARU.exe";
@@ -354,6 +355,21 @@ fn start_menu_lnk() -> Result<PathBuf, String> {
 }
 
 fn desktop_lnk() -> Result<PathBuf, String> {
+    // Respect folder redirection (OneDrive "Backup Desktop" moves the shell
+    // folder out of %USERPROFILE%). Prefer the known redirected location
+    // when it exists, otherwise fall back to %USERPROFILE%\Desktop.
+    if let Some(onedrive) = std::env::var_os("OneDrive") {
+        let candidate = PathBuf::from(onedrive).join("Desktop");
+        if candidate.is_dir() {
+            return Ok(candidate.join(format!("{APP_NAME}.lnk")));
+        }
+    }
+    if let Some(commercial) = std::env::var_os("OneDriveCommercial") {
+        let candidate = PathBuf::from(commercial).join("Desktop");
+        if candidate.is_dir() {
+            return Ok(candidate.join(format!("{APP_NAME}.lnk")));
+        }
+    }
     let profile = std::env::var_os("USERPROFILE").ok_or("USERPROFILE is not set")?;
     Ok(PathBuf::from(profile)
         .join("Desktop")
@@ -368,7 +384,12 @@ fn vcredist_present() -> bool {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(r"C:\Windows"))
         .join("System32");
-    system32.join("vcruntime140.dll").is_file() && system32.join("msvcp140.dll").is_file()
+    // VS 2015-2022 runtime ships vcruntime140.dll + vcruntime140_1.dll
+    // (the latter holds `__CxxFrameHandler4` on x64). Both plus msvcp140
+    // must exist for the app to start.
+    system32.join("vcruntime140.dll").is_file()
+        && system32.join("vcruntime140_1.dll").is_file()
+        && system32.join("msvcp140.dll").is_file()
 }
 
 fn installed_version(dir: &Path) -> Option<String> {
@@ -456,11 +477,31 @@ fn remove_if_exists(path: &Path) {
     }
 }
 
+/// Windows paths are case-insensitive; `Path::starts_with` is case-sensitive,
+/// so compare component-wise in lowercase for the self-delete decision.
+fn path_starts_with_insensitive(path: &Path, base: &Path) -> bool {
+    let mut path_parts = path.components();
+    let mut base_parts = base.components();
+    loop {
+        match (path_parts.next(), base_parts.next()) {
+            (_, None) => return true,
+            (Some(p), Some(b)) => {
+                if p.as_os_str().to_string_lossy().to_lowercase()
+                    != b.as_os_str().to_string_lossy().to_lowercase()
+                {
+                    return false;
+                }
+            }
+            (None, Some(_)) => return false,
+        }
+    }
+}
+
 /// Schedule deletion of a locked file (typically ourselves) via a detached
 /// PowerShell that runs after we exit, then try to remove the directory.
 fn schedule_self_delete(target: &Path, dir: &Path) {
     let script = format!(
-        "Start-Sleep -Seconds 2; Remove-Item -LiteralPath {} -Force; Remove-Item -LiteralPath {} -Force -ErrorAction SilentlyContinue",
+        "Start-Sleep -Seconds 2; Remove-Item -LiteralPath {} -Force; Remove-Item -LiteralPath {} -Recurse -Force -ErrorAction SilentlyContinue",
         powershell_quote(&target.to_string_lossy()),
         powershell_quote(&dir.to_string_lossy())
     );
@@ -555,7 +596,7 @@ fn do_uninstall(opts: &Options, lang: Lang) -> Result<(), String> {
 
     // Remove the uninstaller copy (or ourselves when run as setup --uninstall).
     let uninstall_path = dir.join(UNINSTALL_EXE);
-    if self_path == uninstall_path || self_path.starts_with(&dir) {
+    if self_path == uninstall_path || path_starts_with_insensitive(&self_path, &dir) {
         schedule_self_delete(&self_path, &dir);
     } else {
         remove_if_exists(&uninstall_path);
@@ -680,5 +721,25 @@ mod tests {
     fn powershell_quote_doubles_single_quotes() {
         assert_eq!(powershell_quote("plain"), "'plain'");
         assert_eq!(powershell_quote("a'b"), "'a''b'");
+    }
+
+    #[test]
+    fn path_prefix_match_is_case_insensitive() {
+        let dir = PathBuf::from(r"C:\Users\Test\AppData\Local\Programs\WAKARU");
+        let child = PathBuf::from(r"c:\users\test\appdata\local\programs\wakaru\uninstall.exe");
+        assert!(path_starts_with_insensitive(&child, &dir));
+        let other = PathBuf::from(r"C:\Users\Test\AppData\Local\Programs\Other\app.exe");
+        assert!(!path_starts_with_insensitive(&other, &dir));
+        assert!(!path_starts_with_insensitive(
+            &PathBuf::from(r"C:\Short"),
+            &dir
+        ));
+    }
+
+    #[test]
+    fn version_matches_package() {
+        // Single source of truth: installer Cargo.toml version.
+        assert_eq!(VERSION, env!("CARGO_PKG_VERSION"));
+        assert!(!VERSION.is_empty());
     }
 }

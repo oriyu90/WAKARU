@@ -172,12 +172,31 @@ fn asset_response(
     request: tauri::http::Request<Vec<u8>>,
 ) -> tauri::http::Response<std::borrow::Cow<'static, [u8]>> {
     use tauri::http::{Method, Response, StatusCode};
-    let not_found = || {
+    // Builder failures (invalid header/value) must never panic the protocol
+    // handler and take the whole WebView down: fall back to a minimal 500.
+    fn fallback() -> tauri::http::Response<std::borrow::Cow<'static, [u8]>> {
         Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .header("Access-Control-Allow-Origin", "*")
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
             .body(std::borrow::Cow::Borrowed(&b""[..]))
-            .unwrap()
+            .unwrap_or_else(|_| {
+                // Only reachable on allocation failure; last-resort empty 500.
+                // `Response::new` cannot fail.
+                Response::new(std::borrow::Cow::Borrowed(&b""[..]))
+            })
+    }
+    fn build(
+        builder: tauri::http::response::Builder,
+        body: std::borrow::Cow<'static, [u8]>,
+    ) -> tauri::http::Response<std::borrow::Cow<'static, [u8]>> {
+        builder.body(body).unwrap_or_else(|_| fallback())
+    }
+    let not_found = || {
+        build(
+            Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .header("Access-Control-Allow-Origin", "*"),
+            std::borrow::Cow::Borrowed(&b""[..]),
+        )
     };
 
     // WebKit treats `fetch(wakaru-asset://...)` as a cross-origin request even
@@ -186,12 +205,13 @@ fn asset_response(
     // element sources. Return CORS headers consistently so both paths work in
     // the signed production WebView.
     if request.method() == Method::OPTIONS {
-        return Response::builder()
-            .status(StatusCode::NO_CONTENT)
-            .header("Access-Control-Allow-Origin", "*")
-            .header("Access-Control-Allow-Methods", "GET, OPTIONS")
-            .body(std::borrow::Cow::Borrowed(&b""[..]))
-            .unwrap();
+        return build(
+            Response::builder()
+                .status(StatusCode::NO_CONTENT)
+                .header("Access-Control-Allow-Origin", "*")
+                .header("Access-Control-Allow-Methods", "GET, OPTIONS"),
+            std::borrow::Cow::Borrowed(&b""[..]),
+        );
     }
 
     let Some(state) = app.try_state::<AppState>() else {
@@ -203,11 +223,12 @@ fn asset_response(
         Ok(p) => p,
         Err(e) => {
             tracing::warn!(path, code = %e.code, "asset request denied");
-            return Response::builder()
-                .status(StatusCode::FORBIDDEN)
-                .header("Access-Control-Allow-Origin", "*")
-                .body(std::borrow::Cow::Borrowed(&b""[..]))
-                .unwrap();
+            return build(
+                Response::builder()
+                    .status(StatusCode::FORBIDDEN)
+                    .header("Access-Control-Allow-Origin", "*"),
+                std::borrow::Cow::Borrowed(&b""[..]),
+            );
         }
     };
     match std::fs::metadata(&resolved) {
@@ -218,15 +239,16 @@ fn asset_response(
             // `Content-Range`; anything else → 416. One request is capped so a
             // 1 GiB original is never handed to the WebView at once.
             if *request.method() == Method::HEAD {
-                return Response::builder()
-                    .status(StatusCode::OK)
-                    .header("Content-Type", content_type)
-                    .header("Content-Length", total.to_string())
-                    .header("Accept-Ranges", "bytes")
-                    .header("Cache-Control", "no-cache")
-                    .header("Access-Control-Allow-Origin", "*")
-                    .body(std::borrow::Cow::Borrowed(&b""[..]))
-                    .unwrap();
+                return build(
+                    Response::builder()
+                        .status(StatusCode::OK)
+                        .header("Content-Type", content_type)
+                        .header("Content-Length", total.to_string())
+                        .header("Accept-Ranges", "bytes")
+                        .header("Cache-Control", "no-cache")
+                        .header("Access-Control-Allow-Origin", "*"),
+                    std::borrow::Cow::Borrowed(&b""[..]),
+                );
             }
             if let Some(range_header) = request.headers().get("range").and_then(|v| v.to_str().ok())
             {
@@ -236,22 +258,24 @@ fn asset_response(
             // path; refuse it and force the UI onto the windowed/range path.
             const UNBOUNDED_GET_MAX: u64 = 512 * 1024 * 1024;
             if total > UNBOUNDED_GET_MAX {
-                return Response::builder()
-                    .status(StatusCode::FORBIDDEN)
-                    .header("Access-Control-Allow-Origin", "*")
-                    .body(std::borrow::Cow::Borrowed(&b""[..]))
-                    .unwrap();
+                return build(
+                    Response::builder()
+                        .status(StatusCode::FORBIDDEN)
+                        .header("Access-Control-Allow-Origin", "*"),
+                    std::borrow::Cow::Borrowed(&b""[..]),
+                );
             }
             match std::fs::read(&resolved) {
-                Ok(bytes) => Response::builder()
-                    .status(StatusCode::OK)
-                    .header("Content-Type", content_type)
-                    .header("Content-Length", bytes.len().to_string())
-                    .header("Accept-Ranges", "bytes")
-                    .header("Cache-Control", "no-cache")
-                    .header("Access-Control-Allow-Origin", "*")
-                    .body(std::borrow::Cow::Owned(bytes))
-                    .unwrap(),
+                Ok(bytes) => build(
+                    Response::builder()
+                        .status(StatusCode::OK)
+                        .header("Content-Type", content_type)
+                        .header("Content-Length", bytes.len().to_string())
+                        .header("Accept-Ranges", "bytes")
+                        .header("Cache-Control", "no-cache")
+                        .header("Access-Control-Allow-Origin", "*"),
+                    std::borrow::Cow::Owned(bytes),
+                ),
                 Err(_) => not_found(),
             }
         }
@@ -269,14 +293,27 @@ fn range_response(
 ) -> tauri::http::Response<std::borrow::Cow<'static, [u8]>> {
     use tauri::http::{Response, StatusCode};
     const RANGE_SINGLE_MAX: u64 = 32 * 1024 * 1024;
-    let denied = || {
+    fn fallback() -> tauri::http::Response<std::borrow::Cow<'static, [u8]>> {
         Response::builder()
-            .status(StatusCode::RANGE_NOT_SATISFIABLE)
-            .header("Content-Range", format!("bytes */{total}"))
-            .header("Accept-Ranges", "bytes")
-            .header("Access-Control-Allow-Origin", "*")
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
             .body(std::borrow::Cow::Borrowed(&b""[..]))
-            .unwrap()
+            .unwrap_or_else(|_| Response::new(std::borrow::Cow::Borrowed(&b""[..])))
+    }
+    fn build(
+        builder: tauri::http::response::Builder,
+        body: std::borrow::Cow<'static, [u8]>,
+    ) -> tauri::http::Response<std::borrow::Cow<'static, [u8]>> {
+        builder.body(body).unwrap_or_else(|_| fallback())
+    }
+    let denied = || {
+        build(
+            Response::builder()
+                .status(StatusCode::RANGE_NOT_SATISFIABLE)
+                .header("Content-Range", format!("bytes */{total}"))
+                .header("Accept-Ranges", "bytes")
+                .header("Access-Control-Allow-Origin", "*"),
+            std::borrow::Cow::Borrowed(&b""[..]),
+        )
     };
     let spec = header.trim().strip_prefix("bytes=").unwrap_or("").trim();
     if spec.is_empty() || spec.contains(',') {
@@ -314,11 +351,12 @@ fn range_response(
     let mut f = match std::fs::File::open(path) {
         Ok(f) => f,
         Err(_) => {
-            return Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .header("Access-Control-Allow-Origin", "*")
-                .body(std::borrow::Cow::Borrowed(&b""[..]))
-                .unwrap();
+            return build(
+                Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .header("Access-Control-Allow-Origin", "*"),
+                std::borrow::Cow::Borrowed(&b""[..]),
+            );
         }
     };
     if f.seek(SeekFrom::Start(start)).is_err() {
@@ -331,24 +369,26 @@ fn range_response(
             Ok(0) => break,
             Ok(k) => read += k,
             Err(_) => {
-                return Response::builder()
-                    .status(StatusCode::NOT_FOUND)
-                    .header("Access-Control-Allow-Origin", "*")
-                    .body(std::borrow::Cow::Borrowed(&b""[..]))
-                    .unwrap();
+                return build(
+                    Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .header("Access-Control-Allow-Origin", "*"),
+                    std::borrow::Cow::Borrowed(&b""[..]),
+                );
             }
         }
     }
     buf.truncate(read);
     let end = start + (read as u64).saturating_sub(1);
-    Response::builder()
-        .status(StatusCode::PARTIAL_CONTENT)
-        .header("Content-Type", content_type)
-        .header("Content-Length", read.to_string())
-        .header("Content-Range", format!("bytes {start}-{end}/{total}"))
-        .header("Accept-Ranges", "bytes")
-        .header("Cache-Control", "no-cache")
-        .header("Access-Control-Allow-Origin", "*")
-        .body(std::borrow::Cow::Owned(buf))
-        .unwrap()
+    build(
+        Response::builder()
+            .status(StatusCode::PARTIAL_CONTENT)
+            .header("Content-Type", content_type)
+            .header("Content-Length", read.to_string())
+            .header("Content-Range", format!("bytes {start}-{end}/{total}"))
+            .header("Accept-Ranges", "bytes")
+            .header("Cache-Control", "no-cache")
+            .header("Access-Control-Allow-Origin", "*"),
+        std::borrow::Cow::Owned(buf),
+    )
 }

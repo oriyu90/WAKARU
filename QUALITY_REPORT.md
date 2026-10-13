@@ -2,6 +2,29 @@
 
 Cumulative; newest release first.
 
+## v1.7.1 verification — 2026-10-14
+
+Scope: Windows distribution repair (v1.7.0 shipped only `.sha256`) plus
+installer/backend/verification-gate hardening (D-62). No DB migration,
+no IPC change.
+
+| Gate | Current result |
+|---|---|
+| Frontend typecheck, lint, design/hardcoded checks, i18n, build | pass; eslint 0 warnings, design-rules ok (Windows path fix), 487 keys × 3 languages |
+| Frontend tests and contrast | pass; 57 tests, light/dark contrast ok (CRLF fix) |
+| Rust fmt, clippy, library and installer tests | pass; fmt clean, clippy all-targets `-D warnings`, 236 library tests passed + 1 ignored, installer 7 tests, 43 integration tests passed (phases 1–8, 10) |
+| Rust advisories | pass; cargo-deny advisories/bans/licenses/sources ok |
+| Release installer/portable round-trip and startup | pass; setup 58,098,176 bytes (`3075ab38…fdac48`), portable 20,833,139 bytes (`074ea345…3bd9f778`); `.sha256` match; install→ARP→uninstall clean; portable launch logged `backend ready version="1.7.1"` |
+| i18n JA/EN parity | pass; 487 keys × 3, JA/EN identical values are proper nouns/tool ids only (15) |
+
+### Release artifact
+
+| Item | Value |
+|---|---|
+| App | x64 `WAKARU.exe`, version `1.7.1`, Windows 10/11; WebView2 Evergreen required; unsigned |
+| Setup | `WAKARU_1.7.1_x64-setup.exe`, 58,098,176 bytes; SHA-256 `3075ab38b2e0cc5a9dff80e1db9a1e20e56237d74c1fadc25577606dd7fdac48` |
+| Portable | `WAKARU_1.7.1_x64-portable.zip`, 20,833,139 bytes; SHA-256 `074ea345c6e5c1620eda41dfcc273472c9d8a4c5b8aa3ee52686d3c3bd9f778c` |
+
 ## v1.6.1 verification — 2026-10-01
 
 Scope: v1.6.0 audit fixes (note creation reachability, lane pointer discipline,

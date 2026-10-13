@@ -1,3 +1,48 @@
+# WAKARU v1.7.1
+
+WAKARU v1.7.1 repairs the v1.7.0 Windows distribution (which shipped only
+`.sha256` files) and hardens the installer and verification gates. No data
+migration is required.
+
+## What changed
+
+- Windows distribution is restored: `WAKARU_<version>_x64-setup.exe`
+  (own installer, per-user, no admin rights) and
+  `WAKARU_<version>_x64-portable.zip` (extract and run) with matching
+  `.sha256` files. WebView2 Evergreen Runtime is required (preinstalled on
+  Windows 10 1803+). Both are unsigned, so SmartScreen may warn on first
+  launch.
+- Installer hardening: version comes from `installer/Cargo.toml`
+  (no manual duplication), own SxS manifest (UTF-8, per-monitor-v2,
+  long-path aware, asInvoker), Desktop shortcut respects OneDrive folder
+  redirection, VC++ check covers `vcruntime140_1.dll`, uninstall self-delete
+  removes non-empty directories, path containment is case-insensitive,
+  and `cargo test` works without a real payload via `dummy-payload`.
+- Packaging script validates that `package.json`, `tauri.conf.json` and both
+  `Cargo.toml` files agree with `-Version` and cleans the payload directory
+  so stale files never ship.
+- Backend crash safety: `wakaru-asset://` response building falls back to a
+  minimal 500 instead of panicking, and `save_text` returns a structured
+  `FM_BAD_FORMAT` error instead of `unreachable!`. No IPC or DB change.
+- Verification gates pass on Windows: design-rules path normalisation,
+  contrast CRLF normalisation, 57 frontend tests, 487 i18n keys × 3,
+  Rust fmt/clippy/tests. Third-party list regenerated (whisper-rs 0.16.0).
+- Japanese, English and Simplified Chinese UI remain in parity (487 keys).
+
+## Compatibility
+
+No database migration. All v1.6.x–v1.7.0 projects, settings, notes and
+figures open as-is on both platforms.
+
+## Distribution
+
+- **macOS (Apple Silicon, macOS 12+)**: ad-hoc signed, not Apple-notarised.
+  On first launch right-click WAKARU → **Open**.
+- **Windows 10/11 (x64)**: unsigned per-user setup or portable zip.
+  WebView2 Evergreen Runtime is required. On first launch SmartScreen may
+  warn; choose **More info → Run anyway** only if you downloaded the files
+  from the Releases page and verified the `.sha256`.
+
 # WAKARU v1.7.0
 
 WAKARU v1.7.0 adds Windows 10/11 (x64) support alongside macOS, with its own

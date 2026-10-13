@@ -1,9 +1,9 @@
 # WAKARU Windows packaging: portable zip + single-file setup.exe.
 # Usage (from the repository root):
-#   powershell -ExecutionPolicy Bypass -File windows/package.ps1 [-Version 1.7.0]
+#   powershell -ExecutionPolicy Bypass -File windows/package.ps1 [-Version 1.7.1]
 # Prerequisites: release app binary built (`npm run tauri build` or
 # `cargo build --release`), Rust stable, PowerShell 5.1+.
-param([string]$Version = "1.7.0")
+param([string]$Version = "1.7.1")
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
@@ -14,6 +14,20 @@ function Needs($path, $what) {
     if (-not (Test-Path $path)) { throw "missing ${what}: ${path}" }
 }
 
+# 0. Version consistency: package.json / tauri.conf.json / Cargo.toml files
+# must agree with -Version, otherwise the installer would embed a mismatched
+# payload (cause of the v1.7.0 re-release work).
+$pkgVersion = (Get-Content (Join-Path $root "package.json") -Raw | ConvertFrom-Json).version
+$tauriVersion = (Get-Content (Join-Path $root "src-tauri\tauri.conf.json") -Raw | ConvertFrom-Json).version
+$appCargo = Get-Content (Join-Path $root "src-tauri\Cargo.toml") -Raw
+$setupCargo = Get-Content (Join-Path $root "installer\Cargo.toml") -Raw
+foreach ($v in @($pkgVersion, $tauriVersion)) {
+    if ($v -ne $Version) { throw "version mismatch: -Version $Version but manifest has $v (package.json/tauri.conf.json)" }
+}
+if ($appCargo -notmatch ('version\s*=\s*"' + [regex]::Escape($Version) + '"')) { throw "version mismatch: src-tauri/Cargo.toml has no version $Version" }
+if ($setupCargo -notmatch ('version\s*=\s*"' + [regex]::Escape($Version) + '"')) { throw "version mismatch: installer/Cargo.toml has no version $Version" }
+Write-Output "version: $Version (manifests agree)"
+
 # 1. Locate the release app binary (Tauri output or plain cargo output).
 if ($env:CARGO_TARGET_DIR) {
     $appExe = Join-Path $env:CARGO_TARGET_DIR "release\WAKARU.exe"
@@ -23,11 +37,12 @@ if ($env:CARGO_TARGET_DIR) {
 Needs $appExe "release WAKARU.exe (build it first)"
 Write-Output "app: $appExe"
 
-# 2. Assemble the payload directory.
+# 2. Assemble the payload directory (clean first so stale files never ship).
 $license = Join-Path $root "LICENSE"
 $firstLaunch = Join-Path $root "windows\FIRST_LAUNCH_WINDOWS.txt"
 Needs $license "LICENSE"
 Needs $firstLaunch "FIRST_LAUNCH_WINDOWS.txt"
+if (Test-Path $payload) { Remove-Item -Recurse -Force $payload }
 New-Item -ItemType Directory -Force $payload | Out-Null
 Copy-Item $appExe (Join-Path $payload "WAKARU.exe") -Force
 Copy-Item $license (Join-Path $payload "LICENSE") -Force

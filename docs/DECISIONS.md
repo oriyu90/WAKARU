@@ -647,3 +647,25 @@
 - **理由**: 外部インストーラFWの導入・保守が要らず、動作はround-trip試験で固定する。
   失敗時は構造化エラーで中止し、黙って続行しない。
 - **影響**: DB移行・IPC変更なし。版上げ時は `installer` の版も連動する。
+
+## D-62 · v1.7.1 Windows精査・配布欠落の修復と堅牢化
+
+- **日付**: 2026-10-14（v1.7.1）
+- **論点**: v1.7.0 Releaseに実バイナリがなく `.sha256` のみだった（配布不能）。
+  タグ `v1.7.0` は監査修正（VC++警告・アンロック事前確認）より前で、Windows上の
+  `npm run lint`/`check:contrast` が落ち、installerに堅牢性の欠落があった。
+- **採用**: 版を `1.7.1` へ進め、6 manifests（package.json/lock・tauri.conf・
+  両Cargo.toml・package.ps1既定）を連動させる。`windows/package.ps1` に版一致検査と
+  payload清掃を追加する。installerは `VERSION=env!(CARGO_PKG_VERSION)` の単一化、
+  独自SxSマニフェスト（UTF-8＋DPIv2＋longPath＋asInvoker）、OneDrive転送Desktop対応、
+  `vcruntime140_1.dll` 検査、self-deleteの `-Recurse`、大文字小文字不感覚の
+  配下判定、`dummy-payload` による `cargo test` 無payload対応を追加する。
+  Backendは `wakaru-asset://` の `Response::builder().unwrap()` を500縮退へ置換し、
+  `save_text` の `unreachable!` を構造化エラーへ置換する（IPC・DB不変）。
+  FE検証scriptはWindows改行・path区切りへ対応させる。
+  `THIRD_PARTY_LICENSES.md` を再生成し whisper-rs 0.16系へ追従させる。
+- **理由**: 配布欠落は再Releaseでのみ回復できる。検証gateがWindowsで赤のままでは
+  次回改修の回帰を検出できない。installer/backendの修正はいずれも追加・縮退のみで
+  既存の互換性・上限・原子性を崩さない。
+- **影響**: DB移行・IPC変更なし。日英中UI同時対応（487キー維持）。旧v1.6.x資産は
+  そのまま開く。署名方針は不変（macはad-hoc、Windowsは無署名＋SmartScreen手順）。

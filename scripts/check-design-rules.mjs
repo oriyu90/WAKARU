@@ -36,7 +36,8 @@ function walk(dir) {
     }
     const ext = extname(name);
     if (![".ts", ".tsx", ".css"].includes(ext)) continue;
-    const rel = full.slice(SRC.length);
+    // Normalise Windows backslashes so ALLOW_* (posix style) match on all OS.
+    const rel = full.slice(SRC.length).replace(/\\/g, "/");
     const src = readFileSync(full, "utf8");
     src.split("\n").forEach((text, i) => {
       const line = i + 1;
