@@ -1,3 +1,36 @@
+# WAKARU v1.7.2
+
+WAKARU v1.7.2 gives the Windows installer a native GUI wizard while keeping
+every CLI flow intact. No data migration is required.
+
+## What changed
+
+- Double-clicking `WAKARU_<version>_x64-setup.exe` (or ARP Uninstall) now
+  opens a native Windows dialog wizard (TaskDialog, no new dependencies):
+  confirm → install → result, with a desktop-shortcut checkbox and
+  expandable details. Japanese and English follow the OS locale
+  (`--english` / `--japanese` override).
+- Automation is unchanged: `--yes` / `--force` / `--cli` stay on the
+  console and never open a dialog; terminal runs keep the classic prompt;
+  `--gui` forces dialogs. `QuietUninstallString` (`--yes`) cannot hang.
+- Installer hardening from the shared core split: console and GUI paths run
+  the same `perform_install` / `perform_uninstall` code.
+- Japanese, English and Simplified Chinese UI remain in parity (487 keys).
+
+## Compatibility
+
+No database migration. All v1.6.x–v1.7.1 projects, settings, notes and
+figures open as-is on both platforms.
+
+## Distribution
+
+- **macOS (Apple Silicon, macOS 12+)**: ad-hoc signed, not Apple-notarised.
+  On first launch right-click WAKARU → **Open**.
+- **Windows 10/11 (x64)**: unsigned per-user GUI setup or portable zip.
+  WebView2 Evergreen Runtime is required. On first launch SmartScreen may
+  warn; choose **More info → Run anyway** only if you downloaded the files
+  from the Releases page and verified the `.sha256`.
+
 # WAKARU v1.7.1
 
 WAKARU v1.7.1 repairs the v1.7.0 Windows distribution (which shipped only

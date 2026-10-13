@@ -1,16 +1,25 @@
-//! WAKARU per-user installer for Windows x64 (D-61).
+//! WAKARU per-user installer for Windows x64 (D-61, GUI since D-63).
 //!
 //! Single-file setup.exe with the payload embedded at compile time
 //! (`WAKARU_PAYLOAD_DIR` must contain `WAKARU.exe`, `LICENSE` and
 //! `FIRST_LAUNCH_WINDOWS.txt`). No admin rights, no third-party installer
-//! framework, std-only (plus two `kernel32` FFI declarations for locale
-//! detection and UTF-8 console output).
+//! framework, std-only (plus a few Win32 FFI declarations for locale
+//! detection, UTF-8 console output, console attach and TaskDialog).
 //!
 //! Layout (per user):
 //! - files: `%LocalAppData%\Programs\WAKARU\`
 //! - Start Menu: `%AppData%\Microsoft\Windows\Start Menu\Programs\WAKARU.lnk`
 //! - Add/Remove entry: `HKCU\...\Uninstall\WAKARU` (UninstallString runs the
 //!   installed copy of this program with `--uninstall`)
+//!
+//! UX: double-click (no parent console) opens the native TaskDialog wizard
+//! (`gui` module); CLI flags and non-interactive runs stay on the console.
+
+// Release builds are GUI-first: without a console the TaskDialog wizard
+// runs. Debug builds stay console-first so `cargo test` output is visible.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
+mod gui;
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -26,17 +35,43 @@ const FIRST_LAUNCH_NAME: &str = "FIRST_LAUNCH_WINDOWS.txt";
 const VERSION_FILE: &str = "version.txt";
 const UNINSTALL_EXE: &str = "uninstall.exe";
 
-const PAYLOAD_EXE: &[u8] = include_bytes!(concat!(env!("WAKARU_PAYLOAD_DIR"), "/WAKARU.exe"));
-const PAYLOAD_LICENSE: &[u8] = include_bytes!(concat!(env!("WAKARU_PAYLOAD_DIR"), "/LICENSE"));
-const PAYLOAD_FIRST_LAUNCH: &[u8] = include_bytes!(concat!(
+/// Embedded payload. These MUST be `static` (not `const`): a `const` byte
+/// string is re-emitted per codegen unit and link.exe does not fold the
+/// 57 MiB duplicates, doubling setup.exe (observed in v1.7.2 dev). A
+/// `static` has one address shared by every use site (console + GUI).
+static PAYLOAD_EXE: &[u8] = include_bytes!(concat!(env!("WAKARU_PAYLOAD_DIR"), "/WAKARU.exe"));
+static PAYLOAD_LICENSE: &[u8] =
+    include_bytes!(concat!(env!("WAKARU_PAYLOAD_DIR"), "/LICENSE"));
+static PAYLOAD_FIRST_LAUNCH: &[u8] = include_bytes!(concat!(
     env!("WAKARU_PAYLOAD_DIR"),
     "/FIRST_LAUNCH_WINDOWS.txt"
 ));
+
+/// Payload table for GUI detail text (name + bytes, no copies: the entries
+/// borrow the `static` blobs above, so no additional bulk is emitted).
+static PAYLOAD_BYTES: &[(&str, &[u8])] = &[
+    (EXE_NAME, PAYLOAD_EXE),
+    (LICENSE_NAME, PAYLOAD_LICENSE),
+    (FIRST_LAUNCH_NAME, PAYLOAD_FIRST_LAUNCH),
+];
 
 #[link(name = "kernel32")]
 unsafe extern "system" {
     fn GetUserDefaultLocaleName(locale_name: *mut u16, cch_locale_name: i32) -> i32;
     fn SetConsoleOutputCP(code_page_id: u32) -> i32;
+    fn AttachConsole(process_id: u32) -> i32;
+}
+
+/// Pseudo-handle attaching to the parent process console.
+const ATTACH_PARENT_PROCESS: u32 = 0xFFFF_FFFF;
+
+/// Attach to the launching console when there is one (terminal runs keep
+/// the classic console UX; double-clicks have none and fall to the GUI).
+/// Never fails the caller: `false` simply means "no parent console".
+fn attach_console() -> bool {
+    // SAFETY: integer handle only, no pointers; failure is a normal
+    // `0` return (no console to attach to).
+    unsafe { AttachConsole(ATTACH_PARENT_PROCESS) != 0 }
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -106,6 +141,28 @@ fn msg(lang: Lang, key: &str) -> &str {
         (Lang::En, "vcredist_warn") => "Warning: Visual C++ Redistributable (x64) not found. If the app does not start, install it from https://aka.ms/vs/17/release/vc_redist.x64.exe .",
         (Lang::Ja, "usage") => "使い方",
         (Lang::En, "usage") => "Usage",
+        (Lang::Ja, "gui_install_main") => "WAKARU をインストールします",
+        (Lang::En, "gui_install_main") => "Install WAKARU",
+        (Lang::Ja, "gui_uninstall_main") => "WAKARU を削除します",
+        (Lang::En, "gui_uninstall_main") => "Uninstall WAKARU",
+        (Lang::Ja, "gui_install_btn") => "インストール",
+        (Lang::En, "gui_install_btn") => "Install",
+        (Lang::Ja, "gui_uninstall_btn") => "削除",
+        (Lang::En, "gui_uninstall_btn") => "Uninstall",
+        (Lang::Ja, "gui_reinstall_btn") => "再インストール",
+        (Lang::En, "gui_reinstall_btn") => "Reinstall",
+        (Lang::Ja, "gui_cancel_btn") => "キャンセル",
+        (Lang::En, "gui_cancel_btn") => "Cancel",
+        (Lang::Ja, "gui_desktop_check") => "デスクトップにショートカットを作成する",
+        (Lang::En, "gui_desktop_check") => "Create a desktop shortcut",
+        (Lang::Ja, "gui_show_details") => "詳細を表示",
+        (Lang::En, "gui_show_details") => "Show details",
+        (Lang::Ja, "gui_hide_details") => "詳細を隠す",
+        (Lang::En, "gui_hide_details") => "Hide details",
+        (Lang::Ja, "gui_failed") => "インストールに失敗しました",
+        (Lang::En, "gui_failed") => "Installation failed",
+        (Lang::Ja, "gui_uninstall_failed") => "削除に失敗しました",
+        (Lang::En, "gui_uninstall_failed") => "Uninstall failed",
         _ => key,
     }
 }
@@ -121,6 +178,8 @@ struct Options {
     lang: Option<Lang>,
     show_help: bool,
     show_version: bool,
+    gui: bool,
+    cli: bool,
 }
 
 fn parse_args() -> Result<Options, String> {
@@ -142,6 +201,8 @@ where
         lang: None,
         show_help: false,
         show_version: false,
+        gui: false,
+        cli: false,
     };
     let mut args = iter.into_iter().peekable();
     while let Some(arg) = args.next() {
@@ -156,6 +217,8 @@ where
             }
             "--no-shortcut" => opts.no_shortcut = true,
             "--desktop" => opts.desktop = true,
+            "--gui" => opts.gui = true,
+            "--cli" => opts.cli = true,
             "--english" => opts.lang = Some(Lang::En),
             "--japanese" => opts.lang = Some(Lang::Ja),
             "--help" | "-h" => opts.show_help = true,
@@ -175,6 +238,12 @@ where
     }
     if opts.install && opts.uninstall {
         return Err("--install and --uninstall conflict".into());
+    }
+    if opts.gui && opts.cli {
+        return Err("--gui and --cli conflict".into());
+    }
+    if opts.gui && (opts.yes || opts.force) {
+        return Err("--gui is interactive; drop --yes/--force or use --cli".into());
     }
     // A copy named `uninstall.exe` (left by an install) uninstalls by
     // default; `--install` overrides back to install mode.
@@ -399,16 +468,149 @@ fn installed_version(dir: &Path) -> Option<String> {
         .filter(|text| !text.is_empty())
 }
 
-fn do_install(opts: &Options, lang: Lang) -> Result<(), String> {
-    let dir = match &opts.dir {
+fn resolve_install_dir(opts: &Options) -> Result<PathBuf, String> {
+    match &opts.dir {
         Some(custom) => {
             if !custom.is_absolute() {
                 return Err("--dir must be an absolute path".into());
             }
-            custom.clone()
+            Ok(custom.clone())
         }
-        None => default_dir()?,
+        None => default_dir(),
+    }
+}
+
+fn resolve_uninstall_dir(opts: &Options) -> Result<PathBuf, String> {
+    let self_path =
+        std::env::current_exe().map_err(|e| format!("cannot locate setup binary: {e}"))?;
+    match &opts.dir {
+        Some(custom) => {
+            if !custom.is_absolute() {
+                return Err("--dir must be an absolute path".into());
+            }
+            Ok(custom.clone())
+        }
+        // An `uninstall.exe` left by an install removes its own directory
+        // unless `--dir` says otherwise.
+        None if self_path
+            .file_stem()
+            .is_some_and(|s| s.to_string_lossy().eq_ignore_ascii_case("uninstall"))
+            && self_path.parent().is_some() =>
+        {
+            Ok(self_path.parent().unwrap().to_path_buf())
+        }
+        None => default_dir(),
+    }
+}
+
+/// Shortcut outcome of a successful install (console prints it, GUI shows it).
+struct InstallWarnings {
+    shortcut_failed: Option<String>,
+}
+
+/// Shared install core: files, uninstaller copy, shortcuts, ARP.
+/// UI-agnostic so console and GUI paths behave identically.
+fn perform_install(
+    dir: &Path,
+    desktop: bool,
+    no_shortcut: bool,
+    lang: Lang,
+) -> Result<InstallWarnings, String> {
+    let exe_path = dir.join(EXE_NAME);
+    write_file(&exe_path, PAYLOAD_EXE, lang)?;
+    write_file(&dir.join(LICENSE_NAME), PAYLOAD_LICENSE, lang)?;
+    write_file(&dir.join(FIRST_LAUNCH_NAME), PAYLOAD_FIRST_LAUNCH, lang)?;
+    write_file(&dir.join(VERSION_FILE), VERSION.as_bytes(), lang)?;
+    let self_path =
+        std::env::current_exe().map_err(|e| format!("cannot locate setup binary: {e}"))?;
+    let uninstall_path = dir.join(UNINSTALL_EXE);
+    if self_path != uninstall_path {
+        let bytes = std::fs::read(&self_path).map_err(|e| e.to_string())?;
+        write_file(&uninstall_path, &bytes, lang)?;
+    }
+
+    let mut warnings = InstallWarnings {
+        shortcut_failed: None,
     };
+    if !no_shortcut {
+        match start_menu_lnk() {
+            Ok(lnk) => {
+                if let Err(e) = create_shortcut(&lnk, &exe_path, dir) {
+                    warnings.shortcut_failed = Some(e);
+                }
+            }
+            Err(e) => warnings.shortcut_failed = Some(e),
+        }
+    }
+    if desktop {
+        match desktop_lnk() {
+            Ok(lnk) => {
+                if let Err(e) = create_shortcut(&lnk, &exe_path, dir) {
+                    warnings.shortcut_failed = Some(e);
+                }
+            }
+            Err(e) => warnings.shortcut_failed = Some(e),
+        }
+    }
+
+    register_arp(dir, &uninstall_path, lang)?;
+    Ok(warnings)
+}
+
+/// Shared uninstall core: lock pre-flight, files, shortcuts, ARP, self-copy
+/// removal. UI-agnostic so console and GUI paths behave identically.
+fn perform_uninstall(dir: &Path, lang: Lang) -> Result<(), String> {
+    let self_path =
+        std::env::current_exe().map_err(|e| format!("cannot locate setup binary: {e}"))?;
+    let mut locked = false;
+    // Pre-flight: a running app locks its exe. Fail before deleting
+    // anything so a retry after quitting completes cleanly.
+    {
+        let exe = dir.join(EXE_NAME);
+        if exe.is_file() {
+            let probe = std::fs::OpenOptions::new().write(true).open(&exe);
+            if let Err(e) = probe {
+                if e.raw_os_error() == Some(32) {
+                    return Err(msg(lang, "close_app").to_string());
+                }
+            }
+        }
+    }
+    for name in [EXE_NAME, LICENSE_NAME, FIRST_LAUNCH_NAME, VERSION_FILE] {
+        let path = dir.join(name);
+        if path.is_file() {
+            // Clear read-only so a deliberate removal never trips on it
+            // (a locked running exe still fails below with error 32).
+            clear_readonly(&path);
+            if std::fs::remove_file(&path).is_err() {
+                locked = true;
+            }
+        }
+    }
+    if locked {
+        return Err(msg(lang, "close_app").to_string());
+    }
+    if let Ok(lnk) = start_menu_lnk() {
+        remove_if_exists(&lnk);
+    }
+    if let Ok(lnk) = desktop_lnk() {
+        remove_if_exists(&lnk);
+    }
+    let _ = reg(&["delete", &arp_key(), "/f"]);
+
+    // Remove the uninstaller copy (or ourselves when run as setup --uninstall).
+    let uninstall_path = dir.join(UNINSTALL_EXE);
+    if self_path == uninstall_path || path_starts_with_insensitive(&self_path, dir) {
+        schedule_self_delete(&self_path, dir);
+    } else {
+        remove_if_exists(&uninstall_path);
+        let _ = std::fs::remove_dir(dir);
+    }
+    Ok(())
+}
+
+fn do_install(opts: &Options, lang: Lang) -> Result<(), String> {
+    let dir = resolve_install_dir(opts)?;
     if let Some(current) = installed_version(&dir) {
         if current == VERSION && !opts.force {
             println!("{} ({})", msg(lang, "already"), current);
@@ -429,41 +631,10 @@ fn do_install(opts: &Options, lang: Lang) -> Result<(), String> {
         return Ok(());
     }
 
-    let exe_path = dir.join(EXE_NAME);
-    write_file(&exe_path, PAYLOAD_EXE, lang)?;
-    write_file(&dir.join(LICENSE_NAME), PAYLOAD_LICENSE, lang)?;
-    write_file(&dir.join(FIRST_LAUNCH_NAME), PAYLOAD_FIRST_LAUNCH, lang)?;
-    write_file(&dir.join(VERSION_FILE), VERSION.as_bytes(), lang)?;
-    let self_path =
-        std::env::current_exe().map_err(|e| format!("cannot locate setup binary: {e}"))?;
-    let uninstall_path = dir.join(UNINSTALL_EXE);
-    if self_path != uninstall_path {
-        let bytes = std::fs::read(&self_path).map_err(|e| e.to_string())?;
-        write_file(&uninstall_path, &bytes, lang)?;
+    let warnings = perform_install(&dir, opts.desktop, opts.no_shortcut, lang)?;
+    if let Some(e) = warnings.shortcut_failed {
+        eprintln!("{} ({e})", msg(lang, "shortcut_warn"));
     }
-
-    if !opts.no_shortcut {
-        match start_menu_lnk() {
-            Ok(lnk) => {
-                if let Err(e) = create_shortcut(&lnk, &exe_path, &dir) {
-                    eprintln!("{} ({e})", msg(lang, "shortcut_warn"));
-                }
-            }
-            Err(e) => eprintln!("{} ({e})", msg(lang, "shortcut_warn")),
-        }
-    }
-    if opts.desktop {
-        match desktop_lnk() {
-            Ok(lnk) => {
-                if let Err(e) = create_shortcut(&lnk, &exe_path, &dir) {
-                    eprintln!("{} ({e})", msg(lang, "shortcut_warn"));
-                }
-            }
-            Err(e) => eprintln!("{} ({e})", msg(lang, "shortcut_warn")),
-        }
-    }
-
-    register_arp(&dir, &uninstall_path, lang)?;
 
     println!("{} ({VERSION})", msg(lang, "installed"));
     println!("{}", msg(lang, "how_to_start"));
@@ -521,26 +692,7 @@ fn schedule_self_delete(target: &Path, dir: &Path) {
 }
 
 fn do_uninstall(opts: &Options, lang: Lang) -> Result<(), String> {
-    let self_path =
-        std::env::current_exe().map_err(|e| format!("cannot locate setup binary: {e}"))?;
-    let dir = match &opts.dir {
-        Some(custom) => {
-            if !custom.is_absolute() {
-                return Err("--dir must be an absolute path".into());
-            }
-            custom.clone()
-        }
-        // An `uninstall.exe` left by an install removes its own directory
-        // unless `--dir` says otherwise.
-        None if self_path
-            .file_stem()
-            .is_some_and(|s| s.to_string_lossy().eq_ignore_ascii_case("uninstall"))
-            && self_path.parent().is_some() =>
-        {
-            self_path.parent().unwrap().to_path_buf()
-        }
-        None => default_dir()?,
-    };
+    let dir = resolve_uninstall_dir(opts)?;
     if installed_version(&dir).is_none() && !dir.join(EXE_NAME).is_file() {
         println!("{}", msg(lang, "not_installed"));
         return Ok(());
@@ -558,50 +710,7 @@ fn do_uninstall(opts: &Options, lang: Lang) -> Result<(), String> {
         return Ok(());
     }
 
-    let mut locked = false;
-    // Pre-flight: a running app locks its exe. Fail before deleting
-    // anything so a retry after quitting completes cleanly.
-    {
-        let exe = dir.join(EXE_NAME);
-        if exe.is_file() {
-            let probe = std::fs::OpenOptions::new().write(true).open(&exe);
-            if let Err(e) = probe {
-                if e.raw_os_error() == Some(32) {
-                    return Err(msg(lang, "close_app").into());
-                }
-            }
-        }
-    }
-    for name in [EXE_NAME, LICENSE_NAME, FIRST_LAUNCH_NAME, VERSION_FILE] {
-        let path = dir.join(name);
-        if path.is_file() {
-            // Clear read-only so a deliberate removal never trips on it
-            // (a locked running exe still fails below with error 32).
-            clear_readonly(&path);
-            if std::fs::remove_file(&path).is_err() {
-                locked = true;
-            }
-        }
-    }
-    if locked {
-        return Err(msg(lang, "close_app").into());
-    }
-    if let Ok(lnk) = start_menu_lnk() {
-        remove_if_exists(&lnk);
-    }
-    if let Ok(lnk) = desktop_lnk() {
-        remove_if_exists(&lnk);
-    }
-    let _ = reg(&["delete", &arp_key(), "/f"]);
-
-    // Remove the uninstaller copy (or ourselves when run as setup --uninstall).
-    let uninstall_path = dir.join(UNINSTALL_EXE);
-    if self_path == uninstall_path || path_starts_with_insensitive(&self_path, &dir) {
-        schedule_self_delete(&self_path, &dir);
-    } else {
-        remove_if_exists(&uninstall_path);
-        let _ = std::fs::remove_dir(&dir);
-    }
+    perform_uninstall(&dir, lang)?;
     println!("{}", msg(lang, "uninstalled"));
     Ok(())
 }
@@ -618,33 +727,58 @@ fn print_help(lang: Lang) {
         })
         .unwrap_or_else(|| "setup.exe".into());
     println!("WAKARU setup {VERSION} — {}", msg(lang, "usage"));
+    println!("  Double-click: GUI wizard (install / uninstall dialogs).");
     println!(
-        "  {exe} [--install] [--yes] [--force] [--dir <abs-path>] [--no-shortcut] [--desktop]"
+        "  {exe} [--install] [--yes] [--force] [--dir <abs-path>] [--no-shortcut] [--desktop] [--cli]"
     );
-    println!("  {exe} --uninstall [--yes] [--dir <abs-path>]");
+    println!("  {exe} --uninstall [--yes] [--dir <abs-path>] [--cli]");
+    println!("  {exe} --gui [--install|--uninstall] [--dir <abs-path>] [--desktop|--no-shortcut]");
     println!("  {exe} --help | --version [--english|--japanese]");
 }
 
 fn main() {
-    // SAFETY: process-wide console code page switch, no pointers involved.
-    unsafe {
-        SetConsoleOutputCP(65001);
-    }
     let opts = match parse_args() {
         Ok(opts) => opts,
         Err(e) => {
-            eprintln!("error: {e}");
+            // No console when double-clicked: show the error graphically.
+            if !attach_console() {
+                gui::fatal_box(&format!("error: {e}"));
+            } else {
+                eprintln!("error: {e}");
+            }
             std::process::exit(1);
         }
     };
     let lang = detect_lang(opts.lang);
-    if opts.show_help {
-        print_help(lang);
+    if opts.show_help || opts.show_version {
+        // Help/version are console flows: attach when launched from a shell.
+        attach_console();
+        // SAFETY: process-wide console code page switch, no pointers involved.
+        unsafe {
+            SetConsoleOutputCP(65001);
+        }
+        if opts.show_help {
+            print_help(lang);
+        } else {
+            println!("WAKARU setup {VERSION}");
+        }
         return;
     }
-    if opts.show_version {
-        println!("WAKARU setup {VERSION}");
+    if gui::decide_mode(&opts, attach_console()) == gui::UiMode::Gui {
+        // GUI wizards report errors through dialogs; cancel exits 0.
+        let failed = if opts.uninstall {
+            gui::run_uninstall(&opts, lang).is_err()
+        } else {
+            gui::run_install(&opts, lang).is_err()
+        };
+        if failed {
+            std::process::exit(1);
+        }
         return;
+    }
+    // SAFETY: process-wide console code page switch, no pointers involved.
+    unsafe {
+        SetConsoleOutputCP(65001);
     }
     let result = if opts.uninstall {
         do_uninstall(&opts, lang)
@@ -688,6 +822,13 @@ mod tests {
         assert!(parse_args_from(args(&["--badopt"])).is_err());
         assert!(parse_args_from(args(&["--no-shortcut", "--desktop"])).is_err());
         assert!(parse_args_from(args(&["--install", "--uninstall"])).is_err());
+        assert!(parse_args_from(args(&["--gui", "--cli"])).is_err());
+        assert!(parse_args_from(args(&["--gui", "--yes"])).is_err());
+        assert!(parse_args_from(args(&["--gui", "--force"])).is_err());
+        let opts = parse_args_from(args(&["--gui", "--dir", r"C:\App"])).unwrap();
+        assert!(opts.gui && !opts.cli);
+        let opts = parse_args_from(args(&["--cli"])).unwrap();
+        assert!(opts.cli && !opts.gui);
     }
 
     #[test]
@@ -711,6 +852,17 @@ mod tests {
             "reg_failed",
             "usage",
             "vcredist_warn",
+            "gui_install_main",
+            "gui_uninstall_main",
+            "gui_install_btn",
+            "gui_uninstall_btn",
+            "gui_reinstall_btn",
+            "gui_cancel_btn",
+            "gui_desktop_check",
+            "gui_show_details",
+            "gui_hide_details",
+            "gui_failed",
+            "gui_uninstall_failed",
         ] {
             assert_ne!(msg(Lang::Ja, key), key, "missing ja {key}");
             assert_ne!(msg(Lang::En, key), key, "missing en {key}");

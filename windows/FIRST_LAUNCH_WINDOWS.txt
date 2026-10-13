@@ -5,7 +5,8 @@ WAKARU for Windows — 初回起動の手引き / First-launch guide
 【日本語】
 
 1. ポータブル版はzipを展開して WAKARU.exe を実行してください。
-   インストーラ版は setup.exe を実行すると
+   インストーラ版は setup.exe を実行し、画面の指示に従って進めてください
+   （ダブルクリックでGUIウィザードが開きます）。
    %LocalAppData%\Programs\WAKARU に配置され、スタートメニューに登録されます。
 2. 初回起動時に SmartScreen ("Windows によって PC が保護されました") が
    表示される場合があります。本ソフトは無署名配布のためです。
@@ -28,7 +29,8 @@ WAKARU for Windows — 初回起動の手引き / First-launch guide
 [English]
 
 1. Portable: extract the zip and run WAKARU.exe.
-   Installer: run setup.exe. Files go to %LocalAppData%\Programs\WAKARU
+   Installer: run setup.exe and follow the on-screen wizard (double-click
+   opens GUI dialogs). Files go to %LocalAppData%\Programs\WAKARU
    and a Start menu entry is created. No admin rights are required.
 2. On first launch SmartScreen ("Windows protected your PC") may appear:
    this build is unsigned. Verify the origin (GitHub Releases) and the

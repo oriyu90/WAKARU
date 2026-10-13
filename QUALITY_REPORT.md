@@ -2,6 +2,29 @@
 
 Cumulative; newest release first.
 
+## v1.7.2 verification — 2026-10-14
+
+Scope: GUI wizard for the Windows installer (D-63). No app/backend change
+since v1.7.1 (only version strings), no DB migration, no IPC change.
+
+| Gate | Current result |
+|---|---|
+| Frontend typecheck, lint, design/hardcoded checks, i18n, contrast | pass; typecheck/lint(0)/vitest 57 re-run pass, 487 keys × 3, contrast ok (no `src/` change since v1.7.1) |
+| Backend lib/integration/deny | carry over from v1.7.1 (236 lib + 1 ignored, 43 integration, deny clean); no `src-tauri/src` or `src/` change (vitest 57 re-run pass) |
+| Installer fmt, clippy, unit tests | pass; fmt clean, clippy all-targets `-D warnings`, 11 tests (7 existing + 4 GUI: mode decision, wide strings, JA/EN content ×2) |
+| Installer CLI regression | pass; `--yes` install → ARP 1.7.2 → uninstall clean; `--help`/`--version` JA/EN via console attach |
+| Installer GUI | pass; TaskDialog smoke (no crash, cancellable, nothing installed); Enter-driven install wrote all 5 files + `version.txt` 1.7.2; single 57 MiB payload (`static`, `backend-ready` ×1, 58,125,312 bytes) |
+| i18n JA/EN parity (installer) | pass; catalog 31 keys (12 new GUI keys) fully covered both languages |
+| Release checksums | pass; setup `25bd8ac…10426e7`, portable `9d63938…0928cb8f`, `.sha256` match |
+
+### Release artifact
+
+| Item | Value |
+|---|---|
+| App | x64 `WAKARU.exe`, version `1.7.2`, Windows 10/11; WebView2 Evergreen required; unsigned |
+| Setup | `WAKARU_1.7.2_x64-setup.exe`, 58,125,312 bytes; SHA-256 `25bd8acdd7b428a57244f4981713a0df3722d27002d8cb267b61e095d10426e7` |
+| Portable | `WAKARU_1.7.2_x64-portable.zip`, 20,833,896 bytes; SHA-256 `9d63938fd5233ed093e9b0a8f525c81f883a7338359f06dd6093c7870928cb8f` |
+
 ## v1.7.1 verification — 2026-10-14
 
 Scope: Windows distribution repair (v1.7.0 shipped only `.sha256`) plus

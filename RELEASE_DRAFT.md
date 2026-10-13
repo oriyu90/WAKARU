@@ -1,3 +1,43 @@
+# v1.7.2 release record
+
+Prepared 2026-10-14. Scope: GUI wizard for the Windows installer (D-63),
+CLI flows unchanged.
+See `RELEASE_NOTES.md`, `docs/DECISIONS.md` D-63 and `QUALITY_REPORT.md`.
+
+## Verified artifact
+
+- App: `WAKARU.exe` (x64, Windows 10/11, version 1.7.2; WebView2 Evergreen
+  required; unsigned with SmartScreen guidance in `windows/FIRST_LAUNCH_WINDOWS.txt`)
+- Setup: `WAKARU_1.7.2_x64-setup.exe` (58,125,312 bytes, SHA-256 `25bd8acdd7b428a57244f4981713a0df3722d27002d8cb267b61e095d10426e7`)
+- Portable: `WAKARU_1.7.2_x64-portable.zip` (20,833,896 bytes, SHA-256 `9d63938fd5233ed093e9b0a8f525c81f883a7338359f06dd6093c7870928cb8f`)
+- Checksums: `WAKARU_1.7.2_x64-setup.exe.sha256`,
+  `WAKARU_1.7.2_x64-portable.zip.sha256`
+- The packaged app reaches `WAKARU backend ready version="1.7.2"`.
+- No credentials are embedded in tracked source or distribution files.
+
+## Verification summary
+
+- Frontend: typecheck, lint (0 warnings), 57 vitest tests, contrast,
+  i18n 487 keys × 3 (code unchanged since v1.7.1; production build output
+  reused).
+- Rust backend: unchanged since v1.7.1 (only version strings) — v1.7.1 gates
+  carry over: fmt, clippy `-D warnings`, lib 236 passed + 1 ignored,
+  integration phases 1–8 + 10 (43 passed), `cargo deny` clean.
+- Installer: fmt, clippy `-D warnings`, 11 unit tests; CLI round-trip
+  (`--yes` install → ARP → uninstall) clean; GUI smoke + Enter-driven
+  install clean; payload single-copy; `.sha256` match.
+- No DB migration, no IPC change (additive-only since v1.6.0). v1.6.x–v1.7.1
+  projects, notes and figures open as-is.
+
+## Steps
+
+1. Commit and tag `v1.7.2` on `main`.
+2. Create the GitHub Release `v1.7.2` with the setup exe + portable zip +
+   `.sha256` files.
+3. Update the Studio RIZI site (4 locales) and the private `WAKARU.md` memo.
+
+---
+
 # v1.7.1 release record
 
 Prepared 2026-10-14. Scope: Windows distribution repair (v1.7.0 shipped only

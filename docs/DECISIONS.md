@@ -648,6 +648,28 @@
   失敗時は構造化エラーで中止し、黙って続行しない。
 - **影響**: DB移行・IPC変更なし。版上げ時は `installer` の版も連動する。
 
+## D-63 · インストーラはGUIウィザードにする（CLI互換維持）
+
+- **日付**: 2026-10-14（v1.7.2）
+- **論点**: setup.exeがCUI（黒画面＋Y/n入力）で一般利用者に分かりにくい。
+  外部FWなし・単一exe・依存追加なしの原則は保ちたい。
+- **採用**: comctl32 v6の `TaskDialogIndirect` による native ウィザード
+  （確認→作業→結果、デスクトップ shortcut は検証 checkbox、
+  詳細は展開情報、日英は共有 catalog）。CLI互換は維持する:
+  `--help`/`--version`/`--yes`/`--force`/`--cli` は console、
+  `--gui` は GUI 強制、無指定は親 console の有無で自動選択
+  （ダブルクリック・ARP Uninstall は GUI、端末起動は従来 CUI）。
+  作業本体は `perform_install`/`perform_uninstall` へ切り出し、
+  console/GUI の両経路で同一にする。SxS マニフェストへ
+  Common-Controls v6 依存を追加し、release は GUI サブシステム化
+  （CLI 経路は `AttachConsole` で親 console へ接続）。
+  新規 `unsafe` は FFI の最小宣言のみ（layout assert＋SAFETY注記、
+  全 pointer は呼出中生存の local buffer のみ）。
+- **理由**: OS 標準 dialog のため追加依存・配布物増なし。自動化
+  （`--yes`・QuietUninstallString）は GUI を出さず hang しない。
+- **影響**: DB移行・IPC変更なし。日英 UI 同時対応（installer catalog へ
+  12キー追加し全31キーを両言語テスト、app 側 487キー維持）。
+
 ## D-62 · v1.7.1 Windows精査・配布欠落の修復と堅牢化
 
 - **日付**: 2026-10-14（v1.7.1）

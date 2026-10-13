@@ -1,9 +1,9 @@
 # WAKARU Windows packaging: portable zip + single-file setup.exe.
 # Usage (from the repository root):
-#   powershell -ExecutionPolicy Bypass -File windows/package.ps1 [-Version 1.7.1]
+#   powershell -ExecutionPolicy Bypass -File windows/package.ps1 [-Version 1.7.2]
 # Prerequisites: release app binary built (`npm run tauri build` or
 # `cargo build --release`), Rust stable, PowerShell 5.1+.
-param([string]$Version = "1.7.1")
+param([string]$Version = "1.7.2")
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
